@@ -726,7 +726,7 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
     int i,v,rule;
     int direction,opdir;
     TCP_STATE lflags;
-    clock_t clock = time(0);
+    time_t clock = time(0);
     FW_ID id;
     FW_Connection *conn;
     struct iphdr * ip_pkt = (struct iphdr *)pkt;
