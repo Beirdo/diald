@@ -196,9 +196,8 @@ iface_stop(char *mode, char *iftype, int ifunit,
      */
     del_routes(desc, iface, lip, rip);
 
-    if (current_mode == MODE_DEV) {
-	sprintf(buf, "%s %s 0.0.0.0",
-	    path_ifconfig, iface);
-	run_shell(SHELL_WAIT, desc, buf, -1);
-    }
+    sprintf(buf, "%s %s %s",
+	path_ifconfig, iface,
+	current_mode == MODE_DEV ? "0.0.0.0" : "down");
+    run_shell(SHELL_WAIT, desc, buf, -1);
 }
