@@ -19,12 +19,9 @@ passing over the link.
 
 Getting Diald
 
-The file is called diald-0.99.1.tar.gz. I've uploaded it to
-sunsite.unc.edu:/pub/Linux/incoming. It should move to
-sunsite.unc.edu:/pub/Linux/system/network/serial/diald-0.99.1.tar.gz after a
-suitable interval. It can also be obtained from the diald home page at
-"http://www.dna.lth.se/~erics/diald.html". Note that the diald home page has
-moved from its old location at the University of Toronto.
+The file is called diald-0.99.1.tar.gz. It can be obtained from the diald
+home page at "http://diald.unix.ch/". Note that the diald home page has
+moved from its old location at "http://www.loonie.net/~erics/diald.html".
 
 Mailing List
 
@@ -81,10 +78,10 @@ configured in the Makefile.
 
 Basic Installation (First Time Users)
 
-First run "make depend" then "make" and then "make install" as root. This
-makes the diald daemon and installs it. After installation you need to write
-a /etc/diald.conf file to be able to use diald. Read the manual page to find
-out what this file can contain. The diald-examples manual page gives several
+First run "make" then "make install" as root. This makes the diald daemon
+and installs it. After installation you need to write an /etc/diald.conf
+file to be able to use diald. Read the manual page to find out what this
+file can contain. The diald-examples manual page gives several
 example diald.conf files.
 
 Installation If You Are Already Using an Earlier Version
