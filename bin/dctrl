@@ -26,6 +26,11 @@ set in_usage bps
 set out_bandwidth [expr 33600 / 8]
 set in_bandwidth [expr 33600 / 8]
 
+set user_config_file "$env(HOME)/.dctrl"
+if [ file isfile $user_config_file ] {
+    source $user_config_file
+}
+
 # These should be proc static but Tcl has no such concept.
 set txtotal 0
 set status(rx_total) 0.0
@@ -793,6 +798,8 @@ menu .menu.control.m
 	-command "fifoCmd up"
 .menu.control.m add command -label "Down request" -underline 0 \
 	-command "fifoCmd down"
+.menu.control.m add command -label "Reset configuration" -underline 0 \
+	-command "fifoCmd down ; fifoCmd reset ; openMonitor"
 .menu.control.m add command -label "Terminate on idle" -underline 0 \
 	-command "fifoCmd delayed-quit"
 .menu.control.m add command -label "Quit diald" -underline 0 \
@@ -1072,9 +1079,43 @@ proc repack {} {
     }
 
     wm geometry .
+
+    write_config_file
 }
 
-repack
+proc write_config_file {} {
+    global user_config_file
+    global toolbar dstatus tload gload pqueue dlog
+    
+    set config_file [ open $user_config_file "w" ]
+
+    if {[ info exists toolbar ]} {
+        puts $config_file "set toolbar $toolbar"
+    }
+    
+    if {[ info exists dstatus ]} {
+        puts $config_file "set dstatus $dstatus"
+    }
+    
+    if {[ info exists tload ]} {
+        puts $config_file "set tload $tload"
+    }
+    
+    if {[ info exists gload ]} {
+        puts $config_file "set gload $gload"
+    }
+    
+    if {[ info exists pqueue ]} {
+        puts $config_file "set pqueue $pqueue"
+    }
+    
+    if {[ info exists dlog ]} {
+        puts $config_file "set dlog $dlog"
+    }
+
+    flush $config_file
+    close $config_file
+}
 
 proc load_init {} {
     global status
@@ -1088,6 +1129,8 @@ proc load_init {} {
     set status(tx_total) 0
     set status(rx_total) 0
 }
+
+repack
 
 load_init
 
