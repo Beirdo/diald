@@ -307,6 +307,7 @@ extern int outfill;
 
 /* Global variables */
 
+int clk_tck;			/* clock ticks per second */
 int af_packet;			/* kernel has AF_PACKET sockets */
 int fifo_fd;			/* FIFO command pipe. */
 int tcp_fd;			/* TCP listener. */
