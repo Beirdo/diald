@@ -16,8 +16,9 @@
 #ifdef TUNTAP
 
 #include <sys/uio.h>
-#include "netlink.h"
 #include <linux/if_tun.h>
+
+#include <netlink.h>
 
 
 static int proxy_tun_send(proxy_t *proxy,
