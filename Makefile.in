@@ -1,5 +1,8 @@
 RPM_STAGING_DIR	= /usr/src/packages/SOURCES
 
+ifndef CHOWN
+	CHOWN="-o root -g bin"
+endif
 
 SHELL           = @SHELL@
 
@@ -51,22 +54,22 @@ install: diald
 	$(INSTALL) -d $(DESTDIR)$(bindir)
 	$(INSTALL) -m 0755 bin/dctrl $(DESTDIR)$(bindir)/dctrl
 	$(INSTALL) -d $(DESTDIR)$(sbindir)
-	$(INSTALL) -s -o root -g bin diald $(DESTDIR)$(sbindir)/diald
+	$(INSTALL) -s $(CHOWN) diald $(DESTDIR)$(sbindir)/diald
 	$(INSTALL) -d $(DESTDIR)$(mandir)/man1 $(DESTDIR)$(mandir)/man5 \
 		$(DESTDIR)$(mandir)/man8
-	$(INSTALL) -o root -g bin -m 0644 doc/diald.man $(DESTDIR)$(mandir)/man8/diald.8
-	$(INSTALL) -o root -g bin -m 0644 doc/dctrl.man $(DESTDIR)$(mandir)/man1/dctrl.1
-	$(INSTALL) -o root -g bin -m 0644 doc/diald-examples.man $(DESTDIR)$(mandir)/man5/diald-examples.5
-	$(INSTALL) -o root -g bin -m 0644 doc/diald-control.man $(DESTDIR)$(mandir)/man5/diald-control.5
-	$(INSTALL) -o root -g bin -m 0644 doc/diald-monitor.man $(DESTDIR)$(mandir)/man5/diald-monitor.5
+	$(INSTALL) $(CHOWN) -m 0644 doc/diald.man $(DESTDIR)$(mandir)/man8/diald.8
+	$(INSTALL) $(CHOWN) -m 0644 doc/dctrl.man $(DESTDIR)$(mandir)/man1/dctrl.1
+	$(INSTALL) $(CHOWN) -m 0644 doc/diald-examples.man $(DESTDIR)$(mandir)/man5/diald-examples.5
+	$(INSTALL) $(CHOWN) -m 0644 doc/diald-control.man $(DESTDIR)$(mandir)/man5/diald-control.5
+	$(INSTALL) $(CHOWN) -m 0644 doc/diald-monitor.man $(DESTDIR)$(mandir)/man5/diald-monitor.5
 	-mkdir -p $(DESTDIR)$(libdir)
-	$(INSTALL) -o root -g bin lib/*.gif $(DESTDIR)$(libdir)
-	$(INSTALL) -o root -g bin -m 0644 config/diald.defs $(DESTDIR)$(libdir)/diald.defs
-	$(INSTALL) -o root -g bin -m 0644 config/standard.filter $(DESTDIR)$(libdir)/standard.filter
-	$(INSTALL) -o root -g bin -m 0644 config/dynamic.filter $(DESTDIR)$(libdir)/dynamic.filter
+	$(INSTALL) $(CHOWN) lib/*.gif $(DESTDIR)$(libdir)
+	$(INSTALL) $(CHOWN) -m 0644 config/diald.defs $(DESTDIR)$(libdir)/diald.defs
+	$(INSTALL) $(CHOWN) -m 0644 config/standard.filter $(DESTDIR)$(libdir)/standard.filter
+	$(INSTALL) $(CHOWN) -m 0644 config/dynamic.filter $(DESTDIR)$(libdir)/dynamic.filter
 	$(INSTALL) -d -m 0755 $(DESTDIR)/etc/pam.d
-	$(INSTALL) -o root -g root -m 0644 config/diald.pam $(DESTDIR)/etc/pam.d/diald
-	$(INSTALL) -o root -g bin bin/connect $(DESTDIR)$(libdir)/connect
+	$(INSTALL) $(CHOWN) -m 0644 config/diald.pam $(DESTDIR)/etc/pam.d/diald
+	$(INSTALL) $(CHOWN) bin/connect $(DESTDIR)$(libdir)/connect
 
 clean:
 	rm -f *.o diald
