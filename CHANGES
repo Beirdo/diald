@@ -1,5 +1,8 @@
 Major changes between version 0.98.2 and 0.98.3.
 ------------------------------------------------
+  - "diald -V", "diald -v" or "diald --version" simply prints the
+    version number and exits. (I've even remembered to change the
+    number in version.h finally!)
   - pppd is spawned with the nodefaultroute argument on its command
     line to avoid breakage with some systems which appear to put
     a defaultroute in pppd's global options file.

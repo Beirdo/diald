@@ -121,6 +121,13 @@ main(int argc, char *argv[])
     long tstamp = ticks();
     long ts;
 
+    if (argc > 1
+    && (!strcmp(argv[1], "-V") || !strcmp(argv[1], "-v")
+    || !strcmp(argv[1], "--version"))) {
+	printf("Diald version %s\n", VERSION);
+	exit(0);
+    }
+
     argc_save = argc;
     argv_save = argv;
 
