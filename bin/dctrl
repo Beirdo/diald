@@ -103,9 +103,11 @@ proc addtick {w val} {
 	# get the new scale
 	set ns [expr "int($val)"]
 	if {$val > $ns} { incr ns }
-	set r [expr "($s+0.0)/$ns"]
-	$win scale all 0 $o 1 $r
-	set s $ns
+	if { $ns > 0 } {
+	    set r [expr "($s+0.0)/$ns"]
+	    $win scale all 0 $o 1 $r
+	    set s $ns
+	}
     } else {
     	# Also trim the window down for a smaller value if needed.
 	# figure out how many ticks are currently spanned by the image
@@ -113,7 +115,7 @@ proc addtick {w val} {
 	set fs [expr "($t*$s*1.0)/$h"]
 	set ns [expr "int($fs)"]
 	if {$fs > $ns} {incr ns}
-	if {$ns != $s} {
+	if {$ns > 0 && $ns != $s} {
 		set r [expr "($s+0.0)/$ns"]
 		$win scale all 0 $o 1 $r
 		set s $ns
@@ -123,7 +125,7 @@ proc addtick {w val} {
     set v [expr "($val*$h)/$s"]
 
     # rescale vertically if needed
-    if {"$o"!="$h"} {
+    if {$o > 0 && "$o"!="$h"} {
 	set sc [expr "($h+0.0)/$o"]
 	$win scale all 0 0 1 $sc
 	set type(height) $h
@@ -341,6 +343,9 @@ proc openMonitor {} {
         # before we ask diald to deal with it.
         catch {exec mkfifo -m 0600 $monfifo}
         set monfd [open $monfifo r+]
+
+	# Apparently some systems need this to avoid a hang???
+	after 500
     }
     fifoCmd "monitor $monlevel $monfifo"
     if { $diald_TITLE == "" } {
@@ -645,25 +650,21 @@ proc readMonitor {} {
 			    [expr {$status(rx_load5)*$e5+$rxtotal*($fp-$e5)}]
 			set status(tx_load5) \
 			    [expr {$status(tx_load5)*$e5+$txtotal*($fp-$e5)}]
-			if {$tload} {
-			    set status(rx_load150) \
-				[expr {$status(rx_load150)*$e150+$rxtotal*($fp-$e150)}]
-			    set status(tx_load150) \
-				[expr {$status(tx_load150)*$e150+$txtotal*($fp-$e150)}]
-			    set status(rx_load) \
-				[format "%.3f %.3f" \
-				    [expr {$status(rx_load5)/1000}] \
-				    [expr {$status(rx_load150)/1000}]]
-			    set status(tx_load) \
-				[format "%.3f %.3f" \
-				    [expr {$status(tx_load5)/1000}] \
-				    [expr {$status(tx_load150)/1000}]]
-			}
-			if {$gload} {
-			    update
-			    addtick .lm.tx [expr {$status(tx_load5)/1000}]
-			    addtick .lm.rx [expr {$status(rx_load5)/1000}]
-			}
+			set status(rx_load150) \
+			    [expr {$status(rx_load150)*$e150+$rxtotal*($fp-$e150)}]
+			set status(tx_load150) \
+			    [expr {$status(tx_load150)*$e150+$txtotal*($fp-$e150)}]
+			set status(rx_load) \
+			    [format "%.3f %.3f" \
+				[expr {$status(rx_load5)/1000}] \
+				[expr {$status(rx_load150)/1000}]]
+			set status(tx_load) \
+			    [format "%.3f %.3f" \
+				[expr {$status(tx_load5)/1000}] \
+				[expr {$status(tx_load150)/1000}]]
+			update
+			addtick .lm.tx [expr {$status(tx_load5)/1000}]
+			addtick .lm.rx [expr {$status(rx_load5)/1000}]
 			set status(tx_total) [expr {$status(tx_total)+$txtotal}]
 			set status(rx_total) [expr {$status(rx_total)+$rxtotal}]
 		}
