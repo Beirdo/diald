@@ -69,7 +69,7 @@
 #  define HAVE_AF_PACKET
    typedef struct sockaddr_ll sockaddr_ll_t;
 #else
-   typedef void sockaddr_ll_t;
+   typedef struct { int sll_protocol; } sockaddr_ll_t;
 #endif
 
 #include "config.h"

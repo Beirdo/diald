@@ -1,3 +1,7 @@
+Major changes between version 0.98.2 and 0.98.4.
+------------------------------------------------
+  - Fix for compilation on Linux 2.0.x.
+
 Major changes between version 0.98.2 and 0.98.3.
 ------------------------------------------------
   - Search for ip,route,ifconfig,bootpc in /bin and /usr/bin as

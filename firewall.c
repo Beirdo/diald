@@ -758,12 +758,14 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
      /* If we have the "strict-forwarding" option set then unless one of
      * the two addresses matches the local address we should ignore it.
      */
-    if (strict_forwarding && ip_pkt->saddr != local_addr && ip_pkt->daddr != local_addr) {
+    if (strict_forwarding
+    && (!sll || sll->sll_protocol == htons(ETH_P_IP))
+    && ip_pkt->saddr != local_addr && ip_pkt->daddr != local_addr) {
 	/* We forge resets for TCP protocol stuff that has been
 	 * shut down do to a link failure.
 	 */
 	if (ip_pkt->protocol == IPPROTO_TCP)
-	    forge_tcp_reset(sll->sll_protocol, ip_pkt, len);
+	    forge_tcp_reset(htons(ETH_P_IP), ip_pkt, len);
 	
 	goto skip;
     }
