@@ -74,11 +74,11 @@ proxy_init(proxy_t *proxy, char *proxydev)
 	proxy->close = NULL;
 	proxy->release = NULL;
 
-	if (!strcmp(proxydev, "none"))
-		return 0;
-
-	if (proxydev)
+	if (proxydev) {
+		if (!strcmp(proxydev, "none"))
+			return 0;
 		return proxy_dev_init(proxy, proxydev);
+	}
 
 #ifdef AF_NETLINK
 	if ((fd = proxy_tap_init(proxy, NULL)) >= 0)
