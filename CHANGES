@@ -1,5 +1,12 @@
 Major changes between version 0.98.3 and 0.98.4.
 ------------------------------------------------
+  - Added an ifsetup script that can be used to set up interfaces
+    in *really* interesting ways. If defined it is used instead
+    of ifconfig and *all* routing calls - route, defaultroute,
+    addroute/delroute all has to be handled as part of ifsetup.
+    At this stage ifsetup is mainly experimental. It is here so
+    that configurations using it in future do not have to be
+    redefined in order to fall back on a "stable" diald release.
   - Unified all the functions that invoked external programs via
     a shell into one glorious function. Now the output from
     everything is logged - including ip-up/ip-down - and all

@@ -35,6 +35,7 @@ char *orig_local_ip = 0;
 char *netmask = 0;
 char *remote_ip = 0;
 char *orig_remote_ip = 0;
+char *ifsetup = 0;
 char *addroute = 0;
 char *delroute = 0;
 char *ip_up = 0;
@@ -155,6 +156,7 @@ struct {
     {"strict-forwarding","",0,&strict_forwarding,set_flag},
     {"dslip-mode","<mode>",1,0,set_dslip_mode},
     {"defaultroute","",0,&default_route,set_flag},
+    {"ifsetup","<script>",1,&ifsetup,set_str},
     {"addroute","<script>",1,&addroute,set_str},
     {"delroute","<script>",1,&delroute,set_str},
     {"proxyarp","",0,&proxyarp,set_flag},
@@ -275,6 +277,8 @@ void init_vars()
     remote_ip = 0;
     if (orig_remote_ip) free(orig_remote_ip);
     orig_remote_ip = 0;
+    if (ifsetup) free(ifsetup);
+    ifsetup = 0;
     if (addroute) free(addroute);
     addroute = 0;
     if (delroute) free(delroute);

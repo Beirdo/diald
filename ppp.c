@@ -205,7 +205,7 @@ int ppp_set_addrs()
 	/* The pppd should have configured the interface but there
 	 * may be user or default routes to add :-(.
 	 */
-	iface_start("ppp", link_iface, local_ip, remote_ip);
+	iface_start("link", "ppp", link_iface, local_ip, remote_ip);
 	if (proxy.stop)
 	    proxy.stop(&proxy);
 
@@ -277,7 +277,7 @@ void ppp_reroute()
     local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
     if (link_iface != -1)
-    	iface_stop("ppp", link_iface, local_ip, remote_ip);
+    	iface_stop("link", "ppp", link_iface, local_ip, remote_ip);
     link_iface = -1;
 }
 

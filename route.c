@@ -127,11 +127,19 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 
 
 void
-iface_start(char *iftype, int ifunit, char *lip, char *rip)
+iface_start(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 {
     char buf[128];
 
     /* mark the interface as up */
+    if (ifsetup) {
+	sprintf(buf, "%s start %s %s%d",
+	    ifsetup, mode, iftype, ifunit);
+	run_shell(SHELL_WAIT, "iface start", buf, -1);
+	return;
+    }
+
+    /* With no ifsetup script we have to do it all ourselves. */
     if (lip) {
 	sprintf(buf,"%s %s%d %s%s%s netmask %s metric %d mtu %d up",
 	    path_ifconfig, iftype, ifunit, lip,
@@ -152,9 +160,18 @@ iface_start(char *iftype, int ifunit, char *lip, char *rip)
 
 
 void
-iface_stop(char *iftype, int ifunit, char *lip, char *rip)
+iface_stop(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 {
     char buf[128];
+
+    if (ifsetup) {
+	sprintf(buf, "%s stop %s %s%d",
+	    ifsetup, mode, iftype, ifunit);
+	run_shell(SHELL_WAIT, "iface stop", buf, -1);
+	return;
+    }
+
+    /* With no ifsetup script we have to do it all ourselves. */
 
     /* We do not simply down the interface because it may be required
      * to up (ISDN, for instance, will not answer an incoming call if

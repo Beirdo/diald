@@ -167,7 +167,7 @@ proxy_slip_recv(proxy_t *proxy, unsigned char *p, size_t len)
 static void
 proxy_slip_start(proxy_t *proxy)
 {
-    iface_start(proxy->iftype, proxy->ifunit,
+    iface_start("proxy", proxy->iftype, proxy->ifunit,
 	orig_local_ip, orig_remote_ip);
 }
 
@@ -175,7 +175,7 @@ proxy_slip_start(proxy_t *proxy)
 static void
 proxy_slip_stop(proxy_t *proxy)
 {
-    iface_stop(proxy->iftype, proxy->ifunit,
+    iface_stop("proxy", proxy->iftype, proxy->ifunit,
 	orig_local_ip, orig_remote_ip);
 }
 

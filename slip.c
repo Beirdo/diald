@@ -109,9 +109,7 @@ struct timer_lst failt;
 
 void slip_start(void)
 {
-    char buf[128];
     int disc, sencap;
-    int res;
 
     rx_count = -1;
 
@@ -180,7 +178,7 @@ void slip_start(void)
 	    link_iface);
 
     /* mark the interface as up */
-    iface_start("sl", link_iface, local_ip, remote_ip);
+    iface_start("link", "sl", link_iface, local_ip, remote_ip);
 
     /* run bootp if it is asked for */
     if (dynamic_addrs && dynamic_mode == DMODE_BOOTP && !force_dynamic) start_bootp();
@@ -190,10 +188,8 @@ void slip_start(void)
 
 int slip_set_addrs()
 {
-    char buf[128];
     char type[30];
     char addr[30];
-    int res;
 
     if (waiting_for_bootp && (!have_local || !have_remote)) {
 	int i;
@@ -245,7 +241,7 @@ int slip_set_addrs()
 	local_addr = inet_addr(local_ip);
     }
 
-    iface_start("sl", link_iface, local_ip, remote_ip);
+    iface_start("link", "sl", link_iface, local_ip, remote_ip);
     if (proxy.stop)
 	proxy.stop(&proxy);
 
@@ -277,7 +273,7 @@ void slip_reroute()
     local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
     if (link_iface != -1)
-    	iface_stop("sl", link_iface, local_ip, remote_ip);
+    	iface_stop("link", "sl", link_iface, local_ip, remote_ip);
     link_iface = -1;
 }
 

@@ -130,7 +130,7 @@ int dev_set_addrs()
 		local_ip,remote_ip);
 	}
 
-	iface_start(device_node, link_iface, local_ip, remote_ip);
+	iface_start("link", device_node, link_iface, local_ip, remote_ip);
 	if (proxy.stop)
 	    proxy.stop(&proxy);
 
@@ -184,7 +184,7 @@ void dev_reroute()
 
     /* Kill the alternate routing */
     if (link_iface != -1)
-	iface_stop(device_node, link_iface, local_ip, remote_ip);
+	iface_stop("link", device_node, link_iface, local_ip, remote_ip);
     link_iface = -1;
 }
 
