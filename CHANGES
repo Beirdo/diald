@@ -1,5 +1,6 @@
 Major changes between version 0.99.4 and 0.99.6.
 ------------------------------------------------
+  - Handle dynamic changes of netmask.
   - Fix check for first packet between firewall.c and filter.c
   - Only compile TCP_CORK code if TCP_CORK is defined.
 

@@ -50,7 +50,7 @@ void dev_start()
 
 int dev_set_addrs()
 {
-    ulong laddr = 0, raddr = 0, baddr = 0;
+    ulong laddr = 0, raddr = 0, baddr = 0, nmask = 0xffffffff;
     struct ifreq   ifr; 
 
     /* Try to get the interface number if we don't know it yet. */
@@ -109,6 +109,13 @@ int dev_set_addrs()
 	else
 	    baddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
+	if (ioctl(sockfd, SIOCGIFNETMASK, (caddr_t) &ifr) == -1) 
+	    mon_syslog(LOG_ERR,
+		"failed to get netmask from device %s: %m",
+		current_dev);
+	else
+	    nmask = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
+
 	/* KLUDGE 1:
 	 * If we do not have a valid remote address yet the interface
 	 * is not really up. We assume that a non-blocking connect
@@ -125,6 +132,9 @@ int dev_set_addrs()
 	    addr.s_addr = baddr;
 	    if (broadcast_ip) free(broadcast_ip);
 	    broadcast_ip = strdup(inet_ntoa(addr));
+	    addr.s_addr = nmask;
+	    if (netmask) free(netmask);
+	    netmask = strdup(inet_ntoa(addr));
 	    addr.s_addr = raddr;
 	    if (remote_ip) free(remote_ip);
 	    remote_ip = strdup(inet_ntoa(addr));
@@ -133,12 +143,14 @@ int dev_set_addrs()
 	    local_ip = strdup(inet_ntoa(addr));
 	    local_addr = laddr;
 
-	    mon_syslog(LOG_INFO, "New addresses: local %s%s%s%s%s",
+	    mon_syslog(LOG_INFO, "New addresses: local %s%s%s%s%s%s%s",
 		local_ip,
 		remote_ip ? ", remote " : "",
 		remote_ip ? remote_ip : "",
 		broadcast_ip ? ", broadcast " : "",
-		broadcast_ip ? broadcast_ip : "");
+		broadcast_ip ? broadcast_ip : "",
+		netmask ? ", netmask " : "",
+		netmask ? netmask : "");
 	}
 
 	iface_start("link", device_node, link_iface,
@@ -151,11 +163,11 @@ int dev_set_addrs()
 	 */
 	if (dynamic_addrs > 1 && laddr) {
 	    if (orig_netmask) free(orig_netmask);
-	    orig_netmask = strdup(netmask);
+	    orig_netmask = netmask ? strdup(netmask) : NULL;
 	    if (orig_broadcast_ip) free(orig_broadcast_ip);
-	    orig_broadcast_ip = strdup(broadcast_ip);
+	    orig_broadcast_ip = broadcast_ip ? strdup(broadcast_ip) : NULL;
 	    if (orig_remote_ip) free(orig_remote_ip);
-	    orig_remote_ip = strdup(remote_ip);
+	    orig_remote_ip = remote_ip ? strdup(remote_ip) : NULL;
 	    if (orig_local_ip) free(orig_local_ip);
 	    orig_local_ip = strdup(local_ip);
 	}

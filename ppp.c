@@ -126,7 +126,7 @@ void ppp_start()
 
 int ppp_set_addrs()
 {
-    ulong laddr = 0, raddr = 0, baddr = 0;
+    ulong laddr = 0, raddr = 0, baddr = 0, nmask = 0xffffffff;
 
     /* Try to get the interface number if we don't know it yet. */
     if (link_iface == -1) {
@@ -176,6 +176,11 @@ int ppp_set_addrs()
 	else
 	   baddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
+	if (ioctl(sockfd, SIOCGIFNETMASK, (caddr_t) &ifr) == -1) 
+	   mon_syslog(LOG_ERR,"failed to get ppp netmask: %m");
+	else
+	   nmask = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
+
  	/* Check the MTU, see if it matches what we asked for. If it
 	 * doesn't warn the user and adjust the MTU setting.
 	 * (NOTE: Adjusting the MTU setting may cause kernel nastyness...)
@@ -197,6 +202,9 @@ int ppp_set_addrs()
 	    addr.s_addr = baddr;
 	    if (broadcast_ip) free(broadcast_ip);
 	    broadcast_ip = strdup(inet_ntoa(addr));
+	    addr.s_addr = nmask;
+	    if (netmask) free(netmask);
+	    netmask = strdup(inet_ntoa(addr));
 	    addr.s_addr = raddr;
 	    if (remote_ip) free(remote_ip);
 	    remote_ip = strdup(inet_ntoa(addr));
@@ -205,12 +213,14 @@ int ppp_set_addrs()
 	    local_ip = strdup(inet_ntoa(addr));
 	    local_addr = laddr;
 
-	    mon_syslog(LOG_INFO, "New addresses: local %s%s%s%s%s",
+	    mon_syslog(LOG_INFO, "New addresses: local %s%s%s%s%s%s%s",
 		local_ip,
 		remote_ip ? ", remote " : "",
 		remote_ip ? remote_ip : "",
 		broadcast_ip ? ", broadcast " : "",
-		broadcast_ip ? broadcast_ip : "");
+		broadcast_ip ? broadcast_ip : "",
+		netmask ? ", netmask " : "",
+		netmask ? netmask : "");
 	}
 
 	/* The pppd should have configured the interface but there
@@ -226,9 +236,9 @@ int ppp_set_addrs()
 	 */
 	if (dynamic_addrs > 1 && laddr) {
 	    if (orig_netmask) free(orig_netmask);
-	    orig_netmask = strdup(netmask);
+	    orig_netmask = netmask ? strdup(netmask) : NULL;
 	    if (orig_broadcast_ip) free(orig_broadcast_ip);
-	    orig_broadcast_ip = strdup(broadcast_ip);
+	    orig_broadcast_ip = broadcast_ip ? strdup(broadcast_ip) : NULL;
 	    if (orig_remote_ip) free(orig_remote_ip);
 	    orig_remote_ip = strdup(remote_ip);
 	    if (orig_local_ip) free(orig_local_ip);
