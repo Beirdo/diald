@@ -21,6 +21,17 @@
 #define DIALD_CONFIG_FILE "/etc/diald.conf"
 #define DIALD_DEFS_FILE "/usr/lib/diald/diald.defs"
 
+/*
+ * If you want to be able to reconfigure a running diald by sending
+ * options prefixed with "config " down the control pipe you can
+ * enable this.
+ * WARNING: THERE IS NO SECURITY ON THIS AT THE MOMENT
+ *          IF YOU ENABLE THIS ANYONE WHO CAN CONNECT TO DIALD CAN
+ *          DO *ANYTHING* - INCLUDING CHANGING PROGRAM PATHS TO
+ *          THEIR OWN SCRIPTS (AND, YES, DIALD IS PROBABLY ROOT)
+ */
+#undef CONFIG_REMOTE_CONFIG
+
 
 /*****************************************************************************
  * EVERYTHING BELOW HERE IS RUN TIME CONFIGURABLE
@@ -28,7 +39,8 @@
  * entries in your configuration files.
  ****************************************************************************/
 
-/* You're lock files are probably somewhere else unless you
+/*
+ * Your lock files are probably somewhere else unless you
  * happen to be running a newer distribution that is compiliant
  * the the Linux File System Standard. On older distributions
  * you will usually find them in /var/spool/uucp or /usr/spool/uucp.
@@ -36,13 +48,14 @@
 #define LOCK_PREFIX	"/var/lock/LCK.."
 
 /*
- * If you're lock files should contain binary PID's then
+ * If your lock files should contain binary PID's then
  * set the following to 0. I think most linux
  * distributions want ASCII PID's in the lock files.
  */
 #define PIDSTRING 1
 
-/* Define where to put the diald.pid file. Under the FSSTD this 
+/*
+ * Define where to put the diald.pid file. Under the FSSTD this 
  * should be in /var/run, but you're system might have them
  * elsewhere. Check and be sure.
  */
@@ -65,7 +78,7 @@
 #define PATH_BOOTPC	"/usr/sbin/bootpc"
 
 /*
- * I you're never going to use pppd don't worry if this is wrong.
+ * If you're never going to use pppd don't worry if this is wrong.
  * Otherwise, find your pppd executable and set this path to match its
  * location.
  */

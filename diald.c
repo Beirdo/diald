@@ -544,9 +544,11 @@ void ctrl_read(PIPE *pipe)
 	    } else if (!pipe->is_ctrl) {
 		/* Not a control pipe - just messages from a script */
 		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
+#ifdef CONFIG_REMOTE_CONFIG
 	    } else if (strncmp(buf, "config ", 7) == 0) {
 		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
 		parse_options_line(buf+7);
+#endif
 	    } else if (strcmp(buf,"block") == 0) {
 		mon_syslog(LOG_INFO, "%s: block request", pipe->name);
 		parse_options_line(buf);
