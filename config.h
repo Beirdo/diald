@@ -22,21 +22,11 @@
 #define DIALD_DEFS_FILE "/usr/lib/diald/diald.defs"
 
 /*
- * If you want to be able to reconfigure a running diald by sending
- * options prefixed with "config " down the control pipe you can
- * enable this.
- * WARNING: THERE IS NO SECURITY ON THIS AT THE MOMENT
- *          IF YOU ENABLE THIS ANYONE WHO CAN CONNECT TO DIALD CAN
- *          DO *ANYTHING* - INCLUDING CHANGING PROGRAM PATHS TO
- *          THEIR OWN SCRIPTS (AND, YES, DIALD IS PROBABLY ROOT)
- */
-#undef CONFIG_REMOTE_CONFIG
-
-/*
  * The default access to be allowed on monitor connections. Note
  * that connections on the control fifo can always do anything
  * because there is no way to determine who asked. This only
- * applies to TCP monitor connections.
+ * applies to TCP monitor connections. The full list of access
+ * flags can be found in access.h.
  * (N.B. If ACCESS_CONTROL is not set then *anything* received
  * on the pipe is treated as a messge)
  */

@@ -1,111 +1,79 @@
-Major changes between version 0.16 and 0.17.
+Major changes between version 0.16 and 0.98.
 --------------------------------------------
-* Lots of bug fixes to diald:
-  - monititor output no longer has negative values.
-  - impulse code zeros the current impulse at the end of the
-    current time interval.
-  - no more core dumps when empty or bogus initialization files are used.
-  - fixes to prevent core dumps or switches to 99% CPU consumption when
-    a monitoring (dctrl or diald) gets aborted violently.
-  - lock_file option was not working.
-  - fixes to dctrl so it cleans up after itself better
-  - routing code uses proper netmasks to work with the 2.1 kernels
-  - ppp.c argument passing fixups thanks to Jonathan I. Kamens.
-  - The various run time configurable paths now should actually work.
-    (Thanks to a cast of thousands, well maybe half a dozen...).
-  - Killed a race against fork() calls that could cause diald
-    to exec() itself out of existance.
+  - Add beginnings of per-connection access flags to control
+    who can do what.
+  - Clean up of ctrl pipe handling for script output.
+  - When the connect script times out we should go to STOP_DIAL.
+  - Capture stderr output from scripts and feed it to syslog/monitors.
+  - Allow config options to be set via a ctrl pipe (if allowed by
+    the access flags for that pipe)
+  - Added a protocol version to monitors. Default is original diald
+    information so old monitors (e.g. diald-top) still work. New
+    monitors can ask (e.g. our dctrl) can ask for the new stuff.
+  - Added a title config option that is passed to monitors for
+    identification purposes.
+  - Capture dialler stderr and send to monitors.
+  - New dev device open loop that allows for use of lock.
+  - Documentation update.
+  - Syslog output is offered to monitors as well as syslog.
+  - Ctrl pipes are assigned names for identification in log messages.
+  - Do not tell openlog to put syslog output on stderr as well.
+  - Only become a daemon after reading the initial config.
+  - If we are dialling on a device and we get a request up on that
+    device ignore the request. Either the dialler recognises what is
+    happening or we time out on it. It is probably the damn non-blocking
+    ISDN dial inspired races.
+  - If we have a TCP monitor listener close it before we exit.
+  - Monitors can select the level of syslog messages they see.
+  - Support both AF_PACKET and SOCK_PACKET.
+  - Do not trap fatal signals - we probably just loop madly if they happen.
+  - When we get a request on a ctrl pipe log it to monitor pipes.
+  - Add a blocked-route option to control whether we route through
+    a blocked link or not.
+  - Cache the description of a connection rather than regenerate it
+    every second.
+  - Log the packet that triggers a link up to the monitor pipes.
+  - Added a STATUS2 to give the blocked and force flags.
+  - Reset the line disc to NTTY when opening a serial port.
+  - TCP monitor connections with tcp_wrapper support.
+  - Use AF_PACKET sockets.
+  - Added initializer and deinitializer script options.
+  - Added options to set scheduling class/priority.
+  - Signal bug fix: ensure the sigaction structs are fully initialized.
+  - Ignore empty lines on ctrl pipe reads to allow for \r\n line endings.
+  - Glibc changes.
+  - Add traffic stats on connections.
+  - Sanitize dev handling.
+  - Add options to start in blocked or unblock(default) mode.
 
-* Makefile changes from Jonathan I. Kamens. You can now do:
-  "make install DESTDIR=/tmp/install" to install in a subtree
-  of your choice.
-
-* Minor changes to the way bidirectional calling works.
-  Incoming calls now succeed, even when "block" is asserted.
-  (Block blocks outgoing traffic.) Some updating to the messages in
-  the log files so you know if a call was incoming or outgoing.
-  [Thanks to Mike Jagdis.]
-
-* Ethernet devices in dev mode used to expect a leading "/dev/"
-  in the name. That was just silly. Now you just give the name of the device.
-  Note that "/dev/XXXX" is still required for the name of a tty device.
-
-* New set of experimental filter rules for simple dynamic IP setups.
-
-* Minor changes in the standard filter rule set to prevent
-  redialing on dead HTTP connections. Even more rules for holding
-  windows boxes at bay.
-
-* New "strict-forwarding" option for use with dynamic local IP addresses.
-  If you turn this on diald will always ignore packets from old sessions.
-  What it really does is ignore any packet that does not have at least
-  one endpoint matching the current local address (which can either be
-  the proxy address when the link is down, or the current dynamic address
-  when the link is up.) It also sends TCP reset packets to the endpoint
-  that originates a TCP packet that is ignored by these rules.
-
-* Fixes so diald can compile with glibc.
-  Thanks to Philip Blundell for these.
-
-* Diald no longer uses SIG_ALRM internally. This should kill race conditions
-  that were causing some core dumps. Let me know!
-
-
-Major changes between version 0.16 and 0.17.
---------------------------------------------
-* Lots of bug fixes to diald:
-  - monititor output no longer has negative values.
-  - impulse code zeros the current impulse at the end of the
-    current time interval.
-  - no more core dumps when empty or bogus initialization files are used.
-  - fixes to prevent core dumps or switches to 99% CPU consumption when
-    a monitoring (dctrl or diald) gets aborted violently.
-  - lock_file option was not working.
-  - fixes to dctrl so it cleans up after itself better
-  - routing code uses proper netmasks to work with the 2.1 kernels
-  - ppp.c argument passing fixups thanks to Jonathan I. Kamens.
-  - The various run time configurable paths now should actually work.
-    (Thanks to a cast of thousands, well maybe half a dozen...).
-  - Killed a race against fork() calls that could cause diald
-    to exec() itself out of existance.
-
-* Makefile changes from Jonathan I. Kamens. You can now do:
-  "make install DESTDIR=/tmp/install" to install in a subtree
-  of your choice.
-
-* Minor changes to the way bidirectional calling works.
-  Incoming calls now succeed, even when "block" is asserted.
-  (Block blocks outgoing traffic.) Some updating to the messages in
-  the log files so you know if a call was incoming or outgoing.
-  [Thanks to Mike Jagdis.]
-
-* Ethernet devices in dev mode used to expect a leading "/dev/"
-  in the name. That was just silly. Now you just give the name of the device.
-  Note that "/dev/XXXX" is still required for the name of a tty device.
-
-* New set of experimental filter rules for simple dynamic IP setups.
-
-* Minor changes in the standard filter rule set to prevent
-  redialing on dead HTTP connections. Even more rules for holding
-  windows boxes at bay.
-
-* New "strict-forwarding" option for use with dynamic local IP addresses.
-  If you turn this on diald will always ignore packets from old sessions.
-  What it really does is ignore any packet that does not have at least
-  one endpoint matching the current local address (which can either be
-  the proxy address when the link is down, or the current dynamic address
-  when the link is up.) It also sends TCP reset packets to the endpoint
-  that originates a TCP packet that is ignored by these rules.
-
-* Fixes so diald can compile with glibc.
-  Thanks to Philip Blundell for these.
-
-* Diald no longer uses SIG_ALRM internally. This should kill race conditions
-  that were causing some core dumps. Let me know!
+* Dctrl changes:
+  - Add a menu to allow the log level of the information window to
+    be changed.
+  - Always do the load calculations and graph updates. When we do
+    pop up those windows we want the current status to be shown
+    correctly.
+  - Added window title option.
+  - If a title for the window is specified on the command line use
+    it preference to anything else.
+  - Install the dctrl toolbar gifs on a make install.
+  - Request the new protocol version from diald.
+  - Handle the TITLE message from diald.
+  - Handle the STATUS2 to give the blocked and force flags.
+  - Handle closes of its monitor connection gracefully.
+  - Minor changes to dctrl layout.
+  - Documentation update.
+  - Menu to select the level of syslog messages seen.
+  - dctrl uses a simple state engine to be a little more robust even
+    if some monitor messages go astray (the monitor pipes are non-blocking).
+  - Added a toolbar to dctrl (with tooltips).
+  - Added connection dialogs to dctrl for FIFO/TCP params.
+  - Support TCP connections.
+  - Display traffic stats in connection queue with menus to select
+    type of stats displayed.
 
 
-Major changes between version 0.16 and 0.17.
---------------------------------------------
+Major changes between version 0.16 and 0.16.5.
+----------------------------------------------
 * Lots of bug fixes to diald:
   - monititor output no longer has negative values.
   - impulse code zeros the current impulse at the end of the
