@@ -414,7 +414,8 @@ void act_CLOSE(void)
 }
 void trans_CLOSE(void)
 {
-    if (request_up) GOTO(STATE_DOWN); /* STATE_DOWN handles the link-up-request */
+    if (blocked || request_up || request_down)
+	GOTO(STATE_DOWN); /* STATE_DOWN handles the link-up-request */
     if (no_redial_delay == 1) {
 	no_redial_delay = 0;
 	GOTO(STATE_RETRY);
@@ -427,7 +428,8 @@ void act_RETRY(void)
 }
 void trans_RETRY(void)
 {
-    if (request_up) GOTO(STATE_DOWN);
+    if (blocked || request_up || request_down)
+	GOTO(STATE_DOWN); /* STATE_DOWN handles the link-up-request */
     if (current_retry_count >= 0) GOTO(STATE_CONNECT);
     else GOTO(STATE_DOWN);
 }

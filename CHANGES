@@ -1,5 +1,7 @@
 Major changes between version 0.16 and 0.98.
 --------------------------------------------
+  - A down or block breaks out of a cycle of repeated connect
+    script failures.
   - A down request now aborts an in progress dial/connect script.
   - Call duration is now measured from the moment we try and start
     the link rather than when the link actually becomes up for
