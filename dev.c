@@ -82,6 +82,13 @@ int dev_set_addrs()
 	if ((ifr.ifr_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 	    return 0;	/* interface is not up and running yet */
 
+	/* try and grab the address */
+	if (ioctl(sockfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
+	    return 0;	/* no address yet */
+       	laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
+	if (laddr == INADDR_ANY)
+	    return 0;	/* all zeros - maybe DHCP client active? */
+
 	if (route_wait) {
             /* set the initial rx counter once the link is up */
             if (rx_count == -1) rx_count = dev_rx_count();
@@ -89,14 +96,6 @@ int dev_set_addrs()
             /* check if we got the routing packet yet */
             if (dev_rx_count() == rx_count) return 0;
 	}
-
-	/* Ok, the interface is up, grab the addresses. */
-	if (ioctl(sockfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
-	    mon_syslog(LOG_ERR,
-		"failed to get local address from device %s: %m",
-		current_dev);
-	else
-       	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
 	if (ioctl(sockfd, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
 	    mon_syslog(LOG_ERR,
