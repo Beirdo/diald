@@ -794,7 +794,11 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
     /* Do the TCP liveness changes */
     if (ip_pkt->protocol == IPPROTO_TCP) {
 	struct tcphdr *tcp = (struct tcphdr *)((char *)ip_pkt + 4*ip_pkt->ihl);
+#if 1
+	int tcp_data_len = len - (4*ip_pkt->ihl + tcp->doff*4);
+#else
 	int tcp_data_len = len - (4*ip_pkt->ihl + sizeof(struct tcphdr));
+#endif
 
 	if (conn) {
 	    lflags = conn->tcp_state;
