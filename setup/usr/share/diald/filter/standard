@@ -1,8 +1,8 @@
 # This is a pretty complicated set of filter rules.
 # (These are the rules I use myself.)
 #
-# I've divided the rules up into four sections.
-# TCP packets, UDP packets, ICMP packets and a general catch all rule
+# I've divided the rules up into five sections.
+# TCP packets, UDP packets, IGMP, ICMP packets and a general catch all rule
 # at the end.
 
 
@@ -95,6 +95,7 @@ accept tcp 120 tcp.source=tcp.ftp
 # If we don't catch it above, give the link 10 minutes up time.
 accept tcp 600 any
 
+
 # Rules for UDP packets
 #
 # We time out domain requests right away, we just want them to bring
@@ -113,8 +114,8 @@ accept tcp 600 any
 ignore udp udp.dest=udp.who
 ignore udp udp.source=udp.who
 # Don't bring the link up for RIP.
-ignore udp udp.dest=udp.route
-ignore udp udp.source=udp.route
+ignore udp udp.dest=udp.router
+ignore udp udp.source=udp.router
 # Don't bring the link up for NTP or timed.
 ignore udp udp.dest=udp.ntp
 ignore udp udp.source=udp.ntp
@@ -133,13 +134,34 @@ ignore udp udp.source=udp.netbios-ns,udp.dest=udp.netbios-ns
 accept udp 30 udp.dest=udp.netbios-ns
 accept udp 30 udp.source=udp.netbios-ns
 # keep routed and gated transfers from holding the link up
-ignore udp tcp.dest=udp.route
-ignore udp tcp.source=udp.route
+ignore udp tcp.dest=udp.router
+ignore udp tcp.source=udp.router
 # Anything else gest 2 minutes.
 accept udp 120 any
 
+
+# Rules for IGMP packets
+
+# Bring the link up for mtrace requests.
+accept igmp 10 igmp.vertype=IGMP_MTRACE
+
+# Bring the link up for new membership reports.
+accept igmp 10 igmp.vertype=IGMP_HOST_NEW_MEMBERSHIP_REPORT
+
+# All other IGMP packets are ignored but listed in the connection
+# queue for 5 seconds.
+ignore igmp 0:5 any
+
+
+# Rules for ICMP/ICMP6 packets
+
+# Bring the link up for ICMP echo requests.
+# Some may want to disable this...
+accept icmp 5 icmp.type=ICMP_ECHO
+accept icmp 5 icmp6.type=ICMP6_ECHO_REQUEST
+
+
 # Ignore some background protocols.
-ignore igmp any
 ignore ospfigp any
 
 # Catch any packets that we didn't catch above and give the connection
