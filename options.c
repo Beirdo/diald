@@ -761,17 +761,19 @@ void check_setup()
 {
     int flag = 0;
 
-    if (!path_ifconfig || !*path_ifconfig)
-	flag = 1, mon_syslog(LOG_ERR,"No ifconfig program found.");
-    if ((!path_ip || !*path_ip) && (!path_route || !*path_route))
-	flag = 1, mon_syslog(LOG_ERR,"No ip or route programs found.");
-    else if (remote_ip && inet_addr(remote_ip) == -1)
-	flag = 1, mon_syslog(LOG_ERR,"Bad remote ip address specification.");
-    else if (local_ip) {
-	if (inet_addr(local_ip) == -1)
-	    flag = 1, mon_syslog(LOG_ERR,"Bad local ip address specification.");
-	else
-    	    local_addr = inet_addr(local_ip);
+    if (!ifsetup || !*ifsetup) {
+	if (!path_ifconfig || !*path_ifconfig)
+	    flag = 1, mon_syslog(LOG_ERR, "No ifconfig program found.");
+	if ((!path_ip || !*path_ip) && (!path_route || !*path_route))
+	    flag = 1, mon_syslog(LOG_ERR,"No ip or route programs found.");
+	else if (remote_ip && inet_addr(remote_ip) == -1)
+	    flag = 1, mon_syslog(LOG_ERR,"Bad remote ip address specification.");
+	else if (local_ip) {
+	    if (inet_addr(local_ip) == -1)
+		flag = 1, mon_syslog(LOG_ERR,"Bad local ip address specification.");
+	    else
+    		local_addr = inet_addr(local_ip);
+	}
     }
 
     if (acctlog) {
