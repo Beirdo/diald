@@ -114,8 +114,8 @@ accept tcp 600 any
 ignore udp udp.dest=udp.who
 ignore udp udp.source=udp.who
 # Don't bring the link up for RIP.
-ignore udp udp.dest=udp.route
-ignore udp udp.source=udp.route
+ignore udp udp.dest=udp.router
+ignore udp udp.source=udp.router
 # Don't bring the link up for NTP or timed.
 ignore udp udp.dest=udp.ntp
 ignore udp udp.source=udp.ntp
@@ -134,8 +134,8 @@ ignore udp udp.source=udp.netbios-ns,udp.dest=udp.netbios-ns
 accept udp 30 udp.dest=udp.netbios-ns
 accept udp 30 udp.source=udp.netbios-ns
 # keep routed and gated transfers from holding the link up
-ignore udp tcp.dest=udp.route
-ignore udp tcp.source=udp.route
+ignore udp tcp.dest=udp.router
+ignore udp tcp.source=udp.router
 # Anything else gest 2 minutes.
 accept udp 120 any
 
