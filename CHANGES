@@ -1,4 +1,4 @@
-Major changes between version 0.99.5 and 0.99.6.
+Major changes between version 0.99.5 and 1.0
 ------------------------------------------------
   - Added config save/restore to dctrl. Patch from someone but
     I forget who. If it was you please tell me!

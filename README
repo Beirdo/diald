@@ -2,7 +2,7 @@ The Diald README File
 
 ----------------------------------------------------------------------------
 
-This is release 0.99.4 of diald.
+This is release 1.0 of diald.
 
 Diald is a daemon that provides on demand IP links via SLIP or PPP. The
 purpose of diald is to make it transparently appear that you have a
@@ -19,7 +19,7 @@ passing over the link.
 
 Getting Diald
 
-The file is called diald-0.99.4.tar.gz. It can be obtained from the diald
+The file is called diald-1.0.tar.gz. It can be obtained from the diald
 project on "http://sourceforge.net/". Note that the diald home page has
 moved from its old locations of "http://diald.unix.ch" and
 "http://www.loonie.net/~erics/diald.html". It can now be found at
@@ -27,10 +27,9 @@ moved from its old locations of "http://diald.unix.ch" and
 
 Mailing List
 
-David S. Miller provides a mailing for the discussion of diald on his
-Majordomo server at vger.rutgers.edu. Send mail containing the line
-"subscribe linux-diald" in the BODY of the message to
-Majordomo@vger.rutgers.edu to join the list. Send mail with the word "help"
+There is a mailing for the discussion of diald at vger.kernel.org. Send
+mail containing the line "subscribe linux-diald" in the BODY of the message
+to Majordomo@vger.kernel.org to join the list. Send mail with the word "help"
 in the body to get help on the correct use of the Majordomo list server.
 Announcements of new releases are made on the mailing list, and
 its a good place to ask questions of users who already have diald up and
@@ -47,26 +46,23 @@ question right away, then it may just get filed until I have time to deal
 with it. Someone on the mailing list will probably be able to suggest a
 solution to your problem well before that.
 
-The mailing list is, apparently, being archived by the Mailing List
+The mailing list is, or was, being archived by the Mailing List
 Archives at "http://www.geocrawler.com" (along with a whole load of others).
 
 FAQ
 
 There is a copy of the FAQ distributed with the diald release in the
 subdirectory "doc". This is the version that was current when the diald
-release was packaged. This may not be the most up to date version of the
-FAQ. The most up to date version can always be obtained from the diald home
-page. (See "Getting Diald" for the address of the home page.)
+release was packaged.
 
 Before Installation
 
-You must have SLIP devices in your kernel in order to use diald, EVEN IF YOU
-PLAN TO USE ONLY PPP CONNECTIONS! Let me repeat that, diald needs SLIP to
-work under all circumstances. It uses a SLIP link on a pseudo terminal to
-create the proxy device that stands in for the real connection. Naturally,
-if you plan on using diald to establish PPP connections, you must also have
-PPP devices in your kernel. You must also have a program like "chat" to do
-dialing.
+You must have ethertap or SLIP devices in your kernel in order to use diald,
+EVEN IF YOU PLAN TO USE ONLY PPP CONNECTIONS! Let me repeat that, diald
+needs ethertap or SLIP to work under all circumstances. It creates a proxy
+interface that stands in for the real connection. Naturally, if you plan on
+using diald to establish PPP connections, you must also have PPP devices in
+your kernel. You must also have a program like "chat" to do dialing.
 
 Configuring Diald
 
@@ -141,6 +137,11 @@ Be careful with the permissions on your fifo's.
 
 Please send bug reports, patches or suggestions for improvements to me,
 preferably via the mailing list.
+
+Mike Jagdis
+jaggy@purplet.demon.co.uk
+
+and previously,
 
 Eric Schenk
 Eric.Schenk@dna.lth.se

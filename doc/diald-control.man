@@ -1,10 +1,10 @@
-.\" manual page [] for diald 0.99
+.\" manual page [] for diald 1.0
 .\" SH section heading
 .\" SS subsection heading
 .\" LP paragraph
 .\" IP indented paragraph
 .\" TP hanging label
-.TH DIALD-CONTROL 5 "DIALD 0.99 - 1999.04.06"
+.TH DIALD-CONTROL 5 "DIALD 1.0 - 2001.06.15"
 .SH NAME
 diald-control \- how to control a running copy of diald
 .SH SYNOPSIS
@@ -169,4 +169,5 @@ diald(8), dctrl(1), diald-monitor(5), diald-examples(5)
 
 .SH AUTHOR
 .LP
+Mike Jagdis (jaggy@purplet.demon.co.uk)
 Eric Schenk (Eric.Schenk@dna.lth.se)
