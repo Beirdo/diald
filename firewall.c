@@ -69,7 +69,7 @@ static unsigned int in_slot(FW_Timeslot *slot, time_t *clock)
 #if 0
     mon_syslog(LOG_DEBUG,"slot def: %d %d %x %x %x",
 	slot->start, slot->end, slot->wday, slot->mday, slot->month);
-#endif 0
+#endif
 	if ((slot->start <= ctime)
 	&&  (ctime <= slot->end)
 	&&  (slot->wday & (1<<ltime->tm_wday))
