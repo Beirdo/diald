@@ -180,27 +180,18 @@ void filter_read()
 	(!af_packet && strcmp(from.sa.sa_data, snoop_dev) != 0))
 	    return;
 
-	if (do_reroute) {
-	    /* If we are doing unsafe routing, then we cannot count
-	     * the transmitted packets on the forwarding side of the
-	     * transitter (since there is none!), so we attempt to
-	     * count them here. However, for non AF_PACKET sockets
-	     * we can only tell packets that are leaving our interface
-	     * from this machine, forwarded packets all get counted
-	     * as received bytes.
-	     */
-	    if (
+	/* For non AF_PACKET sockets we can only tell packets
+	 * that are leaving our interface from this machine,
+	 * forwarded packets all get counted as received bytes.
+	 */
+	if (
 #ifdef HAVE_AF_PACKET
-	    (af_packet && from.sl.sll_pkttype == PACKET_OUTGOING)
-	    ||
+	(af_packet && from.sl.sll_pkttype == PACKET_OUTGOING)
+	||
 #endif
-	    (!af_packet && ((struct iphdr *)packet)->saddr == local_addr)) {
-		txtotal += len;
-		itxtotal += len;
-	    } else {
-		rxtotal += len;
-		irxtotal += len;
-	    }
+	(!af_packet && ((struct iphdr *)packet)->saddr == local_addr)) {
+	    txtotal += len;
+	    itxtotal += len;
 	} else {
 	    rxtotal += len;
 	    irxtotal += len;

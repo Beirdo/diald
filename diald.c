@@ -744,16 +744,6 @@ void proxy_read()
     len = recv_packet(buffer,4096);
     dlen = len - sizeof(unsigned short);
 
-    if (!do_reroute) {
-	/* if we are doing unsafe routing, all counting is in the filter.
-	 * otherwise we can see transmitted bytes directly at this spot.
-	 */
-	txtotal += dlen;
-	itxtotal += dlen;
-	rxtotal -= dlen;	/* since it will double count on the snoop */
-	irxtotal -= dlen;
-    }
-
     /* If we get here with the link up and fwdfd not -1,
      * and we are rerouting, then it must be
      * that the external interface has gone down without
@@ -776,7 +766,7 @@ void proxy_read()
 	size_t to_len;
 
 	/* Make sure we try to restore the link to working condition now... */
-	if (do_reroute && current_mode == MODE_PPP) {
+	if (current_mode == MODE_PPP) {
 	    /* Check if a route exists at this point through the ppp device. */
 	    /* If not then we must be half dead. */
 	    if (!ppp_route_exists()) {

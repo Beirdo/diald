@@ -124,24 +124,14 @@ int dev_set_addrs()
 		local_ip,remote_ip);
 	}
 
-	if (!do_reroute
-	&& (dynamic_addrs || (blocked && !blocked_route))) {
-	    proxy_config(local_ip,remote_ip);
-	    set_ptp(proxy_iftype, proxy_ifunit, local_ip, remote_ip, metric+1);
-	    del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-	    add_routes(proxy_iftype,proxy_ifunit,local_ip,remote_ip,metric+1); 
-	}
-
 	/* Set the ptp routing for the new interface */
 	/* this was moved from about 15 lines above by ajy so that for */
 	/* dynamic addresses, we have the remote address when we make */
 	/* the call to setup the route */
 	set_ptp(device_node, link_iface, local_ip, remote_ip, metric+0);
 
-	if (do_reroute) {
-             add_routes(device_node,link_iface,local_ip,remote_ip,metric+0);
-	     del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-	}
+        add_routes(device_node,link_iface,local_ip,remote_ip,metric+0);
+	del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
 
         return 1;
 }
@@ -197,7 +187,7 @@ void dev_reroute()
     local_addr = inet_addr(orig_local_ip);
 
     /* Kill the alternate routing */
-    if (do_reroute && link_iface != -1)
+    if (link_iface != -1)
         del_routes(device_node,link_iface,local_ip,remote_ip,metric+0);
     link_iface = -1;
 }

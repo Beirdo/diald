@@ -196,28 +196,13 @@ int ppp_set_addrs()
 		local_ip,remote_ip);
 	}
 
-	/* have to reset the proxy if we won't be rerouting... */
-	if (!do_reroute
-	&& (dynamic_addrs || (blocked && !blocked_route))) {
-	    /* If we are rerouting, then we have a window without
-	     * routes here. The proxy_config calls ifconfig, which
-	     * clobbers all the routes.
-	     */
-	    proxy_config(local_ip,remote_ip);
-	    set_ptp(proxy_iftype, proxy_ifunit, local_ip, remote_ip, metric+1);
-	    del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-	    add_routes(proxy_iftype,proxy_ifunit,local_ip,remote_ip,metric+1); 
-	}
-
 	/* This is redundant in normal operation, but if we
 	 * have to restart the link, then this is necessary...
 	 */
 	set_ptp("ppp", link_iface, local_ip, remote_ip, metric+0);
 
-	if (do_reroute) {
-	    add_routes("ppp",link_iface,local_ip,remote_ip,metric+0);
-	    del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-	}
+	add_routes("ppp",link_iface,local_ip,remote_ip,metric+0);
+	del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
 
 	return 1;
     }
@@ -301,7 +286,7 @@ void ppp_reroute()
     }
     local_addr = inet_addr(orig_local_ip);
     /* If we did routing on the ppp link, remove it */
-    if (do_reroute && link_iface != -1)
+    if (link_iface != -1)
     	del_routes("ppp",link_iface,local_ip,remote_ip,metric+0);
     link_iface = -1;
 }

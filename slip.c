@@ -254,15 +254,6 @@ int slip_set_addrs()
     res = system(buf);
     report_system_result(res,buf);
 
-    /* have to reset the proxy if we won't be rerouting... */
-    if (!do_reroute
-    && ((dynamic_addrs || force_dynamic) || (blocked && !blocked_route))) {
-	proxy_config(local_ip,remote_ip);
-	set_ptp(proxy_iftype, proxy_ifunit, local_ip, remote_ip, metric+1);
-	del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-	add_routes(proxy_iftype,proxy_ifunit,local_ip,remote_ip,metric+1);
-    }
-
     /* Set the routing for the new slip interface */
     set_ptp("sl", link_iface, local_ip, remote_ip, metric+0);
 
@@ -270,10 +261,8 @@ int slip_set_addrs()
 	local_addr = inet_addr(local_ip);
     }
 
-    if (do_reroute) {
-        add_routes("sl",link_iface,local_ip,remote_ip,metric+0);
-	del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-    }
+    add_routes("sl",link_iface,local_ip,remote_ip,metric+0);
+    del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
 
     return 1;
 }
@@ -307,7 +296,7 @@ void slip_reroute()
     }
     local_addr = inet_addr(orig_local_ip);
     /* If we did routing on the slip link, remove it */
-    if (do_reroute && link_iface != -1) /* just in case we get called twice */
+    if (link_iface != -1) /* just in case we get called twice */
     	del_routes("sl",link_iface,local_ip,remote_ip,metric+0);
     link_iface = -1;
 }

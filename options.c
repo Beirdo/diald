@@ -74,7 +74,6 @@ int dynamic_mode = DMODE_REMOTE_LOCAL;
 int rotate_devices = 0;
 int two_way = 0;
 int give_way = 0;
-int do_reroute = UNSAFE_ROUTING;
 int proxyarp = 0;
 #if 0
 int demasq = 0;
@@ -163,8 +162,6 @@ struct {
     {"ip-up","<script>",1,&ip_up,set_str},
     {"ip-down","<script>",1,&ip_down,set_str},
     {"ip-goingdown","<script>",1,&ip_goingdown,set_str},
-    {"reroute","",0,&do_reroute,set_flag},
-    {"-reroute","",0,&do_reroute,clear_flag},
 #ifdef SIOCSKEEPALIVE
     {"keepalive","<0-255>",1,&keepalive,set_int},
 #endif
@@ -305,7 +302,6 @@ void init_vars()
     dynamic_mode = DMODE_REMOTE_LOCAL;
     rotate_devices = 0;
     two_way = 0;
-    do_reroute = UNSAFE_ROUTING;
     proxyarp = 0;
 #if 0
     demasq = 0;

@@ -121,35 +121,6 @@
 #define MONITOR_VER2		0x00000100
 
 /*
- * If you choose UNSAFE_ROUTING=0, then by default diald will route all
- * outgoing packets to the proxy device and forward them to the real
- * device by itself. This has the advantage that it gets around a bug
- * in the current production release (1.2.X) linux kernels
- * that causes TCP sessions to lock up if the route is changed while
- * a packet is being retransmitted. However, this introduces quite
- * a bit of overhead on outgoing packets (10-20%). (Note that incoming packets
- * don't go through this process!)
- * If you choose UNSAFE_ROUTING=1, then diald will change the routes anyway.
- * If you are using diald on a machine were there is a single outgoing
- * link this is perfectly safe (I think!), but if diald is being used
- * in an environment where more than one ppp or slip link can be active
- * at a time, then there is a small chance that you can lock up TCP
- * sessions. In particular if the link is terminated (either by diald
- * or by the other end hanging up) when a TCP session is in the middle
- * of retransmitting a packet, then that TCP session can become locked
- * if when the link comes back up it is brought back up on a different
- * ppp or slip device.
- * [NOTE: As of linux 1.3.13, the Linux kernel has been
- *  fixed to allow routing changes under an active TCP retransmit,
- *  so with 1.3.13 and later UNSAFE_ROUTING as the default is perfectly safe.]
- * [NOTE 2: unlike previous versions of diald, this option can now be
- * controlled from the command line or configuration file. See the new
- * options "reroute" and "-reroute".
- */
-
-#define UNSAFE_ROUTING 1	/* do rerouting by default */
-
-/*
  * Originally diald just threw away any packets it received when
  * the link was down. This is OK because IP is an unreliable protocol,
  * so applications will resend packets when the link comes back up.
@@ -287,7 +258,6 @@ int redial_backoff;
 int dial_fail_limit;
 int two_way;
 int give_way;
-int do_reroute;
 int proxyarp;
 #if 0
 int demasq;
