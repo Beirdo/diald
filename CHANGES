@@ -1,5 +1,7 @@
 Major changes between version 0.98.2 and 0.98.3.
 ------------------------------------------------
+  - Set the initial log level to LOG_INFO for monitors that connect
+    without giving an explicit monitor setting.
   - Changes for compatibility with glibc 2.1.
   - Fixed a typo in modem.c that prevented non-/dev devices
     from working.

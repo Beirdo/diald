@@ -634,7 +634,7 @@ void ctrl_read(PIPE *pipe)
 		    mon_syslog(LOG_NOTICE, "%s: log level 0x%08x", buf + k, j);
 		} else if (buf[7] != 0 && buf[7] == ' ') {
 		    mon_syslog(LOG_NOTICE, "%s: full monitor connection", buf+8);
-		    j = 255;	/* Heavy weight connection requested */
+		    j = 0x060000ff;	/* Heavy weight connection requested */
 		    k = 8;
 		}
 		if (k >= 8) {
