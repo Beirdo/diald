@@ -36,18 +36,14 @@ proxy_tun_send(proxy_t *proxy,
 	unsigned short wprot, unsigned char *p, size_t len)
 {
     struct tun_pi pi = { 0, wprot };
-    struct msghdr msg;
     struct iovec msg_iov[2];
 
     msg_iov[0].iov_base = &pi;
     msg_iov[0].iov_len = sizeof(pi);
     msg_iov[1].iov_base = p;
     msg_iov[1].iov_len = len;
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_iov = msg_iov;
-    msg.msg_iovlen = 2;
 
-    return sendmsg(proxy->fd, &msg, 0);
+    return writev(proxy->fd, msg_iov, 2);
 }
 
 
@@ -55,18 +51,14 @@ static int
 proxy_tun_recv(proxy_t *proxy, unsigned char *p, size_t len)
 {
     struct tun_pi pi;
-    struct msghdr msg;
     struct iovec msg_iov[2];
 
     msg_iov[0].iov_base = &pi;
     msg_iov[0].iov_len = sizeof(pi);
     msg_iov[1].iov_base = p+2;
     msg_iov[1].iov_len = len-2;
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_iov = msg_iov;
-    msg.msg_iovlen = 2;
 
-    len = recvmsg(proxy->fd, &msg, 0);
+    len = readv(proxy->fd, msg_iov, 2);
     if (len >= sizeof(pi)) {
 	p[0] = pi.proto >> 8;
 	p[1] = pi.proto & 0xff;
