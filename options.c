@@ -38,6 +38,7 @@ char *acctlog = 0;
 char *pidlog = "diald.pid";
 char *fifoname = 0;
 int tcpport = 0;
+int demand = 1;
 int blocked = 0;
 int blocked_route = 1;
 char *lock_prefix = LOCK_PREFIX;
@@ -116,6 +117,9 @@ struct {
     {"pidfile","<f>",1,&pidlog,set_str},
     {"fifo","<f>",1,&fifoname,set_str},
     {"tcpport","<n>",1,&tcpport,set_int},
+    {"demand","",0,&demand,set_flag},
+    {"-demand","",0,&demand,clear_flag},
+    {"nodemand","",0,&demand,clear_flag},
     {"blocked","",0,&blocked,set_blocked},
     {"-blocked","",0,&blocked,clear_blocked},
     {"block","",0,&blocked,set_blocked},
@@ -143,6 +147,7 @@ struct {
     {"delroute","<script>",1,&delroute,set_str},
     {"proxyarp","",0,&proxyarp,set_flag},
     {"demasq","",0,&demasq,set_flag},
+    {"-demasq","",0,&demasq,clear_flag},
     {"ip-up","<script>",1,&ip_up,set_str},
     {"ip-down","<script>",1,&ip_down,set_str},
     {"reroute","",0,&do_reroute,set_flag},

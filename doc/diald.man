@@ -327,12 +327,24 @@ diald is controlling!
 .B blocked
 Start diald in blocked mode. While the link is blocked diald
 will accept incoming connections but will not attempt to make
-an outgoing call unless manually requested.
+an outgoing call either on demand or manually requested.
 
 .TP
 .B -blocked
 Start diald in unblocked mode. Outgoing calls will be attempted
 when necessary. This is the default.
+
+.TP
+.B demand
+Start diald in demand mode. Outgoing calls will be made as
+necessary in order to send packets through the link.
+This is the default.
+
+.TP
+.B -demand
+Start diald in manual mode. Outgoing calls will not be made whenever
+packets wish to cross it but will be made in response to manual
+requests using "up".
 
 .TP
 .B debug \fI<mask>\fR

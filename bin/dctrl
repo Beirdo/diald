@@ -536,7 +536,7 @@ proc readMonitor {} {
     global monstate monfd status
     global queue_list status trans colors gload tload
     global in_usage out_usage in_bandwidth out_bandwidth
-    global blocked forced max_info_lines
+    global demand blocked forced max_info_lines
     global diald_TITLE
 
     if {[gets $monfd foo] == -1} {
@@ -595,8 +595,9 @@ proc readMonitor {} {
 	}
     } elseif {$monstate < 4.0} {
 	switch $monstate {
-	    3.0	{ set blocked $foo; set monstate 3.1 }
-	    3.1	{ set forced $foo; set monstate 0.0 }
+	    3.0	{ set demand $foo; set monstate 3.1 }
+	    3.1	{ set blocked $foo; set monstate 3.2 }
+	    3.2	{ set forced $foo; set monstate 0.0 }
 	}
     } elseif {$monstate < 5.0} {
 	set outp 0
@@ -731,6 +732,10 @@ menu .menu.file.m.open
 
 menubutton .menu.control -text "Control" -menu .menu.control.m -underline 0
 menu .menu.control.m
+.menu.control.m add check -label "Demand Dialling" -underline 0 \
+    -variable demand -command {
+   	 if {$demand} {fifoCmd "demand"} {fifoCmd "nodemand"}
+    }
 .menu.control.m add check -label "Block connection" -underline 0 \
     -variable blocked -command {
    	 if {$blocked} {fifoCmd "block"} {fifoCmd "unblock"}

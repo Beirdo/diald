@@ -91,10 +91,15 @@ void trans_DOWN(void)
 {
     request_down = 0;
     use_req = 0;
-    if (request_up /* && (req_pid || !blocked) */) {
-	request_up = 0; GOTO(STATE_CONNECT);
+    if (request_up) {
+	request_up = 0;
+        if (req_pid || !blocked)
+	    GOTO(STATE_CONNECT);
+	else
+	    mon_syslog(LOG_NOTICE, "Blocked. Up request ignored");
     }
-    else if ((forced || !queue_empty()) && !blocked) GOTO(STATE_CONNECT);
+    else if ((forced || !queue_empty()) && demand && !blocked)
+	GOTO(STATE_CONNECT);
     else if (delayed_quit && queue_empty() && !forced) {
 	mon_syslog(LOG_NOTICE,"Carrying out delayed termination request.");
 	terminate = 1;
@@ -137,6 +142,7 @@ void trans_CONNECT(void)
 	    }
 	    if (dial_fail_limit != 0 && dial_failures > dial_fail_limit) {
 		/* want to block connection until the user comes back...*/
+		/* FIXME: should we just disable demand dialling? */
 		blocked = 1;
 		dial_failures = 0;
 		redial_rtimeout = redial_timeout;
@@ -286,7 +292,7 @@ void act_UP(void)
 void trans_UP(void)
 {
     request_up = 0;
-    if (/* blocked || */ request_down) {
+    if (request_down) {
 	request_down = 0;
 	goto take_link_down;
     }
@@ -414,7 +420,7 @@ void act_CLOSE(void)
 }
 void trans_CLOSE(void)
 {
-    if (blocked || request_up || request_down)
+    if (request_up || request_down)
 	GOTO(STATE_DOWN); /* STATE_DOWN handles the link-up-request */
     if (no_redial_delay == 1) {
 	no_redial_delay = 0;
@@ -428,7 +434,7 @@ void act_RETRY(void)
 }
 void trans_RETRY(void)
 {
-    if (blocked || request_up || request_down)
+    if (request_up || request_down)
 	GOTO(STATE_DOWN); /* STATE_DOWN handles the link-up-request */
     if (current_retry_count >= 0) GOTO(STATE_CONNECT);
     else GOTO(STATE_DOWN);

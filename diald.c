@@ -566,10 +566,22 @@ void ctrl_read(PIPE *pipe)
 	    && strncmp(buf, "config ", 7) == 0) {
 		mon_syslog(LOG_NOTICE, "%s: %s", pipe->name, buf);
 		parse_options_line(buf+7);
+	    } else if ((pipe->access & ACCESS_DEMAND)
+	    && strcmp(buf,"demand") == 0) {
+		mon_syslog(LOG_NOTICE, "%s: demand enable request",
+			pipe->name);
+		parse_options_line(buf);
+	    } else if ((pipe->access & ACCESS_NODEMAND)
+	    && strcmp(buf,"nodemand") == 0) {
+		mon_syslog(LOG_NOTICE, "%s: demand disable request",
+			pipe->name);
+		parse_options_line(buf);
 	    } else if ((pipe->access & ACCESS_BLOCK)
 	    && strcmp(buf,"block") == 0) {
 		mon_syslog(LOG_NOTICE, "%s: block request", pipe->name);
 		parse_options_line(buf);
+		request_down = 1;
+		request_up = 0;
 	    } else if ((pipe->access & ACCESS_UNBLOCK)
 	    && strcmp(buf,"unblock") == 0) {
 		mon_syslog(LOG_NOTICE, "%s: unblock request", pipe->name);

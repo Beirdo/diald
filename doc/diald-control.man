@@ -60,11 +60,18 @@ The following commands may be sent to diald via the fifo or TCP port:
 .TP
 .B block
 Block diald from making outgoing calls until a unblock command is issued.
-If the link is up it will remain up until taken down because
-it is idle or has been explicitly requested with "down".
+If the link is up it will be taken down immediately.
 .TP
 .B unblock
 Remove a block on diald making outgoing calls.
+.TP
+.B demand
+The link will be brought up as necessary when packets are sent
+through it.
+.TP
+.B nodemand
+The link will only be brought up if manually requested using
+the "up" command.
 .TP
 .B force
 Force diald to bring the link up until an unforce command is issued.

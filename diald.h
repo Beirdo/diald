@@ -230,6 +230,7 @@ char *acctlog;
 char *pidlog;
 char *fifoname;
 int tcpport;
+int demand;			/* enables demand dialling */
 int blocked;			/* user has blocked the link */
 int blocked_route;		/* blocked link has routes through it */
 char *lock_prefix;

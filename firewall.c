@@ -335,7 +335,7 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    c->timer.data = (void *)c;
 	    c->timer.function = (void *)(void *)del_connection;
 	    if (unit->connections->next == unit->connections && monitors
-	    && state != STATE_UP && !blocked) {
+	    && state != STATE_UP && !blocked && demand) {
 		c->description = desc_connection(c);
 		if (c->description)
 		    mon_syslog(LOG_NOTICE, "Trigger: %s", c->description);
@@ -1071,7 +1071,8 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    );
 	    mon_write(MONITOR_STATUS, buf, strlen(buf));
 
-	    sprintf(buf,"STATUS2\n%c\n%c\n",
+	    sprintf(buf,"STATUS2\n%c\n%c\n%c\n",
+		(demand ? '1' : '0'),
 		(blocked ? '1' : '0'),
 		(forced ? '1' : '0')
 	    );
