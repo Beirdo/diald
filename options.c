@@ -153,6 +153,7 @@ struct {
     {"remote","<ip-address>",1,&remote_ip,set_str},
     {"netmask","<ip-address>",1,&netmask,set_str},
     {"dynamic","",0,&dynamic_addrs,set_flag},
+    {"sticky","",0,&dynamic_addrs,set_flag2},
     {"strict-forwarding","",0,&strict_forwarding,set_flag},
     {"dslip-mode","<mode>",1,0,set_dslip_mode},
     {"defaultroute","",0,&default_route,set_flag},
@@ -513,6 +514,11 @@ void set_dslip_mode(char **var, char **argv)
 void set_flag(int *var, char **argv)
 {
     *var = 1;
+}
+
+void set_flag2(int *var, char **argv)
+{
+    *var = 2;
 }
 
 void clear_flag(int *var, char **argv)

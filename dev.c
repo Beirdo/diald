@@ -126,6 +126,12 @@ int dev_set_addrs()
 	    if (local_ip) free(local_ip);
 	    local_ip = strdup(inet_ntoa(addr));
 	    local_addr = laddr;
+	    if (dynamic_addrs > 1) {
+		if (orig_remote_ip) free(orig_remote_ip);
+		orig_remote_ip = strdup(remote_ip);
+		if (orig_local_ip) free(orig_local_ip);
+		orig_local_ip = strdup(local_ip);
+	    }
 	    mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 		local_ip,remote_ip);
 	}

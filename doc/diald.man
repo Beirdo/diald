@@ -599,14 +599,12 @@ network interfaces and what entries it places into the routing table.
 .B local \fI<a>
 Sets the local IP address for the link established by
 .B diald.
-This option is not optional.
 If you are not using the dynamic option then this address must
 match the local IP address assigned to you by your provider.
 .TP
 .B remote \fI<a>
 Sets the remote IP address for the link established by
 .B diald.
-This option is also not optional.
 If you are not using the dynamic option then this address should
 match the remote IP address of your provider. (Note that due
 to the nature of IP routing this is not actually necessary,
@@ -627,6 +625,14 @@ If you are not already using them, the addresses 192.168.0.1 and
 Note that it is possible that you will know one of either the local or
 the remote address, even though you do not know the other.
 In this case you might as well specify the one that you do know.
+.TP
+.B sticky
+As \fBdynamic\fR but the actual addresses discovered from an actual
+connection will continue to be used for the proxy interface after
+the link is dropped in preference to the originally configured
+local and remote addresses. This may be useful if your provider uses
+dynamic addresses but only expires an address allocation after a
+relatively long period of inactivity.
 .TP
 .B dslip-mode \fI<mode>
 Set the interpretation of dynamic address information for SLIP mode.

@@ -377,6 +377,7 @@ void set_str(char **, char **);
 void set_scheduler(char **, char **);
 void set_int(int *, char **);
 void set_flag(int *, char **);
+void set_flag2(int *, char **);
 void clear_flag(int *, char **);
 void set_blocked(int *, char **);
 void clear_blocked(int *, char **);

@@ -1,11 +1,19 @@
 Major changes between version 0.98.3 and 0.98.4.
 ------------------------------------------------
+  - Added a "sticky" option. This is like "dynamic" but the IP
+    addresses determined from an actual connection will continue
+    to be used for the proxy in the future in preference to the
+    originally configured addresses. This may be useful if your
+    provider uses dynamic addressing but only expires address
+    allocations after a relatively long period of inactivity.
   - When using ifconfig we specify the remote IP address as the
     broadcast as well as the pointopoint. This is to enable diald
     to handle both pointopoint and broadcast interfaces on 2.2.x
     kernels. Note that if you specify a netmask other than all ones
     (the default) the remote IP you specify should probably be
-    the broadcast.
+    the broadcast. Note also that even though your actual interface
+    may be point-to-point your proxy interface may be an ethertap
+    interface which is broadcast.
   - Added an ifsetup script that can be used to set up interfaces
     in *really* interesting ways. If defined it is used instead
     of ifconfig and *all* routing calls - route, defaultroute,
