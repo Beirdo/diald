@@ -11,7 +11,7 @@ xstrerror(int n)
     static char	buf[30];
 
     if (n >= 0 && n < sys_nerr)
-	return sys_errlist[n];
+	return (char *)sys_errlist[n];
     sprintf(buf, "Error code %d\n", n);
     return buf;
 }
