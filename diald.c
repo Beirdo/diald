@@ -26,6 +26,7 @@
  */
 
 #include "diald.h"
+#include "proxy.h"
 #include "version.h"
 
 #ifdef TCP_WRAPPERS
@@ -160,8 +161,8 @@ main(int argc, char *argv[])
     open_fifo();
     filter_setup();
 
-    proxy_fd = proxy_open();
-    proxy_up();
+    proxy_fd = proxy_init(NULL);
+    proxy_start();
     idle_filter_proxy();
 
     /* We are a session manager and currently have no controlling

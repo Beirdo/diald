@@ -73,11 +73,14 @@ LIBS = -lwrap -lnsl
 # ------------------ END OF USER CONFIGURATIONS ---------------------------
 
 OBJFILES=diald.o options.o modem.o filter.o slip.o lock.o ppp.o dev.o \
-	proxyarp.o fsm.o timer.o parse.o buffer.o $(PROXY).o \
-	route.o bufio.o utils.o firewall.o log.o access.o
+	proxyarp.o fsm.o timer.o parse.o buffer.o \
+	route.o bufio.o utils.o firewall.o log.o access.o \
+	proxy.o proxy_tap.o proxy_slip.o proxy_dev.o
 SOURCEFILES=diald.c options.c modem.c filter.c slip.c lock.c ppp.c dev.c \
-	proxyarp.c fsm.c timer.c firewall.c parse.c buffer.c $(PROXY).c \
-	route.c bufio.c utils.c log.c access.c bin patches config
+	proxyarp.c fsm.c timer.c firewall.c parse.c buffer.c \
+	route.c bufio.c utils.c log.c access.c \
+	proxy.o proxy_tap.o proxy_slip.o proxy_dev.o \
+	bin patches config
 HFILES=config.h diald.h firewall.h fsm.h version.h timer.h bufio.h access.h
 DOCFILES=CHANGES README BUGS THANKS LICENSE doc/diald.man doc/diald-faq.txt \
 	doc/dctrl.man doc/diald-examples.man doc/diald-control.man \

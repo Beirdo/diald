@@ -7,6 +7,7 @@
  */
 
 #include "diald.h"
+#include "proxy.h"
 
 static int dead = 1;
 static int waiting_for_bootp = 0;

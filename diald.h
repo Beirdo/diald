@@ -335,7 +335,7 @@ void block_signals(void);
 void unblock_signals(void);
 void filter_setup(void);
 void get_pty(int *, int *);
-int proxy_open(void);
+int proxy_open(char *);
 void proxy_close(void);
 void proxy_up(void);
 void proxy_down(void);

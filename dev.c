@@ -15,6 +15,7 @@
  */
 
 #include "diald.h"
+#include "proxy.h"
 
 static char device_node[9];
 
