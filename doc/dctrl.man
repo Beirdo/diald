@@ -43,9 +43,7 @@ window.
 Tell
 .B dctrl
 where to find the control fifo for the diald process that
-you wish to control. By default
-.B dctrl
-will use /etc/diald/diald.ctl.
+you wish to control.
 
 .TP
 .B -host \fI<host>\fR -port \fI<port>\fR
