@@ -122,7 +122,12 @@ void ppp_start()
 
 int ppp_set_addrs()
 {
+    static int sock = -1;
     ulong laddr = 0, raddr = 0;
+
+    /* We need a socket. Any socket... */
+    if (sock < 0)
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     /* Try to get the interface number if we don't know it yet. */
     if (link_iface == -1) {
@@ -141,7 +146,7 @@ int ppp_set_addrs()
 	SET_SA_FAMILY (ifr.ifr_dstaddr, AF_INET); 
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
 	sprintf(ifr.ifr_name,"ppp%d",link_iface);
-	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
+	if (ioctl(sock, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
 	   mon_syslog(LOG_ERR,"failed to read ppp interface status: %m");
 	   return 0;
 	}
@@ -157,12 +162,12 @@ int ppp_set_addrs()
 	}
 
 	/* Ok, the interface is up, grab the addresses. */
-	if (ioctl(snoopfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
+	if (ioctl(sock, SIOCGIFADDR, (caddr_t) &ifr) == -1)
 		mon_syslog(LOG_ERR,"failed to get ppp local address: %m");
 	else
        	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
-	if (ioctl(snoopfd, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
+	if (ioctl(sock, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
 	   mon_syslog(LOG_ERR,"failed to get ppp remote address: %m");
 	else
 	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
@@ -171,7 +176,7 @@ int ppp_set_addrs()
 	 * doesn't warn the user and adjust the MTU setting.
 	 * (NOTE: Adjusting the MTU setting may cause kernel nastyness...)
 	 */
-	if (ioctl(snoopfd, SIOCGIFMTU, (caddr_t) &ifr) == -1) {
+	if (ioctl(sock, SIOCGIFMTU, (caddr_t) &ifr) == -1) {
 	    mon_syslog(LOG_ERR,"failed to get ppp mtu setting: %m");
 	} else {
 	    if (ifr.ifr_mtu != mtu) {

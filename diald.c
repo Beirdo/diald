@@ -179,7 +179,7 @@ main(int argc, char *argv[])
 	/* wait up to a second for an event */
         readfds = ctrl_fds;
         if (proxy.fd >= 0) FD_SET(proxy.fd, &readfds);
-        FD_SET(snoopfd,&readfds);
+        if (snoopfd >= 0) FD_SET(snoopfd, &readfds);
 	/* Compute the likely timeout for the next second boundary */
 	ts = tstamp + PAUSETIME*CLK_TCK - ticks();
 	if (ts < 0) ts = 0;
@@ -257,7 +257,9 @@ main(int argc, char *argv[])
 	    }
 
 	    /* update the connection filters */
-	    if (FD_ISSET(snoopfd,&readfds)) filter_read();
+	    if (snoopfd >= 0
+	    && FD_ISSET(snoopfd, &readfds))
+		filter_read();
 
 	    /* deal with packets coming into the pty proxy link */
 	    if (proxy.fd >= 0

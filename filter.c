@@ -101,8 +101,14 @@ void idle_filter_proxy()
 	fwdfd = -1;
     }
 
-    if (snoopfd != -1)
+    if (snoopfd != -1) {
         close(snoopfd);
+	snoopfd = -1;
+    }
+
+    if (proxy.ifunit < 0)
+	return;
+
 #ifdef HAVE_AF_PACKET
     if (af_packet && (snoopfd = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0)
 #endif
