@@ -1,4 +1,0 @@
-#!/bin/sh
-
-/sbin/isdnctrl eaz "$DIALD_DEVICE" "$EAZ_IN"
-/sbin/isdnctrl hangup "$DIALD_DEVICE"
