@@ -64,7 +64,7 @@ install: diald
 	$(INSTALL) -o root -g bin -m 0644 config/diald.defs $(DESTDIR)$(libdir)/diald.defs
 	$(INSTALL) -o root -g bin -m 0644 config/standard.filter $(DESTDIR)$(libdir)/standard.filter
 	$(INSTALL) -d -m 0755 $(DESTDIR)/etc/pam.d
-	$(INSTALL) -o root -g root -m 0644 config/diald.pam $(DESTDIR)/$(sysconfdir)/pam.d/diald
+	$(INSTALL) -o root -g root -m 0644 config/diald.pam $(DESTDIR)/etc/pam.d/diald
 	$(INSTALL) -o root -g bin bin/connect $(DESTDIR)$(libdir)/connect
 
 clean:
