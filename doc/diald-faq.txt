@@ -134,7 +134,7 @@ Note that the address of the diald home page has recently changed!
 
 The most recent release of diald is version 0.16. Diald is available from
 sunsite and the numerous sunsite mirrors. The URL of diald at sunsite is
-ftp://sunsite.unc.edu/pub/Linux/system/Network/serial/diald-0.16.tar.gz. The
+ftp://sunsite.unc.edu/pub/Linux/system/network/serial/diald-0.16.tar.gz. The
 latest version of diald can also be obtained from the diald home page at
 http://www.dna.lth.se/~erics/diald.html.
 
@@ -264,7 +264,8 @@ use to access the modem, and all the programs use UUCP style lock files.
 Note that diald does not use lock files by default. You must request lock
 files with the ``lock'' option. Also note that you must make sure diald
 knows where your other applications put lock files, and that it uses the
-same type of lock files. This must be configured at compile time.
+same type of lock files. See the lock-prefix, pidstring and -pidstring
+options in the diald manual page for more information.
 
 2.6 Can I make diald connect at fixed times (e.g. to deliver mail)?
 

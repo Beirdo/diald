@@ -104,6 +104,59 @@ Major changes between version 0.16 and 0.17.
   that were causing some core dumps. Let me know!
 
 
+Major changes between version 0.16 and 0.17.
+--------------------------------------------
+* Lots of bug fixes to diald:
+  - monititor output no longer has negative values.
+  - impulse code zeros the current impulse at the end of the
+    current time interval.
+  - no more core dumps when empty or bogus initialization files are used.
+  - fixes to prevent core dumps or switches to 99% CPU consumption when
+    a monitoring (dctrl or diald) gets aborted violently.
+  - lock_file option was not working.
+  - fixes to dctrl so it cleans up after itself better
+  - routing code uses proper netmasks to work with the 2.1 kernels
+  - ppp.c argument passing fixups thanks to Jonathan I. Kamens.
+  - The various run time configurable paths now should actually work.
+    (Thanks to a cast of thousands, well maybe half a dozen...).
+  - Killed a race against fork() calls that could cause diald
+    to exec() itself out of existance.
+
+* Makefile changes from Jonathan I. Kamens. You can now do:
+  "make install DESTDIR=/tmp/install" to install in a subtree
+  of your choice.
+
+* Minor changes to the way bidirectional calling works.
+  Incoming calls now succeed, even when "block" is asserted.
+  (Block blocks outgoing traffic.) Some updating to the messages in
+  the log files so you know if a call was incoming or outgoing.
+  [Thanks to Mike Jagdis.]
+
+* Ethernet devices in dev mode used to expect a leading "/dev/"
+  in the name. That was just silly. Now you just give the name of the device.
+  Note that "/dev/XXXX" is still required for the name of a tty device.
+
+* New set of experimental filter rules for simple dynamic IP setups.
+
+* Minor changes in the standard filter rule set to prevent
+  redialing on dead HTTP connections. Even more rules for holding
+  windows boxes at bay.
+
+* New "strict-forwarding" option for use with dynamic local IP addresses.
+  If you turn this on diald will always ignore packets from old sessions.
+  What it really does is ignore any packet that does not have at least
+  one endpoint matching the current local address (which can either be
+  the proxy address when the link is down, or the current dynamic address
+  when the link is up.) It also sends TCP reset packets to the endpoint
+  that originates a TCP packet that is ignored by these rules.
+
+* Fixes so diald can compile with glibc.
+  Thanks to Philip Blundell for these.
+
+* Diald no longer uses SIG_ALRM internally. This should kill race conditions
+  that were causing some core dumps. Let me know!
+
+
 Major changes between version 0.15 and 0.16.
 --------------------------------------------
 * Minor fix for keepalive and outfill options, so diald will compile

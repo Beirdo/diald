@@ -26,6 +26,49 @@ struct {
     {dev_start,dev_set_addrs,dev_dead,dev_stop,dev_reroute,dev_kill,dev_zombie},
 };
 
+/*
+ * Some cruft to try and catch the mysterios disappearing diald.
+ */
+
+void validate_mode()
+{
+	if (mode < 0 || mode > 2) {
+		syslog(LOG_ERR, "Mode value strayed to %d. Tell Eric.\n",mode);
+		die(1);
+	}
+	if (pcontrol[0].start != slip_start
+	|| pcontrol[0].set_addrs != slip_set_addrs
+	|| pcontrol[0].dead != slip_dead
+	|| pcontrol[0].stop != slip_stop
+	|| pcontrol[0].reroute != slip_reroute
+	|| pcontrol[0].kill != slip_kill
+	|| pcontrol[0].zombie != slip_zombie
+	|| pcontrol[1].start != ppp_start
+	|| pcontrol[1].set_addrs != ppp_set_addrs
+	|| pcontrol[1].dead != ppp_dead
+	|| pcontrol[1].stop != ppp_stop
+	|| pcontrol[1].reroute != ppp_reroute
+	|| pcontrol[1].kill != ppp_kill
+	|| pcontrol[1].zombie != ppp_zombie
+	|| pcontrol[2].start != dev_start
+	|| pcontrol[2].set_addrs != dev_set_addrs
+	|| pcontrol[2].dead != dev_dead
+	|| pcontrol[2].stop != dev_stop
+	|| pcontrol[2].reroute != dev_reroute
+	|| pcontrol[2].kill != dev_kill
+	|| pcontrol[2].zombie != dev_zombie) {
+		syslog(LOG_ERR, "Corrupt FSM table. Tell Eric.\n");
+		die(1);
+	}
+}
+
+void control_start() { validate_mode(); (*pcontrol[mode].start)(); }
+int control_set_addrs() { validate_mode(); return (*pcontrol[mode].set_addrs)(); }
+int control_dead() { validate_mode(); return (*pcontrol[mode].dead)(); }
+void control_stop() { validate_mode(); (*pcontrol[mode].stop)(); }
+void control_reroute() { validate_mode(); (*pcontrol[mode].reroute)(); }
+void control_kill() { validate_mode(); (*pcontrol[mode].kill)(); }
+void control_zombie() { validate_mode(); (*pcontrol[mode].zombie)(); }
 
 int blocked = 0;		/* user has blocked the link */
 int state = STATE_DOWN;		/* DFA state */
@@ -46,7 +89,9 @@ void trans_DOWN(void)
 {
     request_down = 0;
     use_req = 0;
-    if (request_up && !blocked) {request_up = 0; GOTO(STATE_CONNECT);}
+    if (request_up && (req_pid || !blocked)) {
+	request_up = 0; GOTO(STATE_CONNECT);
+    }
     else if ((forced || !queue_empty()) && !blocked) GOTO(STATE_CONNECT);
     else if (delayed_quit && queue_empty() && !forced) {
 	syslog(LOG_INFO,"Carrying out delayed termination request.");
@@ -70,7 +115,8 @@ char *cdate(void)
 
 void act_CONNECT(void)
 {
-    if (acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
+    if (!req_pid && acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
+
 	    fprintf(acctfp,"%s: Calling site %s.\n",
 	    cdate(), remote_ip);
 	    fclose(acctfp);
@@ -157,20 +203,23 @@ void trans_KILL_DIAL(void)
 void act_START_LINK(void)
 {
     if (acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
-        fprintf(acctfp,"%s: Connected to site %s.\n",
-	    cdate(), remote_ip);
+        fprintf(acctfp,"%s: %s %s.\n",
+	    cdate(),
+	    use_req ? "Connect request from" : "Connected to site",
+	    remote_ip);
 	fclose(acctfp);
     }
-    (*pcontrol[mode].start)();
+    validate_mode();
+    control_start();
 }
 void trans_START_LINK(void)
 {
-    if ((*pcontrol[mode].dead)()) {
+    if (control_dead()) {
 	/* link protocol died before we really got going */
 	/* We must reroute, just in case we got so far as to change routing */
-   	(*pcontrol[mode].reroute)();
+	control_reroute();
 	GOTO(STATE_DISCONNECT);
-    } else if ((*pcontrol[mode].set_addrs)()) {
+    } else if (control_set_addrs()) {
 	/* Ok, we're up and running. */
 	GOTO(STATE_UP);
     }
@@ -181,26 +230,26 @@ void trans_START_LINK(void)
          *  just in case the routes got changed before we timed out.
 	 */
 	syslog(LOG_INFO,"pppd startup timed out. Check your pppd options. Killing pppd.");
-	(*pcontrol[mode].reroute)();
+	control_reroute();
     }
 }
 
 void act_STOP_LINK(void)
 {
-    (*pcontrol[mode].stop)();
+    control_stop();
 }
 void trans_STOP_LINK(void)
 {
-    if ((*pcontrol[mode].dead)()) GOTO(STATE_DISCONNECT);
+    if (control_dead()) GOTO(STATE_DISCONNECT);
 }
 
 void act_KILL_LINK(void)
 {
-    (*pcontrol[mode].kill)();
+    control_kill();
 }
 void trans_KILL_LINK(void)
 {
-    if ((*pcontrol[mode].dead)()) GOTO(STATE_DISCONNECT);
+    if (control_dead()) GOTO(STATE_DISCONNECT);
 }
 
 void act_UP(void)
@@ -211,6 +260,11 @@ void act_UP(void)
     ppp_half_dead = 0;
     if (buffer_packets)
    	 forward_buffer();
+    if (use_req && acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
+        fprintf(acctfp,"%s: Connected to site %s.\n",
+	    cdate(), remote_ip);
+	fclose(acctfp);
+    }
     /* Once we get here, we might as well kill off any outstanding
      * FIFO requests */
     if (!use_req && req_pid) {
@@ -245,7 +299,7 @@ take_link_down:
 	flush_timeout_queue();
 	/* WARNING: You MUST do this before calling idle_filter_proxy(),
            or the snoop socket will not bind properly! */
-   	(*pcontrol[mode].reroute)();
+	control_reroute();
 	idle_filter_proxy();
 	GOTO(STATE_STOP_LINK);
 	return;
@@ -255,14 +309,14 @@ take_link_down:
 	GOTO(STATE_HALF_DEAD);
 	return;
     }
-    if ((*pcontrol[mode].dead)() || modem_hup) {
+    if (control_dead() || modem_hup) {
 	syslog(LOG_INFO,"Link died on remote end.");
     	if (two_way) flush_timeout_queue();
 	no_redial_delay = 1;
 	current_retry_count = died_retry_count;
 	/* WARNING: You MUST do this before calling idle_filter_proxy(),
            or the snoop socket will not bind properly! */
-   	(*pcontrol[mode].reroute)();
+   	control_reroute();
 	idle_filter_proxy();
 	GOTO(STATE_DISCONNECT);
 	return;
@@ -272,17 +326,17 @@ take_link_down:
 void act_HALF_DEAD(void)
 {
     /* We're half dead, make sure we monitor the correct device... */
-    (*pcontrol[mode].reroute)();
+    control_reroute();
     idle_filter_proxy();
 }
 
 void trans_HALF_DEAD(void)
 {
-    if ((*pcontrol[mode].dead)()) {
+    if ((control_dead)()) {
 	/* link protocol died and did not come back */
-   	(*pcontrol[mode].reroute)();
+   	control_reroute();
 	GOTO(STATE_DISCONNECT);
-    } else if ((*pcontrol[mode].set_addrs)()) {
+    } else if (control_set_addrs()) {
 	/* Ok, we're up and running. */
 	GOTO(STATE_UP);
     }
@@ -292,7 +346,7 @@ void trans_HALF_DEAD(void)
          *  just in case the routes got changed before we timed out.
 	 */
 	syslog(LOG_INFO,"pppd restart timed out. Killing pppd.");
-	(*pcontrol[mode].reroute)();
+	control_reroute();
     }
 }
 
@@ -303,6 +357,12 @@ void act_DISCONNECT(void)
         if (mode != MODE_DEV) {
 	    reopen_modem();
             fork_dialer(disconnector, modem_fd);
+	}
+	else
+	{
+	/* added by jpd so that we can use a disconnect script to bring */
+	/* down the ipppd connection */
+	    fork_connect(disconnector);
 	}
     }
 }
@@ -368,10 +428,10 @@ void trans_RETRY(void)
 void act_ERROR(void)
 {
     syslog(LOG_ERR,"Subprocess sent SIGKILL still alive after %d seconds. Reaping zombie.",kill_timeout);
-    (*pcontrol[mode].zombie)();	/* deal with the zombie */
+    control_zombie();	/* deal with the zombie */
 }
 void trans_ERROR(void) {
-    if ((*pcontrol[mode].dead)()) GOTO(STATE_DISCONNECT);
+    if (control_dead()) GOTO(STATE_DISCONNECT);
 }
 
 void act_ZOMBIE(void)
@@ -431,8 +491,8 @@ void GOTO(int new_state)
     state_timeout = (trans[new_state].timeout)
                      ? *trans[new_state].timeout : -1;
     if (debug&DEBUG_STATE_CONTROL)
-    	syslog(LOG_DEBUG,"new state %s action %d timeout %d",
-	    trans[new_state].name,(int)trans[new_state].action,state_timeout);
+    	syslog(LOG_DEBUG,"new state %s action %p timeout %d",
+	    trans[new_state].name,trans[new_state].action,state_timeout);
     state = new_state;
     output_state();
     (*trans[new_state].action)();

@@ -1,7 +1,5 @@
 # ------------------ USER CONFIGURABLE SETTINGS ---------------------------
 # The directories where files will be installed, you may want to change these.
-# Note that the ETCDIR is where your diald.defs and diald.conf files will be
-# installed. You should make sure that the path names in config.h match!
 
 # dctrl goes here
 BINDIR=/usr/bin
@@ -17,7 +15,7 @@ LIBDIR=/usr/lib/diald
 # Also note that later versions of gcc may generate bad code
 # with the -fomit-frame-pointer option.
 #CFLAGS = -O -g -Wall -fomit-frame-pointer -pipe
-CFLAGS = -O2 -Wall -pipe
+CFLAGS = -O2 -g -Wall -pipe
 
 # If you are using gcc 2.5.8 this will get you QMAGIC executables
 # later versions of gcc do this by default.
@@ -44,10 +42,10 @@ CFLAGS = -O2 -Wall -pipe
 
 OBJFILES=diald.o options.o modem.o filter.o slip.o lock.o ppp.o dev.o \
 	proxyarp.o fsm.o timer.o firewall.o parse.o buffer.o proxy.o \
-	route.o bufio.o
+	route.o bufio.o utils.o
 SOURCEFILES=diald.c options.c modem.c filter.c slip.c lock.c ppp.c dev.c \
 	proxyarp.c fsm.c timer.c firewall.c parse.c buffer.c proxy.c route.c \
-	bufio.c bin patches config
+	bufio.c utils.c bin patches config
 HFILES=config.h diald.h firewall.h fsm.h version.h timer.h bufio.h
 DOCFILES=CHANGES README BUGS THANKS LICENSE doc/diald.man doc/diald-faq.txt \
 	doc/dctrl.man doc/diald-examples.man doc/diald-control.man \
@@ -59,17 +57,21 @@ diald: $(OBJFILES)
 	$(CC) $(LDFLAGS) -o diald $(OBJFILES)
 
 install: diald
-	install -o root -g bin bin/dctrl ${BINDIR}/dctrl
-	install -o root -g bin diald ${SBINDIR}/diald
-	install -o root -g bin -m 0644 doc/diald.man ${MANDIR}/man8/diald.8
-	install -o root -g bin -m 0644 doc/dctrl.man ${MANDIR}/man1/dctrl.1
-	install -o root -g bin -m 0644 doc/diald-examples.man ${MANDIR}/man5/diald-examples.5
-	install -o root -g bin -m 0644 doc/diald-control.man ${MANDIR}/man5/diald-control.5
-	install -o root -g bin -m 0644 doc/diald-monitor.man ${MANDIR}/man5/diald-monitor.5
-	-mkdir ${LIBDIR}
-	install -o root -g bin -m 0644 config/diald.defs ${LIBDIR}/diald.defs
-	install -o root -g bin -m 0644 config/standard.filter ${LIBDIR}/standard.filter
-	install -o root -g bin bin/connect ${LIBDIR}/connect
+	-mkdir -p ${DESTDIR}${BINDIR}
+	install -o root -g bin bin/dctrl ${DESTDIR}${BINDIR}/dctrl
+	-mkdir -p ${DESTDIR}${SBINDIR}
+	install -o root -g bin diald ${DESTDIR}${SBINDIR}/diald
+	-mkdir -p ${DESTDIR}${MANDIR}/man1 ${DESTDIR}${MANDIR}/man5 \
+		${DESTDIR}${MANDIR}/man8
+	install -o root -g bin -m 0644 doc/diald.man ${DESTDIR}${MANDIR}/man8/diald.8
+	install -o root -g bin -m 0644 doc/dctrl.man ${DESTDIR}${MANDIR}/man1/dctrl.1
+	install -o root -g bin -m 0644 doc/diald-examples.man ${DESTDIR}${MANDIR}/man5/diald-examples.5
+	install -o root -g bin -m 0644 doc/diald-control.man ${DESTDIR}${MANDIR}/man5/diald-control.5
+	install -o root -g bin -m 0644 doc/diald-monitor.man ${DESTDIR}${MANDIR}/man5/diald-monitor.5
+	-mkdir -p ${DESTDIR}${LIBDIR}
+	install -o root -g bin -m 0644 config/diald.defs ${DESTDIR}${LIBDIR}/diald.defs
+	install -o root -g bin -m 0644 config/standard.filter ${DESTDIR}${LIBDIR}/standard.filter
+	install -o root -g bin bin/connect ${DESTDIR}${LIBDIR}/connect
 
 clean:
 	rm -f *.o diald

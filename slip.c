@@ -24,7 +24,7 @@ static void start_bootp()
 
     idle_filter_init();
 
-    sprintf(buf,"%s --dev sl%d",PATH_BOOTPC,link_iface);
+    sprintf(buf,"%s --dev sl%d",path_bootpc,link_iface);
     /* FIXME: there is still some possibility of a bad
      * interaction between the signal handlers and the command
      * running on the far side of the pipe. Probably I should
@@ -79,9 +79,10 @@ static int grab_addr(char **var)
 		}
 		break;
 	    }
-	    if (i >= 128)
+	    if (i >= 128) {
 		syslog(LOG_ERR,"Buffer overflow when reading IP address"),
 		die(1);
+	    }
 	}
     }
 done:
@@ -96,7 +97,7 @@ done:
  */
 
 
-static void slip_start_fail(unsigned long data)
+void slip_start_fail(void * data)
 {
    fail = 1;
 }
@@ -178,10 +179,10 @@ void slip_start(void)
     /* mark the interface as up */
     if (netmask) {
         sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    PATH_IFCONFIG,link_iface,local_ip,remote_ip,netmask,mtu);
+	    path_ifconfig,link_iface,local_ip,remote_ip,netmask,mtu);
     } else {
         sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    PATH_IFCONFIG,link_iface,local_ip,remote_ip,mtu);
+	    path_ifconfig,link_iface,local_ip,remote_ip,mtu);
     }
     res = system(buf);
     report_system_result(res,buf);
@@ -249,10 +250,10 @@ int slip_set_addrs()
     /* redo the interface marking and the routing since BOOTP will change it */
     if (netmask) {
         sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    PATH_IFCONFIG,link_iface,local_ip,remote_ip,netmask,mtu);
+	    path_ifconfig,link_iface,local_ip,remote_ip,netmask,mtu);
     } else {
         sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    PATH_IFCONFIG,link_iface,local_ip,remote_ip,mtu);
+	    path_ifconfig,link_iface,local_ip,remote_ip,mtu);
     }
     res = system(buf);
     report_system_result(res,buf);
@@ -311,7 +312,7 @@ int slip_rx_count()
     char buf[128];
     int packets = 0;
     FILE *fp;
-    sprintf(buf,"%s sl%d",PATH_IFCONFIG,link_iface);
+    sprintf(buf,"%s sl%d",path_ifconfig,link_iface);
     if ((fp = popen(buf,"r"))==NULL) {
         syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	return 0;	/* assume half dead in this case... */

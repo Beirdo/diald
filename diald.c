@@ -141,6 +141,7 @@ void main(int argc, char *argv[])
 	    if (FD_ISSET(proxy_mfd,&readfds)) proxy_read();
 	}
 	if (timeout.tv_sec == 0 && timeout.tv_usec == 0) {
+	    fire_timers();
 	    /* advance the clock 1 second */
 	    timeout.tv_sec = PAUSETIME;
 	    timeout.tv_usec = 0;
@@ -164,7 +165,7 @@ void become_daemon()
 {
     int pid;
     FILE *fp;
-    if (daemon) {
+    if (daemon_flag) {
         close(0);
         close(1);
         close(2);
@@ -176,8 +177,8 @@ void become_daemon()
 	/* parent process is finished */
 	if (pid != 0) exit(0);
     }
-    pidfile = malloc(strlen(RUN_PREFIX) + strlen(pidlog) + 2);
-    sprintf(pidfile,"%s/%s",RUN_PREFIX,pidlog);
+    pidfile = malloc(strlen(run_prefix) + strlen(pidlog) + 2);
+    sprintf(pidfile,"%s/%s",run_prefix,pidlog);
     if ((fp = fopen(pidfile,"w")) != NULL) {
         fprintf(fp,"%d\n",getpid());
         fclose(fp);
@@ -205,7 +206,7 @@ void open_fifo()
 	 * are no writers on the remote side of the command fifo.
 	 * This guarantees that there is always at least one writer...
          */
-	if ((fifo_fd = open(fifoname, O_RDWR | O_NDELAY)) >= 0) {
+	if ((fifo_fd = open(fifoname, O_RDWR)) >= 0) {
 	    if (debug&DEBUG_VERBOSE)
 	   	 syslog(LOG_INFO,"Using fifo %s",fifoname);
 	    pipe_init(fifo_fd,&fifo_pipe);
@@ -224,6 +225,10 @@ void open_fifo()
  * Set up the signal handlers.
  */
 static sigset_t sig_mask;
+void stray_signal(int sig)
+{
+	syslog(LOG_ERR, "Stray signal %d ignored", sig);
+}
 
 void signal_setup()
 {
@@ -237,7 +242,6 @@ void signal_setup()
     sigaddset(&sig_mask, SIGUSR1);
     sigaddset(&sig_mask, SIGUSR2);
     sigaddset(&sig_mask, SIGCHLD);
-    sigaddset(&sig_mask, SIGALRM);
     sigaddset(&sig_mask, SIGPIPE);
 
 #define SIGNAL(s, handler)      { \
@@ -253,12 +257,28 @@ void signal_setup()
 
     SIGNAL(SIGHUP, sig_hup);            /* Hangup: modem went down. */
     SIGNAL(SIGINT, sig_intr);           /* Interrupt: take demand dialer down */
-    SIGNAL(SIGTERM, sig_term);          /* Terminate: user take link down */
+    SIGNAL(SIGQUIT, stray_signal);
+    SIGNAL(SIGILL, stray_signal);
+    SIGNAL(SIGABRT, stray_signal);
+    SIGNAL(SIGIOT, stray_signal);
+    SIGNAL(SIGBUS, stray_signal);
+    SIGNAL(SIGFPE, stray_signal);
     SIGNAL(SIGUSR1, linkup);            /* User requests the link to go up */
+    SIGNAL(SIGSEGV, stray_signal);
     SIGNAL(SIGUSR2, print_filter_queue); /* dump the packet queue to the log */
-    SIGNAL(SIGCHLD, sig_chld);		/* reap dead kids */
-    SIGNAL(SIGALRM, alrm_timer);	/* Deal with a timer expired */
     SIGNAL(SIGPIPE, SIG_IGN);
+    SIGNAL(SIGTERM, sig_term);          /* Terminate: user take link down */
+    SIGNAL(SIGSTKFLT, stray_signal);
+    SIGNAL(SIGCHLD, sig_chld);		/* reap dead kids */
+    SIGNAL(SIGURG, stray_signal);
+    SIGNAL(SIGXCPU, stray_signal);
+    SIGNAL(SIGXFSZ, stray_signal);
+    SIGNAL(SIGVTALRM, stray_signal);
+    SIGNAL(SIGPROF, stray_signal);
+    SIGNAL(SIGWINCH, stray_signal);
+    SIGNAL(SIGIO, stray_signal);
+    SIGNAL(SIGPOLL, stray_signal);
+    SIGNAL(SIGPWR, stray_signal);
 }
 
 void block_signals()
@@ -297,6 +317,8 @@ void get_pty(int *mfd, int *sfd)
     int i,c;
     static char buf[128];
 
+    /* FIXME: this is a crudy way to find a pty.
+     */
     for (c = 'p'; c <= 's'; c++)
         for (i = 0; i < 16; i++) {
 	    sprintf(buf,"/dev/pty%c%c",c,ptys[i]);
@@ -309,6 +331,8 @@ void get_pty(int *mfd, int *sfd)
 		return;
 	    }
         }
+    syslog(LOG_ERR,"No pty found in range pty[p-s][0-9a-f]\n");
+    die(1);
 }
 
 /* Read a request off the fifo.
@@ -337,7 +361,7 @@ void get_pty(int *mfd, int *sfd)
 void fifo_read()
 {
     int i;
-    int pid, dev, j,k,l;
+    int pid, dev, j,k,l = 0;
     char *buf, *tail;
 
     i = pipe_read(&fifo_pipe);
@@ -391,7 +415,7 @@ void fifo_read()
 	    } else if (sscanf(buf,"debug %d", &pid) == 1) {
     		syslog(LOG_INFO,"FIFO. Changing debug flags to %d.",pid);
 		debug = pid;
-	    } else if (sscanf(buf,"dynamic %n%*s%n %n",&j,&k,&l) == 1) {
+	    } else if ((sscanf(buf,"dynamic %n%*s%n %n",&j,&k,&l) >= 0) && l) {
 		buf[k] = 0;
 		if (inet_addr(buf+j) == (unsigned long)0xffffffff
 		||  inet_addr(buf+l) == (unsigned long)0xffffffff) {
@@ -418,6 +442,7 @@ void fifo_read()
 		}
 		if (k >= 8) {
 		    /* Check list to see if this is just a status change */
+		    block_signals();	/* don't let anything mess up the data */
 		    new = monitors;
 		    while (new) {
 			if (strcmp(new->name,buf+k) == 0) {
@@ -431,7 +456,7 @@ void fifo_read()
 			if (stat(fifoname,&sbuf) < 0 || !sbuf.st_mode&S_IFIFO) {
 			    syslog(LOG_INFO,"FIFO: %s not a pipe.",
 				buf+k);
-			} else if ((fd = open(buf+k,O_WRONLY))<0) {
+			} else if ((fd = open(buf+k,O_WRONLY|O_NDELAY))<0) {
 			    syslog(LOG_INFO,"FIFO: could not open pipe %s: %m",
 				buf+k);
 			} else {
@@ -444,6 +469,7 @@ void fifo_read()
 			    output_state();
 			}
 		    }
+		    unblock_signals();
 		} else {
 		    syslog(LOG_INFO,"FIFO: empty monitor request ignored");
 		}
@@ -574,8 +600,11 @@ static int in_die = 0;
 void die(int i)
 {
     int count;
+    char tmp[128];
 
     if (!in_die) {
+        sprintf(tmp,"Diald is dieing with code %d",i);
+        syslog(LOG_INFO, tmp);
 	in_die = 1;
 	/* We're killing without a care here. Uhggg. */
 	if (link_pid) kill(link_pid,SIGINT);
@@ -700,9 +729,8 @@ int system(const char *buf)
 
     running_pid = fork();
 
-    if (running_pid != 0) unblock_signals();
-
     if (running_pid < 0) {
+	unblock_signals();
         syslog(LOG_ERR, "failed to fork and run '%s': %m",buf);
 	return -1;
     }
@@ -749,6 +777,9 @@ int system(const char *buf)
         _exit(127);
         /* NOTREACHED */
     }
+
+    unblock_signals();
+
     while (running_pid) {
 	pause();
     }
@@ -765,9 +796,8 @@ void background_system(const char *buf)
 
     pid = fork();
 
-    if (pid != 0) unblock_signals();
-
     if (pid < 0) {
+        unblock_signals();
         syslog(LOG_ERR, "failed to fork and run '%s': %m",buf);
 	return;
     }
@@ -814,11 +844,16 @@ void background_system(const char *buf)
         _exit(127);
         /* NOTREACHED */
     }
+    unblock_signals();
 }
 
+/*
+ * UGH. Pulling stuff out of the monitors list is full of races.
+ */
 void mon_write(int level, char *message,int len)
 {
     MONITORS *c = monitors, *p = 0, *cn;
+    block_signals();	/* don't let anything mess up the data */
     while (c) {
 	cn = c->next;
 	if (c->level&level) {
@@ -826,11 +861,13 @@ void mon_write(int level, char *message,int len)
 		if (errno == EPIPE) {
 		    syslog(LOG_INFO,"Monitor pipe %s closed.",c->name);
 		} else {
+		    syslog(LOG_INFO,"Writing error on pipe %s: %m.",c->name);
 		    /* Write error. The reader probably got swapped out
 		     * or something and the pipe flooded. We'll just "loose"
 		     * the data.
 		     */
 		     p = c;
+		     c = cn;
 		     continue;
 		}
 		close(c->fd);
@@ -844,4 +881,5 @@ void mon_write(int level, char *message,int len)
 	}
 	c = cn;
     }
+    unblock_signals();	/* don't let anything mess up the data */
 }

@@ -11,12 +11,8 @@
 #include "diald.h"
 
 /*
- * SLIP PACKET READING CODE FROM RFC 1055 by J. Romkey.
+ * SLIP PACKET READING AND WRITING CODE FROM RFC 1055 by J. Romkey.
  *
- * RECV_PACKET: receives a packet into the buffer located at "p".
- *      If more than len bytes are received, the packet will
- *      be truncated.
- *      Returns the number of bytes stored in the buffer.
  */
 
 /* SLIP special character codes */
@@ -25,7 +21,60 @@
 #define ESC_END         0334    /* ESC ESC_END means END data byte */
 #define ESC_ESC         0335    /* ESC ESC_ESC means ESC data byte */
 
-int recv_packet(unsigned char *p, int len)
+/* SEND_PACKET: sends a packet of length "len", starting at
+ * location "p".
+ */
+void send_packet(unsigned char *p, size_t len)
+{
+    /* send an initial END character to flush out any data that may
+     * have accumulated in the receiver due to line noise
+     */
+    putc(END,proxy_mfp);
+
+    /* for each byte in the packet, send the appropriate character
+     * sequence
+     */
+    while(len--) {
+	switch(*p) {
+	/* if it's the same code as an END character, we send a
+	 * special two character code so as not to make the
+	 * receiver think we sent an END
+	 */
+	case END:
+	    putc(ESC,proxy_mfp);
+	    putc(ESC_END,proxy_mfp);
+	    break;
+
+	/* if it's the same code as an ESC character,
+	 * we send a special two character code so as not
+	 * to make the receiver think we sent an ESC
+	 */
+	case ESC:
+	    putc(ESC,proxy_mfp);
+	    putc(ESC_ESC,proxy_mfp);
+	    break;
+	/* otherwise, we just send the character
+	 */
+	default:
+	    putc(*p,proxy_mfp);
+	}
+
+	p++;
+    }
+
+    /* tell the receiver that we're done sending the packet
+     */
+    putc(END,proxy_mfp);
+}
+
+/*
+ * RECV_PACKET: receives a packet into the buffer located at "p".
+ *      If more than len bytes are received, the packet will
+ *      be truncated.
+ *      Returns the number of bytes stored in the buffer.
+ */
+
+int recv_packet(unsigned char *p, size_t len)
 {
     int c;
     int received = 0;
@@ -160,10 +209,10 @@ void proxy_config(char *lip, char *rip)
     /* mark the interface as up */
     if (netmask) {
         sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    PATH_IFCONFIG,proxy_iface,lip,rip,netmask,mtu);
+	    path_ifconfig,proxy_iface,lip,rip,netmask,mtu);
     } else {
         sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    PATH_IFCONFIG,proxy_iface,lip,rip,mtu);
+	    path_ifconfig,proxy_iface,lip,rip,mtu);
     }
     res = system(buf);
     report_system_result(res,buf);

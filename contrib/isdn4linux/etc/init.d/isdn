@@ -73,7 +73,7 @@ case "$1" in
 	$SYSPATH\/isdnlog -Dv -m1015 -l1015 -x1015 -C8 /dev/isdnctrl0 
 	
  	sleep 10
-	daemon /sbin/diald device /dev/$DEVICE mode dev &
+	daemon /sbin/diald device $DEVICE mode dev &
 	sleep 10
 
         touch /var/lock/subsys/isdn

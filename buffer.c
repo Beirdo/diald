@@ -97,6 +97,8 @@ void forward_buffer()
     unsigned char pkt[4096];
 
     buffer_check();
+
+    memset(&to,0,sizeof(to));
 #ifdef HAS_SOCKADDR_PKT
     to.spkt_family = AF_INET;
     strcpy(to.spkt_device,snoop_dev);

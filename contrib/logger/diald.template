@@ -3,6 +3,9 @@
 [COUNT -> Attempted to make connection $n times.]
 Calling site
 
+[COUNT -> Received incoming request $n times.]
+Connect request
+
 [COUNT -> Successfully connected $n times.]
 Connected to site
 
