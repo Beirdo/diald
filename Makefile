@@ -22,7 +22,7 @@ LIBDIR=/usr/lib/diald
 #	alias tap0	ethertap
 #	options tap0	-o tap0 unit=0
 #	alias tap1	ethertap
-#	options tap1	-o tap1 unit=0
+#	options tap1	-o tap1 unit=1
 #
 # to you /etc/modules.conf.
 #  If you use proxy - the old slip proxy code - you need a kernel
