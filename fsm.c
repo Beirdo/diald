@@ -98,7 +98,7 @@ void trans_DOWN(void)
 	else
 	    mon_syslog(LOG_NOTICE, "Blocked. Up request ignored");
     }
-    else if ((forced || !queue_empty()) && demand && !blocked)
+    else if ((forced || (!queue_empty() && demand)) && !blocked)
 	GOTO(STATE_CONNECT);
     else if (delayed_quit && queue_empty() && !forced) {
 	mon_syslog(LOG_NOTICE,"Carrying out delayed termination request.");
