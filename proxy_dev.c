@@ -146,7 +146,7 @@ proxy_dev_init(proxy_t *proxy, char *proxydev)
     int d, n;
 
 #ifdef HAVE_AF_PACKET
-    if (af_packet && (d = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0)
+    if (!af_packet || (d = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0)
 #endif
     {
 	af_packet = 0;
