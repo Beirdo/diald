@@ -180,13 +180,6 @@ void slip_start(void)
 	    link_iface);
 
     /* mark the interface as up */
-    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	path_ifconfig,link_iface,local_ip,remote_ip,
-	netmask ? netmask : "255.255.255.255",mtu);
-    res = system(buf);
-    report_system_result(res,buf);
-
-    /* Set the routing for the new slip interface */
     iface_start("sl", link_iface, local_ip, remote_ip);
 
     /* run bootp if it is asked for */

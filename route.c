@@ -47,7 +47,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 	    sprintf(buf,"%s add %s metric %d %s dev %s%d",
 		path_route, rip, metric, win, iftype, ifunit); 
 	}
-	res = system(buf);
+	res = run_shell(SHELL_WAIT, "add route", buf, -1);
 	report_system_result(res, buf);
 
 	if (metric) {
@@ -61,7 +61,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 		sprintf(buf,"%s del %s metric 0 %s dev %s%d",
 		    path_route, rip, win, iftype, ifunit); 
 	    }
-	    res = system(buf);
+	    res = run_shell(SHELL_WAIT, "del route", buf, -1);
 	    report_system_result(res, buf);
 	}
 #endif
@@ -79,7 +79,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 	    sprintf(buf,"%s add default metric %d %s netmask 0.0.0.0 dev %s%d",
 		path_route, metric, win, iftype, ifunit);
 	}
-        res = system(buf);
+        res = run_shell(SHELL_WAIT, "add default route", buf, -1);
     	report_system_result(res, buf);
     }
 
@@ -88,7 +88,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
         sprintf(buf,"%s %s%d %s \"%s\" \"%s\" %d %d",
 	    addroute, iftype, ifunit, (netmask)?netmask:"default",
 	    lip, rip, metric, window);
-	res = system(buf);
+	res = run_shell(SHELL_WAIT, "addroute", buf, -1);
     	report_system_result(res, buf);
     }
 
@@ -113,7 +113,7 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 	    delroute, iftype, ifunit,
 	    (netmask) ? netmask : "default",
 	    lip, rip, metric);
-        res = system(buf);
+        res = run_shell(SHELL_WAIT, "delroute", buf, -1);
         report_system_result(res, buf);
     }
 
@@ -128,7 +128,7 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 	    sprintf(buf, "%s del default metric %d netmask 0.0.0.0 dev %s%d",
 		path_route, metric, iftype, ifunit);
 	}
-        system(buf);
+        run_shell(SHELL_WAIT, "del default route", buf, -1);
     }
 }
 
@@ -147,7 +147,7 @@ iface_start(char *iftype, int ifunit, char *lip, char *rip)
 	    rip ? rip : "",
 	    netmask ? netmask : "255.255.255.255",
 	    metric, mtu);
-	res = system(buf);
+	res = run_shell(SHELL_WAIT, "iface start", buf, -1);
 	report_system_result(res,buf);
     }
 
@@ -178,6 +178,6 @@ iface_stop(char *iftype, int ifunit, char *lip, char *rip)
 
     sprintf(buf, "%s %s%d 0.0.0.0",
 	path_ifconfig, iftype, ifunit);
-    res = system(buf);
+    res = run_shell(SHELL_WAIT, "iface stop", buf, -1);
     report_system_result(res,buf);
 }

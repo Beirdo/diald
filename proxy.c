@@ -90,26 +90,3 @@ proxy_init(proxy_t *proxy, char *proxydev)
 				" Manual control only.");
 	return -1;
 }
-
-
-void
-run_state_script(char *name, char *script, int background)
-{
-    char buf[128];
-
-    snprintf(buf, sizeof(buf)-1, "%s %s %s %s %s",
-	script,
-	snoop_dev,
-	netmask ? netmask : "255.255.255.255",
-	local_ip,
-	remote_ip);
-    buf[sizeof(buf)-1] = '\0';
-
-    if (debug&DEBUG_VERBOSE)
-	mon_syslog(LOG_INFO,"running %s script '%s'", name, buf);
-
-    if (background)
-	background_system(buf);
-    else
-	system(buf);
-}

@@ -197,101 +197,6 @@ void setdtr(int fd, int on)
 
 
 /*
- * fork_dialer - run a program to connect/disconnect the device.
- */
-void fork_dialer(char *prog_type, char *program, int fd)
-{
-    int p[2];
-    PIPE *ctrl_p;
-
-    block_signals();
-
-    if (pipe(p))
-	p[0] = p[1] = -1;
-
-    dial_pid = fork();
-
-    if (dial_pid < 0) {
-	unblock_signals();
-        mon_syslog(LOG_ERR, "failed to fork %s: %m", prog_type);
-	/* FIXME: Probably this should not be fatal */
-        die(1);
-    }
-
-    if (dial_pid == 0) {
-	/* Run in a new process group and foreground ourselves
-	 * on the tty (SIGTTOU is ignored).
-	 * N.B. If we are in dev mode we have /dev/null and
-	 * not a serial line...
-	 */
-	setpgrp();
-	if (tcsetpgrp(modem_fd, getpid()) < 0 && errno != ENOTTY)
-	    mon_syslog(LOG_ERR, "dial: failed to set pgrp: %m");
-
-        /* change the signal actions back to the defaults, then unblock them. */
-        default_sigacts();
-	unblock_signals();
-
-        /* make sure the child doesn't inherit any extra file descriptors */
-	proxy_close();
-	if (fifo_fd != -1) close(fifo_fd);
-	if (tcp_fd != -1) close(tcp_fd);
-	if (pipes) {
-	    PIPE *p = pipes;
-	    while (p) {
-		close(p->fd);
-		p = p->next;
-	    }
-	}
-	if (monitors) {
-	    MONITORS *c = monitors;
-	    while (c) {
-	    	close(c->fd);
-		c = c->next;
-	    }
-	}
-
-	/* make sure the stdin and stdout get directed to the modem */
-        if (fd != 0) { dup2(fd, 0); close(fd); }
-        dup2(0, 1);
-
-	dup2(p[1] >= 0 ? p[1] : 0, 2);
-	if (p[0] >= 0) close(p[0]);
-
-	/* set the current device (compat) */
-	if (current_dev)
-	    setenv("MODEM", current_dev, 1);
-
-	/* set the current command FIFO (if any) */
-	if (fifoname)
-	    setenv("FIFO", fifoname, 1);
-
-	if (current_dev)
-	    setenv("DIALD_DEVICE", current_dev, 1);
-	if (link_name)
-	    setenv("DIALD_LINK", link_name, 1);
-
-        execl("/bin/sh", "sh", "-c", program, (char *)0);
-        mon_syslog(LOG_ERR, "could not exec /bin/sh: %m");
-        _exit(127);
-        /* NOTREACHED */
-    }
-
-    if (p[1] >= 0) close(p[1]);
-
-    if (p[0] >= 0) {
-	if ((ctrl_p = malloc(sizeof(PIPE)))) {
-	    pipe_init(prog_type, 0, p[0], ctrl_p, 0);
-	    FD_SET(p[0], &ctrl_fds);
-	} else
-	    close(p[0]);
-    }
-
-    unblock_signals();
-    mon_syslog(LOG_INFO,"Running %s (pid = %d).", prog_type, dial_pid);
-}
-
-/*
  * Open up a modem and set up the desired parameters.
  */
 int open_modem()
@@ -377,7 +282,8 @@ int open_modem()
 	 * real interface.
 	 */
 	if (!req_pid && connector)
-		fork_dialer("connector", connector, modem_fd);
+		dial_pid = run_shell(SHELL_NOWAIT,
+				"connector", connector, modem_fd);
 	req_pid = 0;
 	return 0;
     }
@@ -430,7 +336,7 @@ int open_modem()
 
 	/* Get rid of any initial line noise after the hangup */
 	tcflush(modem_fd, TCIOFLUSH);
-	fork_dialer("connector", connector, modem_fd);
+	dial_pid = run_shell(SHELL_NOWAIT, "connector", connector, modem_fd);
     } else {
 	/* someone else opened the line, we just set the mode */
 	set_up_tty(modem_fd, 0, inspeed);

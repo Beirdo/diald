@@ -75,7 +75,7 @@ void do_config(void)
 	int res;
 	if (devices && devices[0])
 		setenv("MODEM", devices[0], 1);
-	res = system(deinitializer);
+	res = run_shell(SHELL_WAIT, "deinit", deinitializer, -1);
 	report_system_result(res, deinitializer);
     }
 
@@ -98,7 +98,7 @@ void do_config(void)
         int res;
 	if (devices && devices[0])
 	    setenv("MODEM", devices[0], 1);
-	res = system(initializer);
+	res = run_shell(SHELL_WAIT, "init", initializer, -1);
 	report_system_result(res, initializer);
     }
 
@@ -875,7 +875,7 @@ void die(int i)
 		int res;
 		if (devices && devices[0])
 			setenv("MODEM", devices[0], 1);
-		res = system(deinitializer);
+		res = run_shell(SHELL_WAIT, "deinit", deinitializer, -1);
 		report_system_result(res, deinitializer);
 	}
 
@@ -979,173 +979,6 @@ int report_system_result(int res,char *buf)
     return 1;
 }
 
-int system(const char *buf)
-{
-    int d, p[2];
-    FILE *fd;
-
-    block_signals();
-    if (debug&DEBUG_VERBOSE)
-	mon_syslog(LOG_DEBUG,"running '%s'",buf);
-
-    if (pipe(p))
-	p[0] = p[1] = -1;
-
-    running_pid = fork();
-
-    if (running_pid < 0) {
-	unblock_signals();
-        mon_syslog(LOG_ERR, "failed to fork and run '%s': %m",buf);
-	return -1;
-    }
-
-    if (running_pid == 0) {
-        /* change the signal actions back to the defaults, then unblock them. */
-        default_sigacts();
-	unblock_signals();
-
-        /* Leave the current location */
-        (void) setsid();    /* No controlling tty. */
-        (void) umask (S_IRWXG|S_IRWXO);
-        (void) chdir ("/"); /* no current directory. */
-
-	/* close all fd's the child should not see */
-#if 1
-	/* FIXME: These should not be open to std{in,out,err} anyway
-	 * unless we are not in daemon mode...
-	 */
-	close(0);
-	close(1);
-	close(2);
-#endif
-	if (modem_fd >= 0) close(modem_fd);
-	proxy_close();
-	if (fifo_fd != -1) close(fifo_fd);
-	if (tcp_fd != -1) close(tcp_fd);
-	if (pipes) {
-	    PIPE *c = pipes;
-	    while (c) {
-		close(c->fd);
-		c = c->next;
-	    }
-	}
-	if (monitors) {
-	    MONITORS *c = monitors;
-	    while (c) {
-		close(c->fd);
-		c = c->next;
-	    }
-	}
-
-	/* make sure the stdin, stdout and stderr get directed to /dev/null */
-	d = open("/dev/null", O_RDWR);
-        if (d >= 0) {
-	    if (d != 0) {
-	    	dup2(d, 0);
-		close(d);
-	    }
-	    dup2(p[1] >= 0 ? p[1] : 0, 1);
-            dup2(p[1] >= 0 ? p[1] : 0, 2);
-	    if (p[0] >= 0) close(p[0]);
-        }
-
-        execl("/bin/sh", "sh", "-c", buf, (char *)0);
-        mon_syslog(LOG_ERR, "could not exec /bin/sh: %m");
-        _exit(127);
-        /* NOTREACHED */
-    }
-
-    if (p[1] >= 0) close(p[1]);
-    if (p[0] >= 0 && (fd = fdopen(p[0], "r"))) {
-	char buf[1024];
-
-	while (fgets(buf, sizeof(buf)-1, fd)) {
-	    buf[sizeof(buf)-1] = '\0';
-	    mon_syslog(LOG_DEBUG, "%s", buf);
-	}
-
-	fclose(fd);
-    }
-
-    unblock_signals();
-    while (running_pid)
-	    pause();
-
-    return running_status;
-}
-
-void background_system(const char *buf)
-{
-    int fd, pid;
-
-    block_signals();
-    if (debug&DEBUG_VERBOSE)
-	mon_syslog(LOG_DEBUG,"running '%s'",buf);
-
-    pid = fork();
-
-    if (pid < 0) {
-        unblock_signals();
-        mon_syslog(LOG_ERR, "failed to fork and run '%s': %m",buf);
-	return;
-    }
-
-    if (pid == 0) {
-        /* change the signal actions back to the defaults, then unblock them. */
-        default_sigacts();
-	unblock_signals();
-
-        /* Leave the current location */
-        (void) setsid();    /* No controlling tty. */
-        (void) umask (S_IRWXG|S_IRWXO);
-        (void) chdir ("/"); /* no current directory. */
-
-	/* close all fd's the child should not see */
-#if 1
-	/* FIXME: These should not be open to std{in,out,err} anyway
-	 * unless we are not in daemon mode...
-	 */
-	close(0);
-	close(1);
-	close(2);
-#endif
-	if (modem_fd >= 0) close(modem_fd);
-	proxy_close();
-	if (fifo_fd != -1) close(fifo_fd);
-	if (tcp_fd != -1) close(tcp_fd);
-	if (pipes) {
-	    PIPE *c = pipes;
-	    while (c) {
-		close(c->fd);
-		c = c->next;
-	    }
-	}
-	if (monitors) {
-	    MONITORS *c = monitors;
-	    while (c) {
-		close(c->fd);
-		c = c->next;
-	    }
-	}
-
-	/* make sure the stdin, stdout and stderr get directed to /dev/null */
-	fd = open("/dev/null", O_RDWR);
-        if (fd >= 0) {
-	    if (fd != 0) {
-	    	dup2(fd, 0);
-		close(fd);
-	    }
-	    dup2(0, 1);
-            dup2(0, 2);
-        }
-
-        execl("/bin/sh", "sh", "-c", buf, (char *)0);
-        mon_syslog(LOG_ERR, "could not exec /bin/sh: %m");
-        _exit(127);
-        /* NOTREACHED */
-    }
-    unblock_signals();
-}
 
 /*
  * UGH. Pulling stuff out of the monitors list is full of races.

@@ -376,7 +376,8 @@ void act_DISCONNECT(void)
     dial_status = 0;
     if (disconnector) {
 	reopen_modem();
-        fork_dialer("disconnector", disconnector, modem_fd);
+        dial_pid = run_shell(SHELL_NOWAIT,
+			"disconnector", disconnector, modem_fd);
     }
 }
 void trans_DISCONNECT(void)

@@ -179,6 +179,11 @@ typedef struct monitors {
     char *name;
 } MONITORS;
 
+
+#define SHELL_NOWAIT	0
+#define SHELL_WAIT	1
+extern int run_shell(int mode, const char *name, const char *buf, int fd);
+
 /* Configuration variables */
 
 char **devices;
@@ -293,6 +298,7 @@ int forced;			/* has the user requested the link forced up? */
 int link_pid;			/* current pppd command pid */
 int dial_pid;			/* current dial command pid */
 int running_pid;		/* current system command pid */
+int running_status;		/* status of last system command */
 int dial_status;		/* status from last dial command */
 int state_timeout;		/* state machine timeout counter */
 int state;			/* DFA state */
@@ -451,7 +457,6 @@ int clear_proxyarp (unsigned int);
 int report_system_result(int,char *);
 void mon_syslog(int pri, char *fmt, ...);
 void mon_write(unsigned int,char *,int);
-void background_system(const char *);
 void block_timer();
 void unblock_timer();
 char *cdate(time_t);
