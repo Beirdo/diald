@@ -226,7 +226,7 @@ main(int argc, char *argv[])
 			} else
 #endif
 			if ((p = malloc(sizeof(PIPE)))) {
-			    char def[] = "default";
+			    char def[] = "simple default";
 			    char buf[1024];
 			    int n;
 			    n = snprintf(buf, sizeof(buf)-2, "TCP %s:%d",
