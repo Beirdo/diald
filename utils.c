@@ -35,68 +35,88 @@ int getsn(FILE *fp,char *buf,int len)
     return i;
 }
 
+
 struct proto {
 	char *name;
 	int proto;
 };
 
 static struct proto *protos = NULL;
-static int proto_init=0;
-static int proto_lines=0;
+static int proto_init = 0;
+static int proto_lines = 0;
 
-static void init_protos()
+
+static void
+init_protos(void)
 {
-    FILE *fp;
-    char line[1024];
-    char name[20];
-    int proto;
+	char **alias;
+	struct protoent *proto_entry;
 
-    if ((fp = fopen("/etc/protocols","r"))) {
-	while (getsn(fp,line,1024) != EOF) {
-	    if (sscanf(line,"%19s %d",name,&proto) == 2)
+	setprotoent(1);
+	while ((proto_entry = getprotoent())) {
 		proto_lines++;
-	}
-	fclose(fp);
-    	if ((fp = fopen("/etc/protocols","r"))) {
-	    protos = malloc(sizeof(struct proto)*proto_lines);
-	    proto_lines = 0;
-	    while (getsn(fp,line,1024) != EOF) {
-		if (sscanf(line,"%19s %d",name,&proto) == 2) {
-		    protos[proto_lines].name = strdup(name);
-		    protos[proto_lines].proto = proto;
-		    proto_lines++;
+		alias = proto_entry->p_aliases;
+		/* also count any aliases listed in /etc/protocols */
+		while (*alias) {
+			proto_lines++;
+			alias++;
 		}
-	    }
-	    fclose(fp);
 	}
-    }
-    proto_init=1;
+	endprotoent();
+
+	setprotoent(1);
+	protos = malloc(sizeof(struct proto) * proto_lines);
+	proto_lines = 0;
+	while ((proto_entry = getprotoent())) {
+		protos[proto_lines].name = strdup(proto_entry->p_name);
+		protos[proto_lines].proto = proto_entry->p_proto;
+		proto_lines++;
+		alias = proto_entry->p_aliases;
+		while (*alias) {
+			protos[proto_lines].name = strdup(*alias);
+			protos[proto_lines].proto = proto_entry->p_proto;
+			proto_lines++;
+			alias++;
+		}
+	}
+	endprotoent();
+
+	proto_init=1;
 }
 
-int getprotocol(const char *name)
+
+int
+getprotocol(const char *name)
 {
-    int i;
-    if (!proto_init)
-	init_protos();
-    for (i = 0; i < proto_lines; i++)
-	if (strcmp(protos[i].name,name) == 0)
-	    return protos[i].proto;
-    return 0;
+	int i;
+
+	if (!proto_init)
+		init_protos();
+
+	for (i = 0; i < proto_lines; i++)
+		if (strcmp(protos[i].name,name) == 0)
+			return protos[i].proto;
+	return 0;
 }
 
-char *getprotonumber(int proto)
+
+char *
+getprotonumber(int proto)
 {
-    static char buf[16];
-    int i;
+	static char buf[16];
+	int i;
 
-    if (!proto_init)
-	init_protos();
-    for (i = 0; i < proto_lines; i++)
-	if (protos[i].proto == proto)
-	    return protos[i].name;
-    sprintf(buf, "%d", proto);
-    return buf;
+	if (!proto_init)
+		init_protos();
+
+	for (i = 0; i < proto_lines; i++)
+		if (protos[i].proto == proto)
+			return protos[i].name;
+
+	sprintf(buf, "%d", proto);
+	return buf;
 }
+
 
 struct serv {
 	char *name;
@@ -105,88 +125,63 @@ struct serv {
 };
 
 static struct serv *servs = NULL;
-static int serv_init=0;
-static int serv_lines=0;
+static int serv_init = 0;
+static int serv_lines = 0;
 
-static void init_servs()
+
+static void
+init_servs(void)
 {
-    FILE *fp;
-    char line[1024];
-    char name[20];
-    char proto[20];
-    int serv;
+	char **alias;
+	struct servent *serv_entry;
 
-    if ((fp = fopen("/etc/services","r"))) {
-	while (getsn(fp,line,1024) != EOF) {
-	    if (sscanf(line,"%19s %d/%s",name,&serv,proto) == 3)
+	setservent(1);
+	while ((serv_entry = getservent())) {
 		serv_lines++;
-	}
-	fclose(fp);
-    	if ((fp = fopen("/etc/services","r"))) {
-	    servs = malloc(sizeof(struct serv)*serv_lines);
-	    serv_lines = 0;
-	    while (getsn(fp,line,1024) != EOF) {
-	    	if (sscanf(line,"%19s %d/%s",name,&serv,proto) == 3) {
-		    servs[serv_lines].name = strdup(name);
-		    servs[serv_lines].proto = strdup(proto);
-		    servs[serv_lines].serv = serv;
-		    serv_lines++;
+		alias = serv_entry->s_aliases;
+		/* also count any aliases listed in /etc/services */
+		while (*alias){
+			serv_lines++;
+			alias++;
 		}
-	    }
-	    fclose(fp);
 	}
-    }
-    serv_init=1;
+	endservent();
+  
+	setservent(1);
+	servs = malloc(sizeof(struct serv) * serv_lines);
+	serv_lines = 0;
+	while ((serv_entry = getservent())) {
+		servs[serv_lines].name = strdup(serv_entry->s_name);
+		servs[serv_lines].proto = strdup(serv_entry->s_proto);
+		servs[serv_lines].serv = serv_entry->s_port;
+		serv_lines++;
+		alias = serv_entry->s_aliases;
+		while (*alias) {
+			servs[serv_lines].name = strdup(*alias);
+			servs[serv_lines].proto = strdup(serv_entry->s_proto);
+			servs[serv_lines].serv = serv_entry->s_port;
+			serv_lines++;
+			alias++;
+		}
+	}
+	endservent();
+
+	serv_init=1;
 }
 
-int getservice(const char *name, const char *proto)
-{
-    int i;
-    if (!serv_init)
-	init_servs();
-    for (i = 0; i < serv_lines; i++)
-	if (strcmp(servs[i].name,name) == 0
-	&& strcmp(servs[i].proto,proto) == 0) {
-	    return servs[i].serv;
-        }
-    return 0;
-}
 
-#if 0
-/* Stuff needed because to keep checker happy,
- * because the fast versions of these address memory in four
- * byte blocks, which are often outside of permitted ranges.
- */
-int strlen(const char *s)
+int
+getservice(const char *name, const char *proto)
 {
-   int i = 0;
-   while (*s++)
-	i++;
-   return i;
-}
+	int i;
 
-char *strdup(const char *s)
-{
-     char *t = malloc(strlen(s)+1);
-     char *t2 = t;
-     while ((*t++ = *s++));
-     return t2;
-}
+	if (!serv_init)
+		init_servs();
 
-char *strrchr(const char *s, int c)
-{
-    int i;
-    for (i = strlen(s)-1; i >= 0; i--)
-	if (s[i] == c) return (char *)&s[i];
-    return 0;
-}
+	for (i = 0; i < serv_lines; i++)
+		if (strcmp(servs[i].name,name) == 0
+		&& strcmp(servs[i].proto,proto) == 0)
+			return servs[i].serv;
 
-char *strcat(char *dest, const char *src)
-{
-	char *p = dest;
-	while ((*p++));
-	p--;
-	while ((*p++ = *src++));
-	return dest;
+	return 0;
 }
-#endif
