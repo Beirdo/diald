@@ -119,8 +119,7 @@ void trans_CONNECT(void)
 	if (dial_status == 0) {
 	    dial_failures = 0;
 	    redial_rtimeout = redial_timeout;
-	    if (mode != MODE_DEV)
-	        finish_dial(); /* go into a CLOCAL connection */
+	    finish_dial(); /* go into a CLOCAL connection */
 	    GOTO(STATE_START_LINK);
 	} else {
 	    mon_syslog(LOG_INFO,"Connect script failed.");
@@ -339,9 +338,7 @@ void act_DISCONNECT(void)
 {
     dial_status = 0;
     if (disconnector) {
-        if (mode != MODE_DEV) {
-	    reopen_modem();
-	}
+	reopen_modem();
         fork_dialer("disconnector", disconnector, modem_fd);
     }
 }
@@ -459,6 +456,11 @@ struct {
 void output_state()
 {
     if (monitors) {
+	if (link_name) {
+	    mon_write(MONITOR_VER2|MONITOR_STATE, "TITLE\n", 6);
+	    mon_write(MONITOR_VER2|MONITOR_STATE, link_name, strlen(link_name));
+	    mon_write(MONITOR_VER2|MONITOR_STATE, "\n", 1);
+	}
 	mon_write(MONITOR_STATE,"STATE\n",6);
 	mon_write(MONITOR_STATE,trans[state].name,strlen(trans[state].name));
 	mon_write(MONITOR_STATE,"\n",1);

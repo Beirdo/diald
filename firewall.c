@@ -826,7 +826,7 @@ static char * pcountdown(char *buf, long secs)
     /* Make sure that we don't try to print values that overflow our buffer */
     if (secs < 0) secs = 0;
     if (secs > 359999) secs = 359999;
-    sprintf(buf,"%02ld:%02ld:%02ld\n",secs/3600,(secs/60)%60,secs%60);
+    sprintf(buf,"%02ld:%02ld:%02ld",secs/3600,(secs/60)%60,secs%60);
     return buf;
 }
 
@@ -977,9 +977,9 @@ int ctl_firewall(int op, struct firewall_req *req)
 		(blocked ? '1' : '0'),
 		(forced ? '1' : '0')
 	    );
-	    mon_write(MONITOR_STATUS, buf, 12);
+	    mon_write(MONITOR_VER2|MONITOR_STATUS, buf, 12);
 
-	    mon_write(MONITOR_QUEUE|MONITOR_QUEUE2,"QUEUE\n",6);
+	    mon_write(MONITOR_QUEUE,"QUEUE\n",6);
 	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
 		if (c->timer.next == 0) continue;
 		if (!c->description) c->description = desc_connection(c);
@@ -992,12 +992,12 @@ int ctl_firewall(int op, struct firewall_req *req)
 		c->bytes_total[0] += c->bytes[0];
 		c->bytes_total[1] += c->bytes[1];
 		c->packets[0] = c->packets[1] = c->bytes[0] = c->bytes[1] = 0;
-                mon_write(MONITOR_QUEUE2, buf, strlen(buf));
+                mon_write(MONITOR_VER2|MONITOR_QUEUE, buf, strlen(buf));
 		buf[60] = '\n';
 		buf[61] = '\0';
-                mon_write(MONITOR_QUEUE, buf, strlen(buf));
+                mon_write(MONITOR_VER1|MONITOR_QUEUE, buf, strlen(buf));
 	    }
-	    mon_write(MONITOR_QUEUE|MONITOR_QUEUE2,"END QUEUE\n",10);
+	    mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
 	    return 0;
 	}
 	return 0;

@@ -34,7 +34,7 @@ static void start_bootp()
 	mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	die(1);
     }
-    pipe_init("BOOTP", fileno(bootpfp),&bootp_pipe, 0);
+    pipe_init("BOOTP", 1, fileno(bootpfp),&bootp_pipe, 0);
     have_local = 0;
     have_remote = 0;
     waiting_for_bootp = 1;

@@ -19,6 +19,7 @@ int inspeed = DEFAULT_SPEED;
 int window = 0;
 int mtu = DEFAULT_MTU;
 int mru = DEFAULT_MTU;
+char *link_name = 0;
 char *initializer = 0;
 char *deinitializer = 0;
 char *connector = 0;
@@ -114,10 +115,13 @@ struct {
     {"pidfile","<f>",1,&pidlog,set_str},
     {"fifo","<f>",1,&fifoname,set_str},
     {"tcpport","<n>",1,&tcpport,set_int},
-    {"blocked","",0,&blocked,set_flag},
-    {"-blocked","",0,&blocked,clear_flag},
-    {"blocked-route","",0,&blocked_route,set_flag},
-    {"-blocked-route","",0,&blocked_route,clear_flag},
+    {"blocked","",0,&blocked,set_blocked},
+    {"-blocked","",0,&blocked,clear_blocked},
+    {"block","",0,&blocked,set_blocked},
+    {"unblock","",0,&blocked,clear_blocked},
+    {"blocked-route","",0,&blocked_route,set_blocked_route},
+    {"-blocked-route","",0,&blocked_route,clear_blocked_route},
+    {"linkname","<name>",1,&link_name,set_str},
     {"initializer","<script>",1,&initializer,set_str},
     {"deinitializer","<script>",1,&deinitializer,set_str},
 /* scheduling */
@@ -209,12 +213,16 @@ struct {
 
 void init_vars()
 {
+    /* FIXME: there are many strdup'd strings here that we just
+     * drop whenever a monitor issues a "reset" command...
+     */
     devices = 0;
     device_count = 0;
     inspeed = DEFAULT_SPEED;
     window = 0;
     mtu = DEFAULT_MTU;
     mru = DEFAULT_MTU;
+    link_name = 0;
     initializer = 0;
     deinitializer = 0;
     connector = 0;
@@ -360,6 +368,42 @@ void clear_flag(int *var, char **argv)
     *var = 0;
 }
 
+void set_blocked(int *var, char **argv)
+{
+    if (!blocked_route && state == STATE_DOWN && *var == 0) {
+	del_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, 1);
+	del_ptp("sl", proxy_iface, orig_remote_ip);
+    }
+    *var = 1;
+}
+
+void clear_blocked(int *var, char **argv)
+{
+    if (!blocked_route && state == STATE_DOWN && *var == 1) {
+	set_ptp("sl", proxy_iface, orig_remote_ip, 1);
+	add_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, 1);
+    }
+    *var = 0;
+}
+
+void set_blocked_route(int *var, char **argv)
+{
+    if (blocked && state == STATE_DOWN && *var == 0) {
+	set_ptp("sl", proxy_iface, orig_remote_ip, 1);
+	add_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, 1);
+    }
+    *var = 1;
+}
+
+void clear_blocked_route(int *var, char **argv)
+{
+    if (blocked && state == STATE_DOWN && *var == 1) {
+	del_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, 1);
+	del_ptp("sl", proxy_iface, orig_remote_ip);
+    }
+    *var = 0;
+}
+
 void read_config_file(int *var, char **argv)
 {
     parse_options_file(argv[0]);
@@ -456,15 +500,113 @@ void trim_whitespace(char *s)
     }
 }
 
-/* Parse the given options file */
-void parse_options_file(char *file)
+/* Parse the given options line */
+void parse_options_line(char *line)
 {
-    char line[MAXLINELEN];
     char *argv[MAXARGS];
     char *s;
     char *t1,*t2;
 
     int argc, i;
+
+    trim_whitespace(line);
+    argc = 0;
+    for (s = line, argc = 0; *s && argc < MAXARGS; s++) {
+	if (*s == ' ' || *s == '\t')
+	    *s = 0;
+	else if (*s == '#' && argc == 0) /* the line is a comment */
+	    return;
+	else if (*s == '\"' || *s == '\'') {
+	    char delim = *s;
+	    /* start of a quoted argument */
+	    s++;
+	    argv[argc] = s;
+	    while (*s) {
+		if (*s == delim) { *s++ = 0; break; }
+		if (*s == '\\' && s[1] != 0) s++;
+		s++;
+	    }
+	    s--;
+	    /* go back and fix up "quoted" characters */
+	    t1 = t2 = argv[argc++];
+	    while (*t1) {
+		if (*t1 == '\\') {
+		    t1++;
+		    /* do a translation */
+		    switch (*t1) {
+		    case 'a': *t1 = '\a'; break;
+		    case 'b': *t1 = '\b'; break;
+		    case 'f': *t1 = '\f'; break;
+		    case 'n': *t1 = '\n'; break;
+		    case 'r': *t1 = '\r'; break;
+		    case 's': *t1 = ' '; break;
+		    case 't': *t1 = '\t'; break;
+		    default:
+			if (*t1 >= '0' && *t1 <= '8') {
+			    int val = 0, n;
+			    for (n = 0;
+			    n < 3 && (*t1 >= '0' && *t1 <= '8');
+			    ++n) {
+				val = (val << 3) + (*t1 & 07);
+				t1++;
+			    }
+			    *(--t1) = val;
+			    break;
+			}
+			if (*t1 == 'x') {
+			    int val = 0, n, digit;
+			    t1++;
+			    for (n = 0; n < 2 && isxdigit(*t1); ++n) {
+				digit = toupper(*t1) -'0';
+				if (digit > 10)
+				    digit += '0' + 10 - 'A';
+				val = (val << 4) + digit;
+				t1++;
+			    }
+			    *(--t1) = val;
+			    break;
+			}
+			/* character is itself, don't muck with it. */
+		    }
+		}
+		*t2++ = *t1++;
+	    }
+	    *t2++ = 0;
+	} else { /* just a normal word */
+	    argv[argc++] = s;
+	    while (*s) {
+		if (*s == ' ' || *s == '\t') break;
+		s++;
+	    }
+	    s--;
+	}
+    }
+    *s = 0;
+    if (argc == 0)
+        return;
+
+    for (i = 0; commands[i].str; i++)
+        if (strcmp(commands[i].str,argv[0]) == 0)
+	    break;
+    if (commands[i].parser) {
+        argc -= commands[i].args;
+        if (argc < 0) {
+	    mon_syslog(LOG_ERR,"Insufficient arguments to option '%s'",argv[0]);
+        } else {
+	    (commands[i].parser)(commands[i].var,&argv[1]);
+        }
+    } else if (strcmp("pppd-options",argv[0]) == 0) {
+	copy_pppd_args(argc-1,&argv[1]);
+    } else {
+	mon_syslog(LOG_ERR,"Unknown option '%s'",*argv);
+    }
+}
+
+/* Parse the given options file */
+void parse_options_file(char *file)
+{
+    char line[MAXLINELEN];
+
     FILE *fp = fopen(file,"r");
 
     if (fp == NULL) {
@@ -472,98 +614,7 @@ void parse_options_file(char *file)
 	return;	/* no options file */
     }
     while (getsn(fp,line,1024) != EOF) {
-	trim_whitespace(line);
-	argc = 0;
-	for (s = line, argc = 0; *s && argc < MAXARGS; s++) {
-	    if (*s == ' ' || *s == '\t')
-		*s = 0;
-	    else if (*s == '#' && argc == 0) /* the line is a comment */
-		goto comment;
-	    else if (*s == '\"' || *s == '\'') {
-		char delim = *s;
-		/* start of a quoted argument */
-		s++;
-		argv[argc] = s;
-		while (*s) {
-		    if (*s == delim) { *s++ = 0; break; }
-		    if (*s == '\\' && s[1] != 0) s++;
-		    s++;
-		}
-		s--;
-		/* go back and fix up "quoted" characters */
-		t1 = t2 = argv[argc++];
-		while (*t1) {
-		   if (*t1 == '\\') {
-			t1++;
-			/* do a translation */
-			switch (*t1) {
-			case 'a': *t1 = '\a'; break;
-			case 'b': *t1 = '\b'; break;
-			case 'f': *t1 = '\f'; break;
-			case 'n': *t1 = '\n'; break;
-			case 'r': *t1 = '\r'; break;
-			case 's': *t1 = ' '; break;
-			case 't': *t1 = '\t'; break;
-			default:
-			    if (*t1 >= '0' && *t1 <= '8') {
-				int val = 0, n;
-				for (n = 0;
-				n < 3 && (*t1 >= '0' && *t1 <= '8');
-				++n) {
-				    val = (val << 3) + (*t1 & 07);
-				    t1++;
-				}
-				*(--t1) = val;
-				break;
-			    }
-			    if (*t1 == 'x') {
-				int val = 0, n, digit;
-				t1++;
-				for (n = 0; n < 2 && isxdigit(*t1); ++n) {
-				    digit = toupper(*t1) -'0';
-				    if (digit > 10)
-					digit += '0' + 10 - 'A';
-				    val = (val << 4) + digit;
-				    t1++;
-				}
-				*(--t1) = val;
-				break;
-			    }
-			    /* character is itself, don't muck with it. */
-			}
-		   }
-		   *t2++ = *t1++;
-		}
-		*t2++ = 0;
-	    } else { /* just a normal word */
-		argv[argc++] = s;
-		while (*s) {
-		    if (*s == ' ' || *s == '\t') break;
-		    s++;
-		}
-		s--;
-	    }
-	}
-	*s = 0;
-	if (argc == 0)
-	    goto comment;
-
-	for (i = 0; commands[i].str; i++)
-	    if (strcmp(commands[i].str,argv[0]) == 0)
-		break;
-	if (commands[i].parser) {
-	    argc -= commands[i].args;
-	    if (argc < 0) {
-		mon_syslog(LOG_ERR,"Insufficient arguments to option '%s'",argv[0]);
-	    } else {
-	        (commands[i].parser)(commands[i].var,&argv[1]);
-	    }
-	} else if (strcmp("pppd-options",argv[0]) == 0) {
-		copy_pppd_args(argc-1,&argv[1]);
-	} else {
-	    mon_syslog(LOG_ERR,"Unknown option '%s'",*argv);
-	}
-comment:;
+	parse_options_line(line);
     }
     fclose(fp);
 }

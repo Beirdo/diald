@@ -174,7 +174,21 @@ main(int argc, char *argv[])
     	timeout.tv_sec = ts/CLK_TCK;
     	timeout.tv_usec = 1000*(ts%CLK_TCK)/CLK_TCK;
 	sel = select(256,&readfds,0,0,&timeout);
-	if (sel > 0) {
+	if (sel < 0 && errno == EBADF) {
+	    PIPE *p;
+	    /* Yuk, one of the pipes is probably broken. It cannot
+	     * be fifo_fd or tcp_fd. It must be a [dis]connector.
+	     * Is this correct select behaviour or is it a bug either
+	     * in the kernel or glibc?
+	     */
+	    p = pipes;
+	    while (p) {
+		PIPE *tmp = p->next;
+		if (p->fd != fifo_fd && p->fd != tcp_fd)
+		    ctrl_read(p);
+		p = tmp;
+	    }
+	} else if (sel > 0) {
 	    PIPE *p;
 	    if (tcp_fd != -1) {
 		if (FD_ISSET(tcp_fd,&readfds)) {
@@ -201,7 +215,7 @@ main(int argc, char *argv[])
 			} else
 #endif
 			if ((p = malloc(sizeof(PIPE)))) {
-			    pipe_init("TCP", fd, p, 0);
+			    pipe_init("TCP", 1, fd, p, 0);
 			    FD_SET(fd, &ctrl_fds);
 			    mon_syslog(LOG_INFO, "TCP connection from %s port %d",
 				inet_ntoa(sa.sin_addr), sa.sin_port);
@@ -308,7 +322,7 @@ void open_fifo()
             if (fifo_pipe) {
 	        if (debug&DEBUG_VERBOSE)
 	   	    syslog(LOG_INFO,"Using fifo %s",fifoname);
-	        pipe_init("FIFO", fifo_fd, fifo_pipe, 1);
+	        pipe_init("FIFO", 1, fifo_fd, fifo_pipe, 1);
 		FD_SET(fifo_fd, &ctrl_fds);
             } else {
 	        syslog(LOG_ERR,"Could not open fifo pipe %m");
@@ -469,6 +483,7 @@ void get_pty(int *mfd, int *sfd)
 
 /* Read a request from the command pipe.
  * Valid requests are:
+ *	config		- modify diald configuration.
  *	block		- block diald from calling out.
  *	unblock		- unblock diald from calling out.
  *	down		- bring the link down.
@@ -501,6 +516,7 @@ void ctrl_read(PIPE *pipe)
     if (i < 0) {
 	PIPE **tmp;
 	FD_CLR(pipe->fd, &ctrl_fds);
+/* XXX */mon_syslog(LOG_INFO, "%s: closing pipe fd %d", pipe->name, pipe->fd);
 	close(pipe->fd);
         tmp = &pipes;
         while (*tmp) {
@@ -521,12 +537,18 @@ void ctrl_read(PIPE *pipe)
 	    /* Ok, we've got a line, now we need to "parse" it. */
 	    if (!*buf) {
 		/* Empty line. Probably \r\n? */
+	    } else if (!pipe->is_ctrl) {
+		/* Not a control pipe - just messages from a script */
+		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
+	    } else if (strncmp(buf, "config ", 7) == 0) {
+		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
+		parse_options_line(buf+7);
 	    } else if (strcmp(buf,"block") == 0) {
 		mon_syslog(LOG_INFO, "%s: block request", pipe->name);
-		blocked = 1;
+		parse_options_line(buf);
 	    } else if (strcmp(buf,"unblock") == 0) {
 		mon_syslog(LOG_INFO, "%s: unblock request", pipe->name);
-		blocked = 0;
+		parse_options_line(buf);
 	    } else if (strcmp(buf,"force") == 0) {
 		mon_syslog(LOG_INFO, "%s: force request", pipe->name);
 		forced = 1;
@@ -918,11 +940,15 @@ int report_system_result(int res,char *buf)
 
 int system(const char *buf)
 {
-    int fd;
+    int d, p[2];
+    FILE *fd;
 
     block_signals();
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_DEBUG,"running '%s'",buf);
+
+    if (pipe(p))
+	p[0] = p[1] = -1;
 
     running_pid = fork();
 
@@ -943,9 +969,14 @@ int system(const char *buf)
         (void) chdir ("/"); /* no current directory. */
 
 	/* close all fd's the child should not see */
+#if 1
+	/* FIXME: These should not be open to std{in,out,err} anyway
+	 * unless we are not in daemon mode...
+	 */
 	close(0);
 	close(1);
 	close(2);
+#endif
 	if (modem_fd >= 0) close(modem_fd);
 	close(proxy_mfd);      /* close the master pty endpoint */
 	close(proxy_sfd);      /* close the slave pty endpoint */
@@ -967,14 +998,15 @@ int system(const char *buf)
 	}
 
 	/* make sure the stdin, stdout and stderr get directed to /dev/null */
-	fd = open("/dev/null", O_RDWR);
-        if (fd >= 0) {
-	    if (fd != 0) {
-	    	dup2(fd, 0);
-		close(fd);
+	d = open("/dev/null", O_RDWR);
+        if (d >= 0) {
+	    if (d != 0) {
+	    	dup2(d, 0);
+		close(d);
 	    }
-	    dup2(0, 1);
-            dup2(0, 2);
+	    dup2(p[1] >= 0 ? p[1] : 0, 1);
+            dup2(p[1] >= 0 ? p[1] : 0, 2);
+	    if (p[0] >= 0) close(p[0]);
         }
 
         execl("/bin/sh", "sh", "-c", buf, (char *)0);
@@ -985,9 +1017,22 @@ int system(const char *buf)
 
     unblock_signals();
 
-    while (running_pid) {
-	pause();
+    if (p[1] >= 0) close(p[1]);
+    if (p[0] >= 0 && (fd = fdopen(p[0], "r"))) {
+	char buf[1024];
+
+	while (fgets(buf, sizeof(buf)-2, fd)) {
+	    buf[sizeof(buf)-2] = '\n';
+	    buf[sizeof(buf)-1] = '\0';
+	    mon_syslog(LOG_DEBUG, "%s", buf);
+	}
+
+	fclose(fd);
     }
+
+    while (running_pid)
+	    pause();
+
     return running_status;
 }
 
@@ -1018,9 +1063,14 @@ void background_system(const char *buf)
         (void) chdir ("/"); /* no current directory. */
 
 	/* close all fd's the child should not see */
+#if 1
+	/* FIXME: These should not be open to std{in,out,err} anyway
+	 * unless we are not in daemon mode...
+	 */
 	close(0);
 	close(1);
 	close(2);
+#endif
 	if (modem_fd >= 0) close(modem_fd);
 	close(proxy_mfd);      /* close the master pty endpoint */
 	close(proxy_sfd);      /* close the slave pty endpoint */
@@ -1075,7 +1125,7 @@ void mon_write(unsigned int level, char *message, int len)
     block_signals();	/* don't let anything mess up the data */
     while (c) {
 	cn = c->next;
-	if ((c->level & level)
+	if ((c->level & level) == level
 	&& (!(level & MONITOR_MESSAGE) || pri <= (c->level & 0xff000000))) {
 	    if (write(c->fd,message,len) < 0) {
 		if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -1091,9 +1141,9 @@ void mon_write(unsigned int level, char *message, int len)
 		close(c->fd);
 		if (p) p->next = c->next;
 		else monitors = c->next;
+		mon_syslog(LOG_INFO,"Monitor pipe %s closed.",c->name);
 		free(c->name);
 		free(c);
-		mon_syslog(LOG_INFO,"Monitor pipe %s closed.",c->name);
 	    } else {
 		p = c;
 	    }

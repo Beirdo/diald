@@ -3,7 +3,7 @@
 exec wish "$0" "$@"
 
 # User tunable parameters
-set imagepath "/usr/share/diald"
+set imagepath "/usr/lib/diald"
 set diald_FIFO ""
 set diald_HOST ""
 set diald_PORT 0
@@ -15,7 +15,7 @@ set fifofd ""
 set fifo_counter 0
 
 # Initial values
-set monlevel "0x0700011f"
+set monlevel "0x0700017f"
 set monstate 0.0
 set queue_list [list]
 set max_info_lines 500
@@ -23,6 +23,17 @@ set out_usage bps
 set in_usage bps
 set out_bandwidth [expr 33600 / 8]
 set in_bandwidth [expr 33600 / 8]
+
+# These should be proc static but Tcl has no such concept.
+set txtotal 0
+set status(rx_total) 0.0
+set status(tx_total) 0.0
+set status(rx_load) 0.0
+set status(tx_load) 0.0
+set status(rx_load5) 0.0
+set status(tx_load5) 0.0
+set status(rx_load150) 0.0
+set status(tx_load150) 0.0
 
 
 # Tool tip handling
@@ -190,7 +201,7 @@ set colors(ZOMBIE)	{black black black}
 
 # Set up the basic data for the app
 
-wm title . "Diald Control"
+wm title . "Diald: No link"
 wm iconname . "Diald"
 wm minsize . 1 1
 
@@ -290,8 +301,12 @@ proc closeMonitor {} {
 	catch { close $fifofd }
 	set fifofd ""
     }
+
     .toolbar.up configure -state disabled
     .toolbar.down configure -state disabled
+
+    wm title . "Diald: No link"
+    wm iconname . "Diald"
 }
 
 proc openMonitor {} {
@@ -492,15 +507,18 @@ proc user_number { n } {
 }
 
 proc readMonitor {} {
-    global monstate monfd
+    global monstate monfd status
     global queue_list status trans colors gload tload
     global in_usage out_usage in_bandwidth out_bandwidth
     global blocked forced max_info_lines
 
-    set foo [gets $monfd]
+    if {[gets $monfd foo] == -1} {
+	closeMonitor
+	return 0
+    }
 
     switch " $foo" {
-	{ STATE}		{ set monstate 1.0; return 0 }
+	{ STATE}	{ set monstate 1.0; return 0 }
 	{ STATUS}	{ set monstate 2.0; return 0 }
 	{ STATUS2}	{ set monstate 3.0; return 0 }
 	{ QUEUE}		{ set monstate 4.0
@@ -526,6 +544,7 @@ proc readMonitor {} {
 			set queue_list [list]
 			return 0
 			}
+	{ TITLE}	{ set monstate 8.0; return 0; }
     }
 
     if {$monstate < 1.0} {
@@ -585,7 +604,7 @@ proc readMonitor {} {
 	}
 	set do_tail 0
 	if {[.message.vis.text index "end-1c"] > 1.0} {
-	    if {[lindex [.message.vis.scroll get] 1] == 1} {
+	    if {[lindex [.message.vis.yscroll get] 1] == 1} {
 		set do_tail 1
 	    }
 	    .message.vis.text insert end "\n"
@@ -602,8 +621,9 @@ proc readMonitor {} {
 	}
     } elseif {$monstate < 8.0} {
 	if {$status(fsm)=="UP"} {
+	    global txtotal
 	    switch $monstate {
-		7.0	{ set txtotal $foo; set $monstate 7.1 }
+		7.0	{ set txtotal $foo; set monstate 7.1 }
 		7.1	{
 			set rxtotal $foo
 			set monstate 0.0
@@ -638,6 +658,10 @@ proc readMonitor {} {
 		}
 	    }
 	}
+    } elseif {$monstate < 9.0} {
+	set monstate 0.0
+	wm title . "Diald: $foo"
+	wm iconname . "$foo"
     }
     update
 }
@@ -660,7 +684,7 @@ proc dctrlQuit {} {
 frame .menu -relief raised -bd 2
 pack .menu -side top -fill x -expand 0
 
-frame .spacer -width 480 -height 0
+frame .spacer -width 560 -height 0
 pack .spacer -side top
 
 menubutton .menu.file -text "File" -menu .menu.file.m -underline 0
@@ -753,7 +777,7 @@ pack .toolbar.up .toolbar.down \
 	-side left
 
 # Basic status display
-frame .basic
+frame .basic -relief groove -bd 2
 label .basic.p1 -text "Interface "
 label .basic.p2 -textvar status(iface)
 label .basic.p3 -text " from "
@@ -771,11 +795,9 @@ pack .basic.p6 -side left
 pack .basic.p7 -side left
 pack .basic.p8 -side left
 
-frame .bar1 -bor 1 -rel sunken -height 2
-
 
 # Link status display
-frame .status -bor 0
+frame .status -relief groove -bd 2
 
 set col1 {"Link Status" "Next Alarm" "Forcing Rule"}
 set col2 {status(up) status(timeout) status(force)}
@@ -839,11 +861,10 @@ foreach i $col6 {
     incr i0
 }
 
-frame .bar2 -bor 1 -rel sunken -height 2
 
 # Textual load monitor...
 
-frame .tlm -bor 0
+frame .tlm -relief groove -bd 2
 label .tlm.l1 -text "RX Load/Total"
 message .tlm.l2l -textvar status(rx_load) -width 100 -bor 1 -rel sunken
 message .tlm.l2t -textvar status(rx_total) -width 100 -bor 1 -rel sunken
@@ -857,10 +878,9 @@ pack .tlm.l3 -side left -expand 0 -fill x
 pack .tlm.l4l -side left -expand 1 -fill x
 pack .tlm.l4t -side left -expand 1 -fill x
 
-frame .bar3 -bor 1 -rel sunken -height 2
 
 # Graphical load monitor...
-frame .lm -bor 0
+frame .lm -relief groove -bd 2
 # 60 is a good height. Divisible by 1 through 6 evenly, but high enough to see.
 stripchart .lm.tx 100 60 "TX"
 frame .lm.sep -width 2 -bor 2 -rel sunken
@@ -869,10 +889,9 @@ pack .lm.rx -side left -expand 1 -fill both -pady 0
 pack .lm.sep -side left -fill y -pady 0
 pack .lm.tx -side left -expand 1 -fill both -pady 0
 
-frame .bar4 -bor 1 -rel sunken -height 2
 
 # Connection queue
-frame .queue -bor 0
+frame .queue -relief groove -bd 2
 frame .queue.menu -relief raised -bd 2
 pack .queue.menu -side top -anchor nw -fill x -expand 0
   label .queue.menu.label -text "Connection Queue"
@@ -900,33 +919,32 @@ pack .queue.menu -side top -anchor nw -fill x -expand 0
   pack .queue.menu.label -side left
   pack .queue.menu.out_traffic .queue.menu.in_traffic -side right
 frame .queue.vis -bor 0
-text .queue.vis.text -bor 0 -yscrollcommand ".queue.vis.scroll set" -height 6 -width 72 -highlightthickness 0 -wrap none -insertontime 0
-scrollbar .queue.vis.scroll -relief sunken -command ".queue.vis.text yview" -highlightthickness 0
+text .queue.vis.text -bor 0 -yscrollcommand ".queue.vis.yscroll set" -height 6 -width 72 -highlightthickness 0 -wrap none -insertontime 0
+scrollbar .queue.vis.yscroll -relief sunken -command ".queue.vis.text yview" -highlightthickness 0
 pack .queue.vis.text -side left -fill both -expand 1 -pady 0
-pack .queue.vis.scroll -side right -fill y -pady 0
+pack .queue.vis.yscroll -side right -fill y -pady 0
 pack .queue.vis -side top -fill both -expand 1 -pady 0
 
-frame .bar5 -bor 1 -rel sunken -height 2
 
 # Information
-frame .message -bor 0
+frame .message -relief groove -bd 2
 frame .message.menu -relief raised -bd 2
 pack .message.menu -side top -anchor nw -fill x -expand 0
 label .message.menu.label -text "Information"
 pack .message.menu.label -side left
 frame .message.vis
 text .message.vis.text -bor 0 \
-	-height 8 -width 60 -highlightthickness 0 -wrap none -insertontime 0 \
+	-height 8 -width 60 -highlightthickness 0 -insertontime 0 \
 	-yscrollcommand ".message.vis.yscroll set" \
-	-xscrollcommand ".message.vis.xscroll set"
+	-wrap none -xscrollcommand ".message.vis.xscroll set"
 scrollbar .message.vis.yscroll -relief sunken -highlightthickness 0 \
 	-command ".message.vis.text yview"
 scrollbar .message.vis.xscroll -relief sunken -highlightthickness 0 \
 	-orient horizontal \
 	-command ".message.vis.text xview"
-pack .message.vis.text -side left -fill both -padx 2 -pady 2 -expand 1
 pack .message.vis.yscroll -side right -fill y
-pack .message.vis.xscroll -side bottom -fill x -expand 1
+pack .message.vis.xscroll -side bottom -anchor s -fill x
+pack .message.vis.text -side left -fill both -padx 2 -pady 2 -expand 1
 pack .message.vis -side top -fill both -expand 1 -pady 0
 
 proc repack {} {
@@ -934,15 +952,10 @@ proc repack {} {
 
     pack forget .toolbar
     pack forget .basic
-    pack forget .bar1
     pack forget .status
-    pack forget .bar2
     pack forget .tlm
-    pack forget .bar3
     pack forget .lm
-    pack forget .bar4
     pack forget .queue
-    pack forget .bar5
     pack forget .message
 
     if {$toolbar} {
@@ -950,25 +963,22 @@ proc repack {} {
     }
     pack .basic -anchor nw -expand 0 -fill x -side top
     if {$dstatus} {
-    	pack .bar1 -fill x -side top
     	pack .status -side top -fill both -expand 0 -pady 0
     }
     if {$tload} {
-        pack .bar2 -fill x -side top
         pack .tlm -side top -fill both -expand 0 -pady 0
     }
     if {$gload} {
-	pack .bar3 -fill x -side top
     	pack .lm -side top -fill both -expand 0 -pady 0
     }
     if {$pqueue} {
-    	pack .bar4 -fill x -side top
     	pack .queue -side top -fill both -expand 1 -pady 0
     }
     if {$dlog} {
-    	pack .bar5 -fill x -side top
         pack .message -side top -fill both -expand 1 -pady 0
     }
+
+    wm geometry .
 }
 
 repack

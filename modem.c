@@ -198,7 +198,13 @@ void setdtr(int fd, int on)
  */
 void fork_dialer(char *prog_type, char *program, int fd)
 {
+    int p[2];
+    PIPE *ctrl_p;
+
     block_signals();
+
+    if (pipe(p))
+	p[0] = p[1] = -1;
 
     dial_pid = fork();
 
@@ -237,8 +243,9 @@ void fork_dialer(char *prog_type, char *program, int fd)
 	/* make sure the stdin and stdout get directed to the modem */
         if (fd != 0) { dup2(fd, 0); close(fd); }
         dup2(0, 1);
-	/* FIXME: direct the stderr to the console? */
-        dup2(0, 2);
+
+	dup2(p[1] >= 0 ? p[1] : 0, 2);
+	if (p[0] >= 0) close(p[0]);
 
 	setenv("MODEM",current_dev,1);	/* set the current device */
 	if (fifoname)		/* set the current command FIFO (if any) */
@@ -247,6 +254,16 @@ void fork_dialer(char *prog_type, char *program, int fd)
         mon_syslog(LOG_ERR, "could not exec /bin/sh: %m");
         _exit(127);
         /* NOTREACHED */
+    }
+
+    if (p[1] >= 0) close(p[1]);
+
+    if (p[0] >= 0) {
+	if ((ctrl_p = malloc(sizeof(PIPE)))) {
+	    pipe_init(prog_type, 0, p[0], ctrl_p, 0);
+	    FD_SET(p[0], &ctrl_fds);
+	} else
+	    close(p[0]);
     }
 
     unblock_signals();
@@ -284,10 +301,35 @@ int open_modem()
 		current_dev = req_dev;
 		use_req=1;
 		req_pid=0;
+		modem_fd = open("/dev/null", O_RDWR);
 	} else {
+#if 1
+		for (i = 0; i < device_count; i++) {
+	    		current_dev = devices[(i+rotate_offset)%device_count];
+
+			if (!lock_dev || !lock(current_dev))
+				break;
+
+			current_dev = 0;
+		}
+
+		if (i == device_count) {
+			mon_syslog(LOG_INFO,
+				"Couldn't find a free device to call out on.");
+			current_dev = 0;
+			dial_status = -1;
+			return 2;
+		}
+
+		if (rotate_devices)
+			rotate_offset = (rotate_offset+1)%device_count;
+#else
 		current_dev = devices[rotate_offset];
 		if (rotate_devices)
 			rotate_offset = (rotate_offset+1)%device_count;
+#endif
+
+		modem_fd = open("/dev/null", O_RDWR);
 
 		/* If we have a connector we may need to run it to set up the
 		 * real interface.
@@ -404,6 +446,9 @@ void reopen_modem()
 {
     int npgrpid;
 
+    if (mode == MODE_DEV)
+	return;
+
     if(debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_INFO,"Reopening modem device");
 
@@ -439,6 +484,9 @@ void reopen_modem()
 
 void finish_dial()
 {
+    if (mode == MODE_DEV)
+	return;
+
     if (!req_pid)
         set_up_tty(modem_fd, 0, inspeed);
 }
@@ -448,49 +496,46 @@ void finish_dial()
  */
 void close_modem()
 {
-    current_dev = 0;
-
-    if (mode == MODE_DEV) {
-	req_pid = 0;
-	modem_fd = -1 ;
-	return ;
-    }
-
     if (debug&DEBUG_VERBOSE)
-        mon_syslog(LOG_INFO,"Closing modem line.");
+        mon_syslog(LOG_INFO,"Closing %s", current_dev);
 
-    if (modem_fd < 0) {
+    current_dev = 0;
+    if (modem_fd < 0)
  	return;
+
+    if (mode != MODE_DEV) {
+	/* Get rid of what ever might be waiting to go out still */
+	tcflush(modem_fd, TCIOFLUSH);
+
+	/*
+	 * Restore the initial termio settings.
+	 */
+
+	if (restore_term) {
+	    tcsetattr(modem_fd, TCSANOW, &inittermios);
+	}
+
+	/*
+	 * Hang up the modem up by dropping the DTR.
+	 * We do this because the initial termio settings
+	 * may not have set HUPCL. This forces the issue.
+	 * We need the sleep to give the modem a chance to hang
+	 * up before we get another program asserting the DTR.
+	 */
+	setdtr(modem_fd, 0);
+	sleep(1);
     }
-
-    /* Get rid of what ever might be waiting to go out still */
-    tcflush(modem_fd, TCIOFLUSH);
-
-    /*
-     * Restore the initial termio settings.
-     */
-
-    if (restore_term) {
-	tcsetattr(modem_fd, TCSANOW, &inittermios);
-    }
-
-    /*
-     * Hang up the modem up by dropping the DTR.
-     * We do this because the initial termio settings
-     * may not have set HUPCL. This forces the issue.
-     * We need the sleep to give the modem a chance to hang
-     * up before we get another program asserting the DTR.
-     */
-    setdtr(modem_fd, 0);
-    sleep(1);
 
     close(modem_fd);
-    if (use_req) {
-	if (debug&DEBUG_VERBOSE)
-	    mon_syslog(LOG_INFO, "Killing requesting shell pid %d",req_pid);
-	killpg(req_pid, SIGKILL);
-	kill(req_pid, SIGKILL);
-	req_pid = 0;
-    } else if (lock_dev) unlock();
     modem_fd = -1;
+
+    if (use_req) {
+	if (req_pid) {
+	    if (debug&DEBUG_VERBOSE)
+		mon_syslog(LOG_INFO, "Killing requesting shell pid %d",req_pid);
+	    killpg(req_pid, SIGKILL);
+	    kill(req_pid, SIGKILL);
+	    req_pid = 0;
+	}
+    } else if (lock_dev) unlock();
 }

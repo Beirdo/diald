@@ -169,6 +169,12 @@ Note that these commands can be used within a file to
 include another file.
 
 .TP
+.B linkname \fI<name>\fR
+Specifies a name or description to be used for this link. The name
+will be sent to monitors that connect as an aid in identifying the
+link in question.
+
+.TP
 .B scheduler \fI<class>\fR
 Set diald's scheduling class. Valid choices for systems that
 support POSIX scheduling classes are:

@@ -116,7 +116,8 @@
 #define MONITOR_LOAD		0x00000008
 #define MONITOR_MESSAGE		0x00000010
 #define MONITOR_QUEUE		0x00000020
-#define MONITOR_QUEUE2		0x00000100
+#define MONITOR_VER1		0x00000080
+#define MONITOR_VER2		0x00000100
 
 /*
  * If you choose UNSAFE_ROUTING=0, then by default diald will route all
@@ -209,6 +210,7 @@ int inspeed;
 int window;
 int mtu;
 int mru;
+char *link_name;
 char *initializer;
 char *deinitializer;
 char *connector;
@@ -341,6 +343,7 @@ int ppp_half_dead;		/* is the ppp link half dead? */
 /* function prototypes */
 void init_vars(void);
 void parse_init(void);
+void parse_options_line(char *);
 void parse_options_file(char *);
 void parse_args(int, char *[]);
 void check_setup(void);
@@ -383,6 +386,10 @@ void set_scheduler(char **, char **);
 void set_int(int *, char **);
 void set_flag(int *, char **);
 void clear_flag(int *, char **);
+void set_blocked(int *, char **);
+void clear_blocked(int *, char **);
+void set_blocked_route(int *, char **);
+void clear_blocked_route(int *, char **);
 void set_mode(char **, char **);
 void set_dslip_mode(char **, char **);
 void read_config_file(int *, char **);
@@ -454,7 +461,7 @@ void set_ptp(char *, int, char *, int);
 void del_ptp(char *, int, char *);
 void add_routes(char *, int, char *, char *, int);
 void del_routes(char *, int, char *, char *, int);
-void pipe_init(char *, int, PIPE *, int);
+void pipe_init(char *, int, int, PIPE *, int);
 int pipe_read(PIPE *);
 void pipe_flush(PIPE *, int);
 int set_proxyarp (unsigned int);

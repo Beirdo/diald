@@ -8,10 +8,11 @@
 
 #include "diald.h"
 
-void pipe_init(char *name, int fd,PIPE *pipe, int flush)
+void pipe_init(char *name, int is_ctrl, int fd, PIPE *pipe, int flush)
 {
     char buf[2];
     pipe->name = name;
+    pipe->is_ctrl = is_ctrl;
     pipe->fd = fd;
     pipe->count = 0;
     fcntl(fd,F_SETFL,fcntl(fd,F_GETFL)|O_NONBLOCK);
@@ -38,11 +39,15 @@ int pipe_read(PIPE *pipe)
     if (i > 0) {
 	pipe->count += i;
 	return pipe->count;
+    } else if (i == 0 || errno == EAGAIN) {
+	if (1 || pipe->is_ctrl) {
+	    mon_syslog(LOG_ERR,"EOF on %s. Closing pipe fd %d", pipe->name, pipe->fd);
+	}
+	return -1;
+    } else if (errno == EINTR) {
+	return 0;
     } else {
-	if (i == 0 || errno == EAGAIN)
-	    mon_syslog(LOG_ERR,"EOF on control fifo. Closing fifo.");
-	else
-	    mon_syslog(LOG_ERR,"Error on control fifo: %m");
+	mon_syslog(LOG_ERR,"Error on %s: %m", pipe->name);
 	return -1;	/* error! shut down reader... */
     }
 }

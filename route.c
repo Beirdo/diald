@@ -110,11 +110,6 @@ void del_routes(char *itype, int iface, char *lip, char *rip, int metric)
         system(buf);
     }
 
-    if (debug&DEBUG_VERBOSE)
-	mon_syslog(LOG_INFO, "Deleting pointopoint route for %s%d",itype,iface);
-    sprintf(buf,"%s del %s metric %d dev %s%d",path_route,rip,metric,itype,iface); 
-    res = system(buf);
-
     if (delroute) {
 	/* call delroute <iface> <netmask> <local> <remote> */
         sprintf(buf,"%s %s%d %s %s %s %d",
@@ -122,4 +117,9 @@ void del_routes(char *itype, int iface, char *lip, char *rip, int metric)
         res = system(buf);
         report_system_result(res,buf);
     }
+
+    if (debug&DEBUG_VERBOSE)
+	mon_syslog(LOG_INFO, "Deleting pointopoint route for %s%d",itype,iface);
+    sprintf(buf,"%s del %s metric %d dev %s%d",path_route,rip,metric,itype,iface); 
+    res = system(buf);
 }

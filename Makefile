@@ -79,6 +79,7 @@ install: diald
 	install -o root -g bin -m 0644 doc/diald-control.man ${DESTDIR}${MANDIR}/man5/diald-control.5
 	install -o root -g bin -m 0644 doc/diald-monitor.man ${DESTDIR}${MANDIR}/man5/diald-monitor.5
 	-mkdir -p ${DESTDIR}${LIBDIR}
+	install -o root -g bin *.gif ${DESTDIR}${LIBDIR}
 	install -o root -g bin -m 0644 config/diald.defs ${DESTDIR}${LIBDIR}/diald.defs
 	install -o root -g bin -m 0644 config/standard.filter ${DESTDIR}${LIBDIR}/standard.filter
 	install -o root -g bin bin/connect ${DESTDIR}${LIBDIR}/connect
