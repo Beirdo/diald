@@ -1,11 +1,11 @@
 # ------------------ USER CONFIGURABLE SETTINGS ---------------------------
-# The directories where files will be installed, you may want to change these.
 
 # Once you have read, understood, and made any necessary changes
 # you may comment out the next two lines.
 unconfig:
 	@echo 'EDIT THE CONFIG SETTINGS IN THE MAKEFILE!'; exit 1
 
+# The directories where files will be installed, you may want to change these.
 # dctrl goes here
 BINDIR=/usr/bin
 # diald goes here
@@ -14,23 +14,6 @@ SBINDIR=/usr/sbin
 MANDIR=/usr/man
 # the configuration files go here
 LIBDIR=/usr/lib/diald
-
-# Choose a proxy interface type. If you use tap you need to build
-# a kernel with ethertap support. If you build ethertap as a module
-# you need to add lines like:
-#
-#	alias tap0	ethertap
-#	options tap0	-o tap0 unit=0
-#	alias tap1	ethertap
-#	options tap1	-o tap1 unit=1
-#
-# to you /etc/modules.conf.
-#  If you use proxy - the old slip proxy code - you need a kernel
-# built with slip support.
-#  The new tap code is preferred. Expect the slip code to removed
-# in a future version of diald. Prepare.
-PROXY = tap
-#PROXY = proxy
 
 # Compiler flags. Note that with gcc 2.5.8 using -g without -O
 # will cause it to miscompile the filter parsing code.

@@ -10,6 +10,10 @@
 
 #include "diald.h"
 
+
+/* N.B. 2.0 Linux kernels do not have AF_NETLINK or ethertap. */
+#ifdef AF_NETLINK
+
 #include <sys/uio.h>
 #include <netinet/if_ether.h>
 #include <linux/types.h>
@@ -167,3 +171,5 @@ unlock:
 
     return -1;
 }
+
+#endif /* AF_NETLINK */

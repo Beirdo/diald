@@ -10,11 +10,6 @@
 
 #include "diald.h"
 
-#include <sys/uio.h>
-#include <netinet/if_ether.h>
-#include <linux/types.h>
-#include <linux/netlink.h>
-
 
 void
 send_packet(unsigned short wprot, unsigned char *p, size_t len)
@@ -82,8 +77,10 @@ proxy_init(proxy_t *proxy, char *proxydev)
 	if (proxydev)
 		return proxy_dev_init(proxy, proxydev);
 
+#ifdef AF_NETLINK
 	if ((fd = proxy_tap_init(proxy, NULL)) >= 0)
 		return fd;
+#endif
 	if ((fd = proxy_slip_init(proxy, NULL)) >= 0)
 		return fd;
 	mon_syslog(LOG_ERR, "Unable to get a proxy interface."

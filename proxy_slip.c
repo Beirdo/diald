@@ -223,34 +223,47 @@ proxy_slip_init(proxy_t *proxy, char *proxydev)
     /* change proxy_sfd to 8 bit clean line, 38400 speed */
     set_up_tty(proxy_sfd,1, 38400);
 
-    if (ioctl(proxy_sfd, TIOCGETD, &orig_disc) < 0)
-	mon_syslog(LOG_ERR,"Can't get line discipline on proxy device: %m"), die(1);
+    if (ioctl(proxy_sfd, TIOCGETD, &orig_disc) < 0) {
+	mon_syslog(LOG_ERR,"Can't get line discipline on proxy device: %m");
+	goto close_and_fail;
+    }
 
     /* change line disciple to SLIP and set the SLIP encapsulation */
     disc = N_SLIP;
     if ((unit = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
 	if (errno == ENFILE) {
-	   mon_syslog(LOG_ERR,"No free slip device available for proxy."), die(1);
+	   mon_syslog(LOG_ERR,"No free slip device available for proxy.");
+	   goto close_and_fail;
 	} else if (errno == EEXIST) {
 	    mon_syslog(LOG_ERR,"Proxy device already in slip mode!?");
 	} else if (errno == EINVAL) {
 	    mon_syslog(LOG_ERR,"SLIP not supported by kernel, can't build proxy.");
-	    die(1);
-	} else
-	   mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
+	    goto close_and_fail;
+	} else {
+	   mon_syslog(LOG_ERR,"Can't set line discipline: %m");
+	   goto close_and_fail;
+	}
     }
 
-    if (ioctl(proxy_sfd, SIOCSIFENCAP, &sencap) < 0)
-	mon_syslog(LOG_ERR,"Can't set encapsulation: %m"), die(1);
+    if (ioctl(proxy_sfd, SIOCSIFENCAP, &sencap) < 0) {
+	mon_syslog(LOG_ERR,"Can't set encapsulation: %m");
+	goto close_and_fail;
+    }
 
     /* verify that it worked */
-    if (ioctl(proxy_sfd, TIOCGETD, &disc) < 0)
-	mon_syslog(LOG_ERR,"Can't get line discipline: %m"), die(1);
-    if (ioctl(proxy_sfd, SIOCGIFENCAP, &sencap) < 0)
-	mon_syslog(LOG_ERR,"Can't get encapsulation: %m"), die(1);
+    if (ioctl(proxy_sfd, TIOCGETD, &disc) < 0) {
+	mon_syslog(LOG_ERR,"Can't get line discipline: %m");
+	goto close_and_fail;
+    }
+    if (ioctl(proxy_sfd, SIOCGIFENCAP, &sencap) < 0) {
+	mon_syslog(LOG_ERR,"Can't get encapsulation: %m");
+	goto close_and_fail;
+    }
 
-    if (disc != N_SLIP || sencap != 0)
-        mon_syslog(LOG_ERR,"Couldn't set up the proxy link correctly!"), die(1);
+    if (disc != N_SLIP || sencap != 0) {
+        mon_syslog(LOG_ERR,"Couldn't set up the proxy link correctly!");
+	goto close_and_fail;
+    }
 
     if (debug&DEBUG_VERBOSE)
         mon_syslog(LOG_INFO,"Proxy device established on interface sl%d",
@@ -267,4 +280,9 @@ proxy_slip_init(proxy_t *proxy, char *proxydev)
     proxy->release = proxy_slip_release;
     proxy->fd = d;
     return d;
+
+close_and_fail:
+    close(d);
+    close(proxy_sfd);
+    return -1;
 }

@@ -10,11 +10,6 @@
 
 #include "diald.h"
 
-#include <sys/uio.h>
-#include <netinet/if_ether.h>
-#include <linux/types.h>
-#include <linux/netlink.h>
-
 
 static char *current_proxy;
 #ifdef HAVE_AF_PACKET

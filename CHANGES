@@ -1,5 +1,10 @@
 Major changes between version 0.98.2 and 0.98.4.
 ------------------------------------------------
+  - Ethertap/SLIP proxy is no longer a compile time option. Diald
+    will search first for a usable ethertap interface and then
+    fall back on using a pseudo terminalled SLIP interface if
+    necessary. If all the SLIP interfaces are in use diald will
+    come up with no proxy and you will have to "up" it manually.
   - If the lock option is specified we create a device lock
     for incoming devices if one does not already exist. This is
     because newer versions of the kernel ISDN code appear to bounce
