@@ -139,6 +139,10 @@ ignore udp tcp.source=udp.route
 # Anything else gest 2 minutes.
 accept udp 120 any
 
+# Ignore some background protocols.
+ignore igmp any
+ignore ospfigp any
+
 # Catch any packets that we didn't catch above and give the connection
 # 30 seconds of live time.
 accept any 30 any
