@@ -535,8 +535,10 @@ when we have finished managing it.
 .TP
 .B connect \fI<p>\fR
 Use the executable or shell script \fI<p>\fR to set up the
-serial line. This normally dials the modem and starts up
-the remote SLIP or PPP session.
+serial line. This normally dials the modem, starts up
+the \fBremote\fR SLIP or PPP session. It should \fBnot\fR
+start SLIP or PPP locally - diald will do this itself
+once the connect script returns a success (zero) exit status.
 The command \fI<p>\fR
 is started with the standard output and input directed
 at the modem device.
