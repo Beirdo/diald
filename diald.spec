@@ -40,9 +40,19 @@ rm -rf "$RPM_BUILD_ROOT"
 %doc %{_mandir}/man5/diald-control.5
 %doc %{_mandir}/man5/diald-monitor.5
 %doc %{_mandir}/man8/diald.8
-%config %attr (0644, root, root) /usr/lib/diald/connect
-%attr (0755, root, root) /usr/sbin/diald
-%attr (0755, root, root) /usr/bin/dctrl
-%attr (0644, root, root) /usr/share/diald/*.gif
-%attr (0644, root, root) /usr/share/diald/diald.defs
-%attr (0644, root, root) /usr/share/diald/standard.filter
+/usr/sbin/diald
+/usr/bin/dctrl
+/etc/pam.d/diald
+/usr/share/diald/dctrl/*.gif
+/usr/share/diald/diald.defs
+/usr/share/diald/standard.filter
+/usr/share/diald/dynamic.filter
+/usr/share/diald/connect
+/usr/share/diald/disconnect
+/usr/share/diald/device/dhcp
+/usr/share/diald/device/dhcp.hangup
+/usr/share/diald/device/isdn
+/usr/share/diald/device/isdn.hangup
+/usr/share/diald/modem/generic
+/usr/share/diald/login/demon
+/usr/share/diald/login/shell-generic

@@ -24,8 +24,8 @@ disconnect()
 	# If this device has a hangup script we use it to hang up
 	# the physical link.
 	if [ -n "$dial_script"  -a "$dial_script" != '-' \
-	-a -x "$CFG_SCRIPTS/$dial_script.hangup" ]; then
-		"$CFG_SCRIPTS/$dial_script.hangup"
+	-a -x "$CFG_SCRIPTS/device/$dial_script.hangup" ]; then
+		"$CFG_SCRIPTS/device/$dial_script.hangup"
 		status=$?
 		if [ $status -ne 0 ]; then
 			exit $status

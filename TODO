@@ -86,3 +86,5 @@ Internationalize...
 If after dialling we can do a PPPIOCGUNIT on the modem we had a
 broken dial script that started pppd itself. Can we recover
 gracefully from this?
+
+Remove assumption that we are always dealing with links supporting IPv4.

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+exec 1>&2
+
+/etc/rc.d/init.d/dhclient stop $DIALD_DEVICE

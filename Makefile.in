@@ -63,10 +63,22 @@ install: diald
 	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/dctrl
 	$(INSTALL) -o root -g bin lib/*.gif $(DESTDIR)$(datadir)/diald/dctrl
 	$(INSTALL) -o root -g bin -m 0644 config/diald.defs $(DESTDIR)$(datadir)/diald/diald.defs
-	$(INSTALL) -o root -g bin -m 0644 config/standard.filter $(DESTDIR)$(datadir)/diald/standard.filter
 	$(INSTALL) -d -m 0755 $(DESTDIR)$(sysconfdir)/pam.d
 	$(INSTALL) -o root -g root -m 0644 config/diald.pam $(DESTDIR)$(sysconfdir)/pam.d/diald
-	$(INSTALL) -o root -g bin bin/connect $(DESTDIR)$(datadir)/diald/connect
+	$(INSTALL) -o root -g bin -m 0644 config/standard.filter $(DESTDIR)$(datadir)/diald/standard.filter
+	$(INSTALL) -o root -g bin -m 0644 config/dynamic.filter $(DESTDIR)$(datadir)/diald/dynamic.filter
+	$(INSTALL) -o root -g bin config/connect $(DESTDIR)$(datadir)/diald/connect
+	$(INSTALL) -o root -g bin config/disconnect $(DESTDIR)$(datadir)/diald/disconnect
+	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/device
+	$(INSTALL) -o root -g bin config/device/dhcp $(DESTDIR)$(datadir)/diald/device/dhcp
+	$(INSTALL) -o root -g bin config/device/dhcp.hangup $(DESTDIR)$(datadir)/diald/device/dhcp.hangup
+	$(INSTALL) -o root -g bin config/device/isdn $(DESTDIR)$(datadir)/diald/device/isdn
+	$(INSTALL) -o root -g bin config/device/isdn.hangup $(DESTDIR)$(datadir)/diald/device/isdn.hangup
+	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/modem
+	$(INSTALL) -o root -g bin -m 0644 config/modem/generic $(DESTDIR)$(datadir)/diald/modem/generic
+	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/login
+	$(INSTALL) -o root -g bin -m 0644 config/login/demon $(DESTDIR)$(datadir)/diald/login/demon
+	$(INSTALL) -o root -g bin -m 0644 config/login/shell-generic $(DESTDIR)$(datadir)/diald/login/shell-generic
 
 clean:
 	rm -f *.o diald

@@ -1,5 +1,6 @@
 Major changes between version 2.0 and 2.0.1
 ------------------------------------------------
+  - Install example configurations built from my setup stuff.
   - Timeouts now take an optional colon followed by a second
     number. The second number is how much longer to keep the
     connection in the connection queue after its timeout has
