@@ -66,12 +66,12 @@ accept tcp 120 tcp.dest=tcp.www
 accept tcp 120 tcp.source=tcp.www
 
 # SSL connections are usually for secure http so treat them like http.
-# NOTE: Your /etc/services may not define the tcp service ssl, in which
+# NOTE: Your /etc/services may not define the tcp service https, in which
 # case you should comment out the following two lines or get a more
 # up to date /etc/services file. See the FAQ for information on obtaining
 # a new /etc/services file.
-keepup tcp 120 tcp.dest=tcp.ssl
-keepup tcp 120 tcp.source=tcp.ssl
+keepup tcp 120 tcp.dest=tcp.https
+keepup tcp 120 tcp.source=tcp.https
 
 # Once the link is no longer live, we try to shut down the connection
 # quickly. Note that if the link is already down, a state change
