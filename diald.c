@@ -1189,7 +1189,8 @@ void mon_write(unsigned int level, char *message, int len)
 {
     int pri = 6<<24;
     MONITORS *c = monitors, *p = 0, *cn;
-    if ((level & MONITOR_MESSAGE) && message[0] == '<') {
+    if ((level & MONITOR_MESSAGE)
+    && len > 3 && message[0] == '<' && message[2] == '>') {
 	pri = (message[1] - '0')<<24;
 	message += 3;
 	len -= 3;
