@@ -32,10 +32,10 @@ proxy_dev_send(proxy_t *proxy,
 	unsigned short wprot, unsigned char *p, size_t len)
 {
     struct sockaddr *to;
+    size_t to_len;
     struct sockaddr_pkt sp;
 #ifdef HAVE_AF_PACKET
     struct sockaddr_ll sl;
-    size_t to_len;
 
     if (af_packet) {
 	memset(&sl, 0, sizeof(sl));
