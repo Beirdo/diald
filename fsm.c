@@ -70,7 +70,6 @@ void control_reroute() { validate_mode(); (*pcontrol[mode].reroute)(); }
 void control_kill() { validate_mode(); (*pcontrol[mode].kill)(); }
 void control_zombie() { validate_mode(); (*pcontrol[mode].zombie)(); }
 
-int blocked = 0;		/* user has blocked the link */
 int state = STATE_DOWN;		/* DFA state */
 int current_retry_count = 0;	/* current retry count */
 int no_redial_delay = 0;

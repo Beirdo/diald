@@ -36,6 +36,7 @@
 #endif
 
 /* intialized variables. */
+int af_packet = 1;		/* kernel has AF_PACKET sockets */
 int modem_fd = -1;		/* modem device fp (for proxy reads) */
 MONITORS *monitors = 0;		/* Monitor pipes */
 PIPE *pipes = 0;		/* Command pipes */
@@ -247,6 +248,8 @@ main(int argc, char *argv[])
 	change_state();
     }
     die(0);
+
+    return 0;
 }
 
 /*
@@ -386,15 +389,17 @@ void signal_setup()
     SIGNAL(SIGQUIT, stray_signal);
     SIGNAL(SIGILL, stray_signal);
     SIGNAL(SIGABRT, stray_signal);
-    SIGNAL(SIGIOT, stray_signal);
-    SIGNAL(SIGBUS, stray_signal);
     SIGNAL(SIGFPE, stray_signal);
     SIGNAL(SIGUSR1, linkup);            /* User requests the link to go up */
+#if 0 /* if we do these we probably loop madly on crashes! */
+    SIGNAL(SIGIOT, stray_signal);
+    SIGNAL(SIGBUS, stray_signal);
     SIGNAL(SIGSEGV, stray_signal);
+    SIGNAL(SIGSTKFLT, stray_signal);
+#endif
     SIGNAL(SIGUSR2, print_filter_queue); /* dump the packet queue to the log */
     SIGNAL(SIGPIPE, SIG_IGN);
     SIGNAL(SIGTERM, sig_term);          /* Terminate: user take link down */
-    SIGNAL(SIGSTKFLT, stray_signal);
     SIGNAL(SIGCHLD, sig_chld);		/* reap dead kids */
     SIGNAL(SIGURG, stray_signal);
     SIGNAL(SIGXCPU, stray_signal);

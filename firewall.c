@@ -476,6 +476,19 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
     }
 }
 
+/* Check if we need to reorder IP addresses for cannonical ordering */
+static int ip_direction(struct iphdr *pkt)
+{
+    struct udphdr *udp = (struct udphdr *)((char *)pkt + 4*pkt->ihl);
+    if (ntohl(pkt->saddr) > ntohl(pkt->daddr)
+    || (ntohl(pkt->saddr) == ntohl(pkt->daddr) &&
+       (pkt->protocol == IPPROTO_TCP || pkt->protocol == IPPROTO_UDP)
+       && ntohs(udp->source) > ntohs(udp->dest)))
+	return 2;
+    else
+	return 1;
+}
+
 static void ip_swap_addrs(struct iphdr *pkt)
 {
     struct udphdr *udp = (struct udphdr *)((char *)pkt + 4*pkt->ihl);
@@ -657,10 +670,15 @@ int check_firewall(int unitnum,
     }
 
     /* Build the connection ID, and set the direction flag */
-    direction = 1;
-    if (sll->sll_pkttype != PACKET_OUTGOING) {
-	direction = 2;
-	ip_swap_addrs(ip_pkt);
+    if (af_packet) {
+	direction = 1;
+	if (sll->sll_pkttype != PACKET_OUTGOING) {
+	    direction = 2;
+	    ip_swap_addrs(ip_pkt);
+	}
+    } else {
+	direction = ip_direction(ip_pkt);
+	if (direction == 2) ip_swap_addrs(ip_pkt);
     }
 
     memset(&id,0,sizeof(id));

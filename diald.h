@@ -215,6 +215,8 @@ char *acctlog;
 char *pidlog;
 char *fifoname;
 int tcpport;
+int blocked;			/* user has blocked the link */
+int blocked_route;		/* blocked link has routes through it */
 char *lock_prefix;
 int pidstring;
 char *run_prefix;
@@ -277,6 +279,7 @@ extern int outfill;
 
 /* Global variables */
 
+int af_packet;			/* kernel has AF_PACKET sockets */
 int fifo_fd;			/* FIFO command pipe. */
 int tcp_fd;			/* TCP listener. */
 fd_set ctrl_fds;		/* TCP command/monitor connections. */
@@ -296,8 +299,6 @@ int dial_pid;			/* current dial command pid */
 int running_pid;		/* current system command pid */
 int dial_status;		/* status from last dial command */
 int state_timeout;		/* state machine timeout counter */
-int blocked;			/* user has blocked the link */
-int blocked_route;		/* blocked link has routed through it */
 int state;			/* DFA state */
 int current_retry_count;	/* current retry count */
 int proxy_iface;		/* Interface number for proxy pty */

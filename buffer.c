@@ -93,19 +93,29 @@ void forward_buffer()
     unsigned int clen, i;
     unsigned long stamp;
     unsigned long ctime = timestamp();
-#if 1
-    struct sockaddr_ll to;
-#endif
+    struct sockaddr_pkt sp;
+    struct sockaddr_ll sl;
+    struct sockaddr *to;
+    size_t to_len;
     unsigned char pkt[4096];
 
     buffer_check();
 
-#if 1
-    memset(&to,0,sizeof(to));
-    to.sll_family = AF_PACKET;
-    to.sll_protocol = htons(ETH_P_IP);
-    to.sll_ifindex = snoop_index;
-#endif
+    if (af_packet) {
+	memset(&sl, 0, sizeof(sl));
+	sl.sll_family = AF_PACKET;
+	sl.sll_protocol = htons(ETH_P_IP);
+	sl.sll_ifindex = snoop_index;
+	to = (struct sockaddr *)&sl;
+	to_len = sizeof(sl);
+    } else {
+	memset(&sp, 0, sizeof(sp));
+	sp.spkt_family = AF_INET;
+	strcpy(sp.spkt_device, snoop_dev);
+	sp.spkt_protocol = htons(ETH_P_IP);
+	to = (struct sockaddr *)&sp;
+	to_len = sizeof(sp);
+    }
 
     while (used > 0) {
 	clen = (B(head)<<8) | B(head+1);
@@ -121,11 +131,7 @@ void forward_buffer()
              * on the snoopfd (which points to the same device),
              * then we will never get them back on snoopfd.
              */
-#if 1
-	    if (sendto(snoopfd,pkt,clen,0,(struct sockaddr *)&to,sizeof(to)) < 0) {
-#else
-	    if (sendto(snoopfd,pkt,clen,0,NULL,0) < 0) {
-#endif
+	    if (sendto(snoopfd, pkt, clen, 0, to, to_len) < 0) {
 		syslog(LOG_ERR,"Error forwarding data packet to physical device from buffer: %m");
 	    }
 	}
