@@ -235,6 +235,10 @@ void trans_START_LINK(void)
 	/* We must reroute, just in case we got so far as to change routing */
 	control_reroute();
 	GOTO(STATE_DISCONNECT);
+    } else if (request_down) {
+        mon_syslog(LOG_NOTICE,"Cancelling link.");
+	flush_timeout_queue();
+	GOTO(STATE_STOP_DIAL);
     } else if (control_set_addrs()) {
 	/* Ok, we're up and running. */
 	GOTO(STATE_UP);
