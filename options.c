@@ -334,6 +334,10 @@ void init_vars()
 	path_ip = strdup("/sbin/ip");
     else if (!access("/usr/sbin/ip", X_OK))
 	path_ip = strdup("/usr/sbin/ip");
+    else if (!access("/bin/ip", X_OK))
+	path_ip = strdup("/bin/ip");
+    else if (!access("/usr/bin/ip", X_OK))
+	path_ip = strdup("/usr/bin/ip");
     else
 	path_ip = NULL;
 #endif
@@ -345,6 +349,10 @@ void init_vars()
 	path_route = strdup("/sbin/route");
     else if (!access("/usr/sbin/route", X_OK))
 	path_route = strdup("/usr/sbin/route");
+    else if (!access("/bin/route", X_OK))
+	path_route = strdup("/bin/route");
+    else if (!access("/usr/bin/route", X_OK))
+	path_route = strdup("/usr/bin/route");
     else
 	path_route = NULL;
 #endif
@@ -356,6 +364,10 @@ void init_vars()
 	path_ifconfig = strdup("/sbin/ifconfig");
     else if (!access("/usr/sbin/ifconfig", X_OK))
 	path_ifconfig = strdup("/usr/sbin/ifconfig");
+    else if (!access("/bin/ifconfig", X_OK))
+	path_ifconfig = strdup("/bin/ifconfig");
+    else if (!access("/usr/bin/ifconfig", X_OK))
+	path_ifconfig = strdup("/usr/bin/ifconfig");
     else
 	path_ifconfig = NULL;
 #endif
@@ -367,6 +379,10 @@ void init_vars()
 	path_bootpc = strdup("/sbin/bootpc");
     else if (!access("/usr/sbin/bootpc", X_OK))
 	path_bootpc = strdup("/usr/sbin/bootpc");
+    else if (!access("/bin/bootpc", X_OK))
+	path_bootpc = strdup("/bin/bootpc");
+    else if (!access("/usr/bin/bootpc", X_OK))
+	path_bootpc = strdup("/usr/bin/bootpc");
     else
 	path_bootpc = NULL;
 #endif
@@ -378,6 +394,10 @@ void init_vars()
 	path_pppd = strdup("/sbin/pppd");
     else if (!access("/usr/sbin/pppd", X_OK))
 	path_pppd = strdup("/usr/sbin/pppd");
+    else if (!access("/bin/pppd", X_OK))
+	path_pppd = strdup("/bin/pppd");
+    else if (!access("/usr/bin/pppd", X_OK))
+	path_pppd = strdup("/usr/bin/pppd");
     else
 	path_pppd = NULL;
 #endif

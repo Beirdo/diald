@@ -83,6 +83,13 @@
 
 #define RUN_PREFIX	"/var/run"
 
+
+/* The following will all be searched for in /sbin:/usr/sbin:/bin:/usr/bin
+ * so you do not, normally, need to define any of these paths. If you
+ * have a really strange setup you can either define paths here or
+ * use the run time path-* options.
+ */
+#if 0
 /*
  * Diald needs to use some external binaries to set up
  * routing tables and to bring up the proxy device. If
@@ -117,3 +124,4 @@
  * location.
  */
 #undef PATH_PPPD	"/usr/sbin/pppd"
+#endif
