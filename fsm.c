@@ -100,11 +100,13 @@ void trans_DOWN(void)
 
 void act_CONNECT(void)
 {
-    if (!req_pid && acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
-
-	    fprintf(acctfp,"%s: Calling site %s.\n",
-	    cdate(), remote_ip);
+    if (!req_pid) {
+	mon_syslog(LOG_NOTICE, "Calling site %s\n", remote_ip);
+	if (acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
+	    fprintf(acctfp, "%s: Calling site %s.\n",
+		cdate(time(0)), remote_ip);
 	    fclose(acctfp);
+	}
     }
     txtotal = rxtotal = 0;
     dial_status = 0;
@@ -191,13 +193,19 @@ void trans_KILL_DIAL(void)
 
 void act_START_LINK(void)
 {
+    time(&call_start_time);
+    mon_syslog(LOG_NOTICE,
+	use_req ? "Connect request from %s\n" : "Connected to site %s\n",
+	remote_ip);
+
     if (acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
         fprintf(acctfp,"%s: %s %s.\n",
-	    cdate(),
+	    cdate(call_start_time),
 	    use_req ? "Connect request from" : "Connected to site",
 	    remote_ip);
 	fclose(acctfp);
     }
+
     validate_mode();
     control_start();
 }
@@ -249,10 +257,14 @@ void act_UP(void)
     ppp_half_dead = 0;
     if (buffer_packets)
    	 forward_buffer();
-    if (use_req && acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
-        fprintf(acctfp,"%s: Connected to site %s.\n",
-	    cdate(), remote_ip);
-	fclose(acctfp);
+    if (use_req) {
+	mon_syslog(LOG_NOTICE, "Connected to site %s\n", remote_ip);
+
+	if (acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
+	    fprintf(acctfp, "%s: Connected to site %s.\n",
+		cdate(time(0)), remote_ip);
+	    fclose(acctfp);
+	}
     }
     /* Once we get here, we might as well kill off any outstanding
      * FIFO requests */
@@ -363,13 +375,19 @@ void act_CLOSE(void)
     if (acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
 	int duration = -call_start_time;
 	char *tm;
-	tm = cdate();
+	tm = cdate(time(&call_start_time));
 	duration += call_start_time;
+	mon_syslog(LOG_NOTICE,
+	    "Disconnected. Call duration %d seconds.\n",
+	    duration);
         fprintf(acctfp,"%s: Disconnected. Call duration %d seconds.\n",
-	    tm,duration);
+	    tm, duration);
         fprintf(acctfp,"      IP transmitted %d bytes and received %d bytes.\n",
-	    txtotal,rxtotal);
+	    txtotal, rxtotal);
 	fclose(acctfp);
+	mon_syslog(LOG_NOTICE,
+	    "IP transmitted %d bytes and received %d bytes.\n",
+	    txtotal, rxtotal);
     }
     close_modem();
     interface_down();

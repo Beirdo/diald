@@ -30,7 +30,7 @@ mon_syslog(int pri, char *fmt, ...)
 	va_start(ap, fmt);
 
 	l1 = snprintf(fmt2, sizeof(fmt2)-1,
-		"<%c>MESSAGE\n%s ", pri+'0', cdate());
+		"<%c>MESSAGE\n%s ", pri+'0', cdate(time(0)));
 	for (p = fmt2+l1; (c = *fmt) && p < fmt2+sizeof(fmt2)-2; fmt++) {
 		if (c == '%' && fmt[1] == 'm') {
 			fmt++;

@@ -3,13 +3,12 @@
 /* Grumble. Attempt to generate a nicely formatted ascii date without
  * a built in newline.
  */
-char *cdate(void)
+char *cdate(time_t now)
 {
     static char dt[128];
     int len;
 
-    time((time_t *)&call_start_time);
-    len = strftime(dt,128,"%c %Z",localtime((time_t *)&call_start_time));
+    len = strftime(dt, 128, "%c %Z", localtime(&now));
     if (len == 128) dt[len] = 0;
     return dt;
 }

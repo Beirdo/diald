@@ -90,6 +90,12 @@ Rewrite dctrl in Java...
 
 90% of the packets that trigger a link up are DNS queries. Consider
 parsing the request out and displaying it meaningfully.
+-- If we have a caching nameserver on this end of the link which
+   isn't used for general, internal, queries (sensible if you don't
+   want mispelled host names to bounce the link) you could have
+   your down script enable query logging and your up script
+   disable query logging. Not perfect but a generic packet parser
+   in diald is getting a bit silly IMHO.
 
 It doesn't make sense to buffer some types of packets (e.g. ntp?).
 Does diald allow us to (not) do that?
