@@ -32,17 +32,17 @@ Internet).
 %setup
 
 %build
-./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+./configure --prefix=%{_prefix} --sysconfdir=/etc --localstatedir=/var \
 	--mandir=%{_mandir}
 make
 
 %install
 make install DESTDIR="$RPM_BUILD_ROOT"
-gzip -9fN %{_mandir}/man1/dctrl.1 \
-	%{_mandir}/man5/diald-examples.5 \
-	%{_mandir}/man5/diald-control.5 \
-	%{_mandir}/man5/diald-monitor.5 \
-	%{_mandir}/man8/diald.8
+gzip -9fN %{buildroot}%{_mandir}/man1/dctrl.1 \
+	%{buildroot}%{_mandir}/man5/diald-examples.5 \
+	%{buildroot}%{_mandir}/man5/diald-control.5 \
+	%{buildroot}%{_mandir}/man5/diald-monitor.5 \
+	%{buildroot}%{_mandir}/man8/diald.8
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
@@ -51,24 +51,24 @@ rm -rf "$RPM_BUILD_ROOT"
 %files
 %doc BUGS CHANGES LICENSE NOTES TODO TODO.budget doc/diald-faq.txt
 %doc README README.ethertap README.masq README.pam
-%{_mandir}/man1/dctrl.1.gz
-%{_mandir}/man5/diald-examples.5.gz
-%{_mandir}/man5/diald-control.5.gz
-%{_mandir}/man5/diald-monitor.5.gz
-%{_mandir}/man8/diald.8.gz
-%attr (0644, root, root) /usr/share/diald/diald.defs
+%attr (0644, root, root) %{_mandir}/man1/dctrl.1.gz
+%attr (0644, root, root) %{_mandir}/man5/diald-examples.5.gz
+%attr (0644, root, root) %{_mandir}/man5/diald-control.5.gz
+%attr (0644, root, root) %{_mandir}/man5/diald-monitor.5.gz
+%attr (0644, root, root) %{_mandir}/man8/diald.8.gz
+%attr (0644, root, root) %{_datadir}/diald/diald.defs
 %attr (0644, root, root) /etc/pam.d/diald
-%attr (0755, root, root) /usr/sbin/diald
-%attr (0755, root, root) /usr/bin/dctrl
-%attr (0644, root, root) /usr/share/diald/dctrl/*.gif
-%attr (0644, root, root) /usr/share/diald/standard.filter
-%attr (0644, root, root) /usr/share/diald/dynamic.filter
-%attr (0755, root, root) /usr/share/diald/connect
-%attr (0755, root, root) /usr/share/diald/disconnect
-%attr (0755, root, root) /usr/share/diald/device/dhcp
-%attr (0755, root, root) /usr/share/diald/device/dhcp.hangup
-%attr (0755, root, root) /usr/share/diald/device/isdn
-%attr (0755, root, root) /usr/share/diald/device/isdn.hangup
-%attr (0755, root, root) /usr/share/diald/modem/generic
-%attr (0755, root, root) /usr/share/diald/login/demon
-%attr (0755, root, root) /usr/share/diald/login/shell-generic
+%attr (0755, root, root) %{_sbindir}/diald
+%attr (0755, root, root) %{_bindir}/dctrl
+%attr (0644, root, root) %{_datadir}/diald/dctrl/*.gif
+%attr (0644, root, root) %{_datadir}/diald/standard.filter
+%attr (0644, root, root) %{_datadir}/diald/dynamic.filter
+%attr (0755, root, root) %{_datadir}/diald/connect
+%attr (0755, root, root) %{_datadir}/diald/disconnect
+%attr (0755, root, root) %{_datadir}/diald/device/dhcp
+%attr (0755, root, root) %{_datadir}/diald/device/dhcp.hangup
+%attr (0755, root, root) %{_datadir}/diald/device/isdn
+%attr (0755, root, root) %{_datadir}/diald/device/isdn.hangup
+%attr (0755, root, root) %{_datadir}/diald/modem/generic
+%attr (0755, root, root) %{_datadir}/diald/login/demon
+%attr (0755, root, root) %{_datadir}/diald/login/shell-generic
