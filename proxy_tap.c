@@ -51,7 +51,7 @@ proxy_tap_send(proxy_t *proxy,
     msg_iov[2].iov_len = len;
     memset(&msg, 0, sizeof(msg));
     msg.msg_iov = msg_iov;
-    msg.msg_iovlen = 2;
+    msg.msg_iovlen = 3;
 
     sendmsg(proxy->fd, &msg, 0);
 }
