@@ -50,7 +50,7 @@ static void init_protos()
 
     if ((fp = fopen("/etc/protocols","r"))) {
 	while (getsn(fp,line,1024) != EOF) {
-	    if (sscanf(line,"%s %d",name,&proto) == 2)
+	    if (sscanf(line,"%19s %d",name,&proto) == 2)
 		proto_lines++;
 	}
 	fclose(fp);
@@ -58,7 +58,7 @@ static void init_protos()
 	    protos = malloc(sizeof(struct proto)*proto_lines);
 	    proto_lines = 0;
 	    while (getsn(fp,line,1024) != EOF) {
-		if (sscanf(line,"%s %d",name,&proto) == 2) {
+		if (sscanf(line,"%19s %d",name,&proto) == 2) {
 		    protos[proto_lines].name = strdup(name);
 		    protos[proto_lines].proto = proto;
 		    proto_lines++;
@@ -115,7 +115,7 @@ static void init_servs()
 
     if ((fp = fopen("/etc/services","r"))) {
 	while (getsn(fp,line,1024) != EOF) {
-	    if (sscanf(line,"%s %d/%s",name,&serv,proto) == 3)
+	    if (sscanf(line,"%19s %d/%s",name,&serv,proto) == 3)
 		serv_lines++;
 	}
 	fclose(fp);
@@ -123,7 +123,7 @@ static void init_servs()
 	    servs = malloc(sizeof(struct serv)*serv_lines);
 	    serv_lines = 0;
 	    while (getsn(fp,line,1024) != EOF) {
-	    	if (sscanf(line,"%s %d/%s",name,&serv,proto) == 3) {
+	    	if (sscanf(line,"%19s %d/%s",name,&serv,proto) == 3) {
 		    servs[serv_lines].name = strdup(name);
 		    servs[serv_lines].proto = strdup(proto);
 		    servs[serv_lines].serv = serv;
