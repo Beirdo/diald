@@ -26,7 +26,10 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
+
 
 static char *lock_file = 0;
 static int rotate_offset = 0;

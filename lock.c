@@ -4,7 +4,9 @@
  * This code is derived from chat.c.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
 
 
 /*

@@ -8,7 +8,7 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
 
 #include <signal.h>
 #if HAVE_SYS_TIME_H
@@ -18,6 +18,9 @@
 #if HAVE_UNISTD_H
 #  include <unistd.h>
 #endif
+
+#include <diald.h>
+
 
 static struct timer_lst head = {&head,&head,0,0,0,0};
 

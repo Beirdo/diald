@@ -7,7 +7,9 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
 
 static int dead = 1;
 static int waiting_for_bootp = 0;

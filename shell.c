@@ -6,7 +6,9 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
 
 
 int

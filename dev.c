@@ -15,7 +15,10 @@
  *
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
+
 
 static char device_node[9];
 

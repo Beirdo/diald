@@ -26,8 +26,10 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include "diald.h"
-#include "version.h"
+#include <config.h>
+
+#include <diald.h>
+#include <version.h>
 
 #if HAVE_LIBWRAP
 #  include <tcpd.h>
@@ -35,6 +37,7 @@
    int allow_severity = LOG_INFO;
    int deny_severity = LOG_NOTICE;
 #endif
+
 
 /* intialized variables. */
 int af_packet = 1;		/* kernel has AF_PACKET sockets */

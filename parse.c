@@ -7,8 +7,12 @@
  * distributed with this software for terms of use.
  */
 
+#include <config.h>
+
 #include <setjmp.h>
-#include "diald.h"
+
+#include <diald.h>
+
 
 #define TOK_LE 256
 #define TOK_GE 257

@@ -1,4 +1,7 @@
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
+
 
 /* Grumble. Attempt to generate a nicely formatted ascii date without
  * a built in newline.

@@ -7,7 +7,10 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
+
 
 #define MAXLINELEN 1024
 #define MAXARGS 512

@@ -8,7 +8,9 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
 
 
 /* N.B. 2.0 Linux kernels do not have AF_NETLINK or ethertap. */

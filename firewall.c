@@ -7,7 +7,11 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
+
+
 #if defined(__GLIBC__)
 typedef u_int8_t __u8;
 typedef u_int16_t __u16;

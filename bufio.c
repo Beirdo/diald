@@ -7,7 +7,10 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
+
 
 void pipe_init(char *name, int access, int fd, PIPE *pipe, int flush)
 {

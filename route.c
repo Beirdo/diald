@@ -7,7 +7,9 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
 
 static void
 add_routes(char *desc, char *iface, char *lip, char *rip, int metric)

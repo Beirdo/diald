@@ -6,6 +6,8 @@
  * distributed with this software for terms of use.
  */
 
+#include <config.h>
+
 #if HAVE_SYSLOG_H
 #  include <syslog.h>
 #endif
@@ -14,11 +16,11 @@
 #include <stdlib.h>
 #include <grp.h>
 
-#include "diald.h"
-
 #if HAVE_LIBPAM
 #include <security/pam_appl.h>
 #endif
+
+#include <diald.h>
 
 
 static struct {

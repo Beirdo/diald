@@ -7,7 +7,11 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
+
+
 #define B(i) buffer[(i)%buffer_size]
 
 static int oldsize = 0;

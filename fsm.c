@@ -7,7 +7,10 @@
  * distributed with this software for terms of use.
  */
 
-#include "diald.h"
+#include <config.h>
+
+#include <diald.h>
+
 
 int call_timer_running = 0;
 time_t call_start_time;

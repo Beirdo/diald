@@ -9,13 +9,15 @@
  * distributed with this software for terms of use.
  */
 
+#include <config.h>
+
 #if HAVE_PTY_H
 #  include <pty.h>
 #else
 extern int openpty(int *, int *, void *name, void *termios, void *win);
 #endif
 
-#include "diald.h"
+#include <diald.h>
 
 
 static int proxy_slip_send(proxy_t *proxy,
