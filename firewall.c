@@ -552,7 +552,7 @@ void zombie_connection(FW_Connection *c)
     c->timer.function = (void *)del_connection;
     c->timer.expires = c->conn_hold;
     add_timer(&c->timer);
-out:
+out: ;
 }
 
 void del_impulse(FW_unit *unit)
