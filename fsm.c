@@ -142,6 +142,7 @@ void trans_CONNECT(void)
 	}
     } else if (state_timeout == 0) {
 	mon_syslog(LOG_INFO,"Connect script timed out. Killing script.");
+	GOTO(STATE_STOP_DIAL);
     } else if (req_pid && !use_req) {
         /* we never get here on a connect FIFO request anyway */
         mon_syslog(LOG_INFO,"Cancelling connect script in favour of request.");
@@ -152,7 +153,9 @@ void trans_CONNECT(void)
 void act_STOP_DIAL(void)
 {
     if (dial_pid) {
+#if 0
         if (debug&DEBUG_VERBOSE)
+#endif
             mon_syslog(LOG_INFO,"Sending SIGINT to (dis)connect process %d",
 		dial_pid);
 	if (kill(dial_pid,SIGINT) == -1 && errno == ESRCH) {
@@ -170,7 +173,9 @@ void trans_STOP_DIAL(void)
 void act_KILL_DIAL(void)
 {
     if (dial_pid) {
+#if 0
         if (debug&DEBUG_VERBOSE)
+#endif
             mon_syslog(LOG_INFO,"Sending SIGKILL to (dis)connect process %d",
 		dial_pid);
 	if (kill(dial_pid,SIGKILL) == -1 && errno == ESRCH) {

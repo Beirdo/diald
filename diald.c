@@ -176,15 +176,16 @@ main(int argc, char *argv[])
 	sel = select(256,&readfds,0,0,&timeout);
 	if (sel < 0 && errno == EBADF) {
 	    PIPE *p;
-	    /* Yuk, one of the pipes is probably broken. It cannot
-	     * be fifo_fd or tcp_fd. It must be a [dis]connector.
+	    /* Yuk, one of the pipes is probably broken. It seems to
+	     * happen on unnamed pipes created with pipe(). Named
+	     * pipes used by dctrl etc. seem ok.
 	     * Is this correct select behaviour or is it a bug either
 	     * in the kernel or glibc?
 	     */
 	    p = pipes;
 	    while (p) {
 		PIPE *tmp = p->next;
-		if (p->fd != fifo_fd && p->fd != tcp_fd)
+		if (!p->is_ctrl)
 		    ctrl_read(p);
 		p = tmp;
 	    }
@@ -210,15 +211,19 @@ main(int argc, char *argv[])
 			fromhost(&rq);
 			if (!hosts_access(&rq)) {
 				close(fd);
-				mon_syslog(LOG_INFO, "TCP connection from %s port %d - DENIED",
+				mon_syslog(LOG_INFO, "Connection from TCP %s:%d - DENIED",
 				    inet_ntoa(sa.sin_addr), sa.sin_port);
 			} else
 #endif
 			if ((p = malloc(sizeof(PIPE)))) {
-			    pipe_init("TCP", 1, fd, p, 0);
-			    FD_SET(fd, &ctrl_fds);
-			    mon_syslog(LOG_INFO, "TCP connection from %s port %d",
+			    char buf[1024];
+			    int n;
+			    n = snprintf(buf, sizeof(buf)-2, "TCP %s:%d",
 				inet_ntoa(sa.sin_addr), sa.sin_port);
+			    buf[n] = '\0';
+			    pipe_init(strdup(buf), 1, fd, p, 0);
+			    FD_SET(fd, &ctrl_fds);
+			    mon_syslog(LOG_INFO, "Connection from %s", buf);
 			} else {
 			    close(fd);
 			    mon_syslog(LOG_INFO, "malloc: %m");
@@ -516,7 +521,6 @@ void ctrl_read(PIPE *pipe)
     if (i < 0) {
 	PIPE **tmp;
 	FD_CLR(pipe->fd, &ctrl_fds);
-/* XXX */mon_syslog(LOG_INFO, "%s: closing pipe fd %d", pipe->name, pipe->fd);
 	close(pipe->fd);
         tmp = &pipes;
         while (*tmp) {
@@ -656,7 +660,7 @@ void ctrl_read(PIPE *pipe)
 		    mon_write(MONITOR_MESSAGE,"\n",1);
 		}
             } else if (sscanf(buf,"connect %d %n", &pid, &dev) == 1) {
-#if 1
+#if 0
 /* XXX */mon_syslog(LOG_INFO,"%s: up request on %s state=%d, dial=%d, dev=%s", pipe->name, buf+dev, state, dial_pid, current_dev ? current_dev : "none");
 #endif
 		/* Damn ISDN has no blocking dial. If we get a request up

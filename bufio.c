@@ -40,8 +40,11 @@ int pipe_read(PIPE *pipe)
 	pipe->count += i;
 	return pipe->count;
     } else if (i == 0 || errno == EAGAIN) {
-	if (1 || pipe->is_ctrl) {
-	    mon_syslog(LOG_ERR,"EOF on %s. Closing pipe fd %d", pipe->name, pipe->fd);
+	/* A close of a pipe is only significant if it is a control
+	 * pipe, not if it is a capture pipe for a script.
+	 */
+	if (pipe->is_ctrl) {
+	    mon_syslog(LOG_INFO, "Closing %s", pipe->name);
 	}
 	return -1;
     } else if (errno == EINTR) {
