@@ -294,7 +294,7 @@ void init_vars()
 
 void set_int(int *var, char **argv)
 {
-    *var = atoi(*argv);
+    *var = strtol(*argv, NULL, 0);
 }
 
 void set_str(char **var, char **argv)
