@@ -28,6 +28,10 @@
 #include "diald.h"
 #include "version.h"
 
+#ifndef __GLIBC__
+#  include <asm/sigcontext.h>
+#endif
+
 #ifdef TCP_WRAPPERS
 #  include <tcpd.h>
 
