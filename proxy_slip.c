@@ -22,7 +22,6 @@ static void proxy_slip_release(proxy_t *proxy);
 int proxy_slip_init(proxy_t *proxy, char *proxydev);
 
 
-static int proxy_mfd;		/* master pty fd */
 static FILE *proxy_mfp;		/* also have an fp. Hackery for recv_packet. */
 static int proxy_sfd;		/* slave pty fd */
 
@@ -184,7 +183,7 @@ proxy_slip_stop(proxy_t *proxy)
 static void
 proxy_slip_close(proxy_t *proxy)
 {
-    close(proxy_mfd);
+    close(proxy->fd);
     close(proxy_sfd);
 }
 
@@ -214,12 +213,12 @@ proxy_slip_release(proxy_t *proxy)
 int
 proxy_slip_init(proxy_t *proxy, char *proxydev)
 {
-    int disc, sencap = 0;
+    int d, disc, sencap = 0;
 
-    get_pty(&proxy_mfd, &proxy_sfd);
-    if (proxy_mfd < 0)
+    get_pty(&d, &proxy_sfd);
+    if (d < 0)
 	return -1;
-    proxy_mfp = fdopen(proxy_mfd, "r+");
+    proxy_mfp = fdopen(d, "r+");
 
     /* change proxy_sfd to 8 bit clean line, 38400 speed */
     set_up_tty(proxy_sfd,1, 38400);
@@ -265,5 +264,6 @@ proxy_slip_init(proxy_t *proxy, char *proxydev)
     proxy->stop = proxy_slip_stop;
     proxy->close = proxy_slip_close;
     proxy->release = proxy_slip_release;
-    return proxy_mfd;
+    proxy->fd = d;
+    return d;
 }

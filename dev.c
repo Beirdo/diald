@@ -125,7 +125,8 @@ int dev_set_addrs()
 	}
 
 	iface_start(device_node, link_iface, local_ip, remote_ip);
-	iface_stop(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
+	if (proxy.stop)
+	    proxy.stop(&proxy);
 
         return 1;
 }
@@ -171,8 +172,8 @@ void dev_stop()
 void dev_reroute()
 {
     /* Restore the original proxy. */
-    if (!blocked || blocked_route)
-	iface_start(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
+    if (proxy.start && (!blocked || blocked_route))
+	proxy.start(&proxy);
     local_addr = inet_addr(orig_local_ip);
 
     /* Kill the alternate routing */

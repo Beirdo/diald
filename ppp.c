@@ -200,7 +200,8 @@ int ppp_set_addrs()
 	 * may be user or default routes to add :-(.
 	 */
 	iface_start("ppp", link_iface, local_ip, remote_ip);
-	iface_stop(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
+	if (proxy.stop)
+	    proxy.stop(&proxy);
 
 	return 1;
     }
@@ -265,8 +266,8 @@ void ppp_stop()
 void ppp_reroute()
 {
     /* Restore the original proxy. */
-    if (!blocked || blocked_route)
-	iface_start(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
+    if (proxy.start && (!blocked || blocked_route))
+	proxy.start(&proxy);
     local_addr = inet_addr(orig_local_ip);
 
     if (link_iface != -1)

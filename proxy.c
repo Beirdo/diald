@@ -70,6 +70,15 @@ proxy_init(proxy_t *proxy, char *proxydev)
 {
 	int fd;
 
+	proxy->ifunit = -1;
+	proxy->send = NULL;
+	proxy->recv = NULL;
+	proxy->init = NULL;
+	proxy->start = NULL;
+	proxy->stop = NULL;
+	proxy->close = NULL;
+	proxy->release = NULL;
+
 	if (proxydev)
 		return proxy_dev_init(proxy, proxydev);
 
@@ -79,14 +88,6 @@ proxy_init(proxy_t *proxy, char *proxydev)
 		return fd;
 	mon_syslog(LOG_ERR, "Unable to get a proxy interface."
 				" Manual control only.");
-	proxy->ifunit = -1;
-	proxy->send = NULL;
-	proxy->recv = NULL;
-	proxy->init = NULL;
-	proxy->start = NULL;
-	proxy->stop = NULL;
-	proxy->close = NULL;
-	proxy->release = NULL;
 	return -1;
 }
 

@@ -50,7 +50,7 @@ proxy_tap_send(proxy_t *proxy,
     msg.msg_iov = msg_iov;
     msg.msg_iovlen = 2;
 
-    sendmsg(proxy_fd, &msg, 0);
+    sendmsg(proxy->fd, &msg, 0);
 }
 
 
@@ -68,7 +68,7 @@ proxy_tap_recv(proxy_t *proxy, unsigned char *p, size_t len)
     msg.msg_iov = msg_iov;
     msg.msg_iovlen = 2;
 
-    len = recvmsg(proxy_fd, &msg, 0);
+    len = recvmsg(proxy->fd, &msg, 0);
     return (len < 0 ? 0 : len - sizeof(hdr));
 }
 
@@ -92,7 +92,7 @@ proxy_tap_stop(proxy_t *proxy)
 static void
 proxy_tap_close(proxy_t *proxy)
 {
-    close(proxy_fd);
+    close(proxy->fd);
     /* Do not remove the lock file here. If we do every time we fork
      * a child we drop the lock. Instead we just let the lock go stale
      * when we have finished. We should handle this better...
@@ -149,6 +149,7 @@ proxy_tap_init(proxy_t *proxy, char *proxydev)
 	proxy->stop = proxy_tap_stop;
 	proxy->close = proxy_tap_close;
 	proxy->release = proxy_tap_release;
+	proxy->fd = d;
 	return d;
 
 close_and_unlock:

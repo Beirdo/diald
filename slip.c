@@ -252,7 +252,8 @@ int slip_set_addrs()
     }
 
     iface_start("sl", link_iface, local_ip, remote_ip);
-    iface_stop(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
+    if (proxy.stop)
+	proxy.stop(&proxy);
 
     return 1;
 }
@@ -277,8 +278,8 @@ void slip_stop()
 void slip_reroute()
 {
     /* Restore the original proxy. */
-    if (!blocked || blocked_route)
-	iface_start(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
+    if (proxy.start && (!blocked || blocked_route))
+	proxy.start(&proxy);
     local_addr = inet_addr(orig_local_ip);
 
     if (link_iface != -1)

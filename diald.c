@@ -161,8 +161,8 @@ main(int argc, char *argv[])
     open_fifo();
     filter_setup();
 
-    proxy_fd = proxy_init(&proxy, NULL);
-    proxy_start();
+    proxy_init(&proxy, NULL);
+    if (proxy.start) proxy.start(&proxy);
     idle_filter_proxy();
 
     /* We are a session manager and currently have no controlling
@@ -178,7 +178,7 @@ main(int argc, char *argv[])
     while (!terminate) {
 	/* wait up to a second for an event */
         readfds = ctrl_fds;
-        FD_SET(proxy_fd,&readfds);
+        if (proxy.fd >= 0) FD_SET(proxy.fd, &readfds);
         FD_SET(snoopfd,&readfds);
 	/* Compute the likely timeout for the next second boundary */
 	ts = tstamp + PAUSETIME*CLK_TCK - ticks();
@@ -260,7 +260,9 @@ main(int argc, char *argv[])
 	    if (FD_ISSET(snoopfd,&readfds)) filter_read();
 
 	    /* deal with packets coming into the pty proxy link */
-	    if (FD_ISSET(proxy_fd,&readfds)) proxy_read();
+	    if (proxy.fd >= 0
+	    && FD_ISSET(proxy.fd, &readfds))
+		proxy_read();
 	}
 	/* check if ticks() has advanced a second since last check.
 	 * This is immune to wall clock skew because we use the ticks count.

@@ -60,7 +60,7 @@ proxy_dev_send(proxy_t *proxy,
 	to_len = sizeof(sp);
     }
 
-    sendto(proxy_fd, p, len, 0, to, to_len);
+    sendto(proxy->fd, p, len, 0, to, to_len);
 }
 
 
@@ -77,7 +77,7 @@ proxy_dev_recv(proxy_t *proxy, unsigned char *p, size_t len)
     unsigned char *q = p + sizeof(unsigned short);
     size_t qlen = len - sizeof(unsigned short);
 
-    len = recvfrom(proxy_fd, q, qlen, 0, (struct sockaddr *)&from, &flen);
+    len = recvfrom(proxy->fd, q, qlen, 0, (struct sockaddr *)&from, &flen);
     if (len <= 0)
 	return 0;
 
@@ -103,8 +103,11 @@ static void
 proxy_dev_start(proxy_t *proxy)
 {
     if (current_dev && !strcmp(current_proxy, current_dev)) {
-	if (proxy_fd >= 0) close(proxy_fd);
-	proxy_fd = proxy_dev_init(proxy, current_proxy);
+	if (proxy->fd >= 0) {
+	    close(proxy->fd);
+	    proxy->fd = -1;
+	}
+	proxy_dev_init(proxy, current_proxy);
 	return;
     }
 
@@ -117,8 +120,10 @@ static void
 proxy_dev_stop(proxy_t *proxy)
 {
     if (current_dev && !strcmp(current_proxy, current_dev)) {
-	close(proxy_fd);
-	proxy_fd = -1;
+	if (proxy->fd >= 0) {
+	    close(proxy->fd);
+	    proxy->fd = -1;
+	}
 	return;
     }
 
@@ -130,7 +135,10 @@ proxy_dev_stop(proxy_t *proxy)
 static void
 proxy_dev_close(proxy_t *proxy)
 {
-    close(proxy_fd);
+    if (proxy->fd >= 0) {
+	close(proxy->fd);
+	proxy->fd = -1;
+    }
     /* Do not remove the lock file here. If we do every time we fork
      * a child we drop the lock. Instead we just let the lock go stale
      * when we have finished. We should handle this better...
@@ -149,23 +157,14 @@ proxy_dev_release(proxy_t *proxy)
 int
 proxy_dev_init(proxy_t *proxy, char *proxydev)
 {
-    int n;
-
-    current_proxy = proxydev;
-
-    n = strcspn(proxydev, "0123456789" );
-    proxy->ifunit = atoi(proxydev + n);
-    if (n > sizeof(proxy->iftype)-1)
-		n = sizeof(proxy->iftype)-1;
-    strncpy(proxy->iftype, proxydev, n);
-    proxy->iftype[n] = '\0';
+    int d, n;
 
 #ifdef HAVE_AF_PACKET
-    if (af_packet && (n = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0)
+    if (af_packet && (d = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0)
 #endif
     {
 	af_packet = 0;
-	if ((n = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
+	if ((d = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
 	    mon_syslog(LOG_ERR, "Could not get socket to do packet monitoring: %m");
 	    return -1;
 	}
@@ -177,9 +176,9 @@ proxy_dev_init(proxy_t *proxy, char *proxydev)
 	struct sockaddr_ll to;
 
 	strncpy(ifr.ifr_name, proxydev, IFNAMSIZ);
-	if (ioctl(n, SIOCGIFINDEX, &ifr) < 0) {
+	if (ioctl(d, SIOCGIFINDEX, &ifr) < 0) {
 	    mon_syslog(LOG_ERR, "Proxy interface %s: %m", proxydev);
-	    close(n);
+	    close(d);
 	    return -1;
 	}
 	current_proxy_index = ifr.ifr_ifindex;
@@ -187,9 +186,9 @@ proxy_dev_init(proxy_t *proxy, char *proxydev)
 	to.sll_family = AF_PACKET;
 	to.sll_protocol = htons(ETH_P_ALL);
 	to.sll_ifindex = ifr.ifr_ifindex;
-	if (bind(n, (struct sockaddr *)&to, sizeof(to)) < 0) {
+	if (bind(d, (struct sockaddr *)&to, sizeof(to)) < 0) {
 	    mon_syslog(LOG_ERR, "Bind to proxy interface %s: %m", proxydev);
-	    close(n);
+	    close(d);
 	    return -1;
 	}
     } else
@@ -199,13 +198,20 @@ proxy_dev_init(proxy_t *proxy, char *proxydev)
 
 	to.sa_family = AF_INET;
 	strcpy(to.sa_data, proxydev);
-	if (bind(n, (struct sockaddr *)&to, sizeof(to)) < 0) {
+	if (bind(d, (struct sockaddr *)&to, sizeof(to)) < 0) {
 	    mon_syslog(LOG_ERR, "Bind to proxy interface %s: %m", proxydev);
-	    close(n);
+	    close(d);
 	    return -1;
 	}
     }
 
+    current_proxy = proxydev;
+    n = strcspn(proxydev, "0123456789" );
+    proxy->ifunit = atoi(proxydev + n);
+    if (n > sizeof(proxy->iftype)-1)
+		n = sizeof(proxy->iftype)-1;
+    strncpy(proxy->iftype, proxydev, n);
+    proxy->iftype[n] = '\0';
     proxy->send = proxy_dev_send;
     proxy->recv = proxy_dev_recv;
     proxy->init = proxy_dev_init;
@@ -213,5 +219,6 @@ proxy_dev_init(proxy_t *proxy, char *proxydev)
     proxy->stop = proxy_dev_stop;
     proxy->close = proxy_dev_close;
     proxy->release = proxy_dev_release;
+    proxy->fd = d;
     return n;
 }

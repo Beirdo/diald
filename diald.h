@@ -283,7 +283,6 @@ int tcp_fd;			/* TCP listener. */
 fd_set ctrl_fds;		/* TCP command/monitor connections. */
 PIPE *pipes;			/* List of control/monitor pipes. */
 MONITORS *monitors;		/* List of monitor pipes. */
-int proxy_fd;			/* proxy */
 int modem_fd;			/* modem device fp (for slip links) */
 int modem_hup;			/* have we seen a modem HUP? */
 int request_down;		/* has the user requested link down? */
