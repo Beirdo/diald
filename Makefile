@@ -1,6 +1,11 @@
 # ------------------ USER CONFIGURABLE SETTINGS ---------------------------
 # The directories where files will be installed, you may want to change these.
 
+# Once you have read, understood, and made any necessary changes
+# you may comment out the next two lines.
+unconfig:
+	@echo 'EDIT THE CONFIG SETTINGS IN THE MAKEFILE!'; exit 1
+
 # dctrl goes here
 BINDIR=/usr/bin
 # diald goes here
@@ -10,9 +15,26 @@ MANDIR=/usr/man
 # the configuration files go here
 LIBDIR=/usr/lib/diald
 
+# Choose a proxy interface type. If you use tap you need to build
+# a kernel with ethertap support. If you build ethertap as a module
+# you need to add lines like:
+#
+#	alias tap0	ethertap
+#	options tap0	-o tap0 unit=0
+#	alias tap1	ethertap
+#	options tap1	-o tap1 unit=0
+#
+# to you /etc/modules.conf.
+#  If you use proxy - the old slip proxy code - you need a kernel
+# built with slip support.
+#  The new tap code is preferred. Expect the slip code to removed
+# in a future version of diald. Prepare.
+PROXY = tap
+#PROXY = proxy
+
 # Compiler flags. Note that with gcc 2.5.8 using -g without -O
 # will cause it to miscompile the filter parsing code.
-# Also note that later versions of gcc may generate bad code
+# Also note that some versions of gcc may generate bad code
 # with the -fomit-frame-pointer option.
 
 # Linux, libc.so.6, TCP access control via /etc/hosts.allow (tcp_wrappers)
@@ -51,11 +73,11 @@ LIBS = -lwrap -lnsl
 # ------------------ END OF USER CONFIGURATIONS ---------------------------
 
 OBJFILES=diald.o options.o modem.o filter.o slip.o lock.o ppp.o dev.o \
-	proxyarp.o fsm.o timer.o parse.o buffer.o tap.o \
+	proxyarp.o fsm.o timer.o parse.o buffer.o $(PROXY).o \
 	route.o bufio.o utils.o firewall.o log.o access.o
 SOURCEFILES=diald.c options.c modem.c filter.c slip.c lock.c ppp.c dev.c \
-	proxyarp.c fsm.c timer.c firewall.c parse.c buffer.c tap.c route.c \
-	bufio.c utils.c log.c access.c bin patches config
+	proxyarp.c fsm.c timer.c firewall.c parse.c buffer.c $(PROXY).c \
+	route.c bufio.c utils.c log.c access.c bin patches config
 HFILES=config.h diald.h firewall.h fsm.h version.h timer.h bufio.h access.h
 DOCFILES=CHANGES README BUGS THANKS LICENSE doc/diald.man doc/diald-faq.txt \
 	doc/dctrl.man doc/diald-examples.man doc/diald-control.man \

@@ -1,5 +1,11 @@
 Major changes between version 0.98.2 and 0.98.3.
 ------------------------------------------------
+  - Added options to select either the new ethertap proxy code or
+    the old slip proxy code in the Makefile. The Makefile will
+    now complain if the config settings have not been set before
+    compiling.
+  - Added a fixwrappers script to remove bogus setenv stuff from
+    the tcp_wrappers library if it exists.
   - Set the initial log level to LOG_INFO for monitors that connect
     without giving an explicit monitor setting.
   - Changes for compatibility with glibc 2.1.
