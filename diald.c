@@ -148,7 +148,7 @@ main(int argc, char *argv[])
 #ifdef _SC_CLK_TCK
     clk_tck = sysconf(_SC_CLK_TCK);
 #endif
-#if CLK_TCK
+#ifdef CLK_TCK
     if (clk_tck <= 0)
 	clk_tck = CLK_TCK;
 #elif HZ
