@@ -8,7 +8,7 @@
 
 #include "diald.h"
 
-#ifdef 0
+#if 0
 #ifdef PPP_VERSION_2_2_0
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
@@ -26,40 +26,60 @@ static int rx_count = -1;
 void ppp_start()
 {
     int pgrpid;
-    char buf[24];
+
+    block_signals();
 
     link_iface = -1;
     rx_count = -1;
+
     /* Run pppd directly here and set up to wait for the iface */
     link_pid = fork();
 
     if (link_pid < 0) {
-	syslog(LOG_ERR, "failed to fork pppd: %m");
+        unblock_signals();
+	mon_syslog(LOG_ERR, "failed to fork pppd: %m");
 	die(1);
     }
 
+#define ADD_ARG(arg) { argv[i] = arg; argv_len += strlen(argv[i++]) + 1; }
+    
     if (link_pid == 0) {
-	char **argv = (char **)malloc(sizeof(char *)*(pppd_argc+9));
+	char **argv = (char **)malloc(sizeof(char *)*(pppd_argc+11));
+	int argv_len = 0;
+	char buf[24], *argv_buf;
 	int i = 0, j;;
 
-	argv[i++] = PATH_PPPD;
-	argv[i++] = "-detach";
-	if (modem) argv[i++] = "modem";
-	if (crtscts) argv[i++] = "crtscts";
-        argv[i++] = "mtu";
+        default_sigacts();
+        unblock_signals();
+
+	ADD_ARG(path_pppd);
+	ADD_ARG("-detach");
+	if (modem) ADD_ARG("modem");
+	if (crtscts) ADD_ARG("crtscts");
+	ADD_ARG("mtu");
 	sprintf(buf,"%d",mtu);
-	argv[i++] = buf;
-        argv[i++] = "mru";
+	ADD_ARG(strdup(buf));
+	ADD_ARG("mru");
 	sprintf(buf,"%d",mru);
-	argv[i++] = buf;
+	ADD_ARG(strdup(buf));
 	if (netmask) {
-	    argv[i++] = "netmask";
-	    argv[i++] = netmask;
+	  ADD_ARG("netmask");
+	  ADD_ARG(netmask);
 	}
 	for (j = 0; j < pppd_argc; j++) {
-	    argv[i++] = pppd_argv[j];
+	  ADD_ARG(pppd_argv[j]);
 	}
 	argv[i++] = 0;
+
+	if ((argv_buf = (char *)malloc(argv_len + 1))) {
+	  argv_len = i - 1;
+	  *argv_buf = '\0';
+	  for (i = 0; i < argv_len; i++) {
+	    strcat(argv_buf, argv[i]);
+	    strcat(argv_buf, " ");
+	  }
+	  mon_syslog(LOG_DEBUG, "Running pppd: %s", argv_buf);
+	}
 
 	/* make sure pppd is the session leader and has the controlling
          * terminal so it gets the SIGHUP's
@@ -74,13 +94,14 @@ void ppp_start()
 	dup2(modem_fd, 0);
 	dup2(modem_fd, 1);
 
-	execv(PATH_PPPD,argv);
+	execv(path_pppd,argv);
 
-	syslog(LOG_ERR, "could not exec %s: %m",PATH_PPPD);
+	mon_syslog(LOG_ERR, "could not exec %s: %m",path_pppd);
 	_exit(99);
 	/* NOTREACHED */
     }
-    syslog(LOG_INFO,"Running pppd (pid = %d).",link_pid);
+    unblock_signals();
+    mon_syslog(LOG_INFO,"Running pppd (pid = %d).",link_pid);
 }
 
 /*
@@ -120,7 +141,7 @@ int ppp_set_addrs()
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
 	sprintf(ifr.ifr_name,"ppp%d",link_iface);
 	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
-	   syslog(LOG_ERR,"failed to read ppp interface status");
+	   mon_syslog(LOG_ERR,"failed to read ppp interface status");
 	   return 0;
 	}
 	if (!(ifr.ifr_flags & IFF_UP))
@@ -136,12 +157,12 @@ int ppp_set_addrs()
 
 	/* Ok, the interface is up, grab the addresses. */
 	if (ioctl(snoopfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
-		syslog(LOG_ERR,"failed to get ppp local address: %m");
+		mon_syslog(LOG_ERR,"failed to get ppp local address: %m");
 	else
        	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
 	if (ioctl(snoopfd, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
-	   syslog(LOG_ERR,"failed to get ppp remote address: %m");
+	   mon_syslog(LOG_ERR,"failed to get ppp remote address: %m");
 	else
 	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
@@ -150,12 +171,12 @@ int ppp_set_addrs()
 	 * (NOTE: Adjusting the MTU setting may cause kernel nastyness...)
 	 */
 	if (ioctl(snoopfd, SIOCGIFMTU, (caddr_t) &ifr) == -1) {
-	    syslog(LOG_ERR,"failed to get ppp mtu setting: %m");
+	    mon_syslog(LOG_ERR,"failed to get ppp mtu setting: %m");
 	} else {
 	    if (ifr.ifr_mtu != mtu) {
-	        syslog(LOG_ERR,"PPP negotiated mtu of %d does not match requested setting %d.",ifr.ifr_mtu,mtu);
-		syslog(LOG_ERR,"Attempting to auto adjust mtu.");
-		syslog(LOG_ERR,"Restart diald with mtu set to %d to avoid errors.",ifr.ifr_mtu);
+	        mon_syslog(LOG_ERR,"PPP negotiated mtu of %d does not match requested setting %d.",ifr.ifr_mtu,mtu);
+		mon_syslog(LOG_ERR,"Attempting to auto adjust mtu.");
+		mon_syslog(LOG_ERR,"Restart diald with mtu set to %d to avoid errors.",ifr.ifr_mtu);
 		mtu = ifr.ifr_mtu;
 	        proxy_config(orig_local_ip,orig_remote_ip);
 	    }
@@ -169,27 +190,34 @@ int ppp_set_addrs()
 	    addr.s_addr = laddr;
 	    local_ip = strdup(inet_ntoa(addr));
 	    local_addr = laddr;
-	    syslog(LOG_INFO,"New addresses: local %s, remote %s.",
+	    mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 		local_ip,remote_ip);
-	    /* have to reset the proxy if we won't be rerouting... */
-	    if (!do_reroute) {
-		/* If we are rerouting, then we have a window without
-		 * routes here. The proxy_config calls ifconfig, which
-		 * clobbers all the routes.
-		 */
-	    	proxy_config(local_ip,remote_ip);
-    		set_ptp("sl",proxy_iface,remote_ip,1);
-	        add_routes("sl",proxy_iface,local_ip,remote_ip,1);
-	    }
 	}
 
+	/* have to reset the proxy if we won't be rerouting... */
+	if (!do_reroute
+	&& (dynamic_addrs || (blocked && !blocked_route))) {
+	    /* If we are rerouting, then we have a window without
+	     * routes here. The proxy_config calls ifconfig, which
+	     * clobbers all the routes.
+	     */
+	    proxy_config(local_ip,remote_ip);
+	    set_ptp("sl",proxy_iface,remote_ip,1);
+	    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	    add_routes("sl",proxy_iface,local_ip,remote_ip,1); 
+	}
+
+#if 1
 	/* This is redundant in normal operation, but if we
 	 * have to restart the link, then this is necessary...
 	 */
 	set_ptp("ppp",link_iface,remote_ip,0);
+#endif
 
-	if (do_reroute)
+	if (do_reroute) {
 	     add_routes("ppp",link_iface,local_ip,remote_ip,0);
+	     del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	}
 	return 1;
     }
     return 0;
@@ -212,9 +240,9 @@ int ppp_route_exists()
     int device = 0;
     int found = 0;
     FILE *fp;
-    sprintf(buf,"%s -n",PATH_ROUTE);
+    sprintf(buf,"%s -n",path_route);
     if ((fp = popen(buf,"r"))==NULL) {
-        syslog(LOG_ERR,"Could not run command '%s': %m",buf);
+        mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	return 0;	/* assume half dead in this case... */
     }
 
@@ -232,9 +260,9 @@ int ppp_rx_count()
     char buf[128];
     int packets = 0;
     FILE *fp;
-    sprintf(buf,"%s ppp%d",PATH_IFCONFIG,link_iface);
+    sprintf(buf,"%s ppp%d",path_ifconfig,link_iface);
     if ((fp = popen(buf,"r"))==NULL) {
-        syslog(LOG_ERR,"Could not run command '%s': %m",buf);
+        mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	return 0;	/* assume half dead in this case... */
     }
 
@@ -264,8 +292,12 @@ void ppp_reroute()
      * to avoid this. Sigh.
      */
     proxy_config(orig_local_ip,orig_remote_ip);
-    set_ptp("sl",proxy_iface,orig_remote_ip,1);
-    add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    if (blocked && !blocked_route)
+	del_ptp("sl",proxy_iface,orig_remote_ip);
+    else {
+	set_ptp("sl",proxy_iface,orig_remote_ip,1);
+	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
     local_addr = inet_addr(orig_local_ip);
     /* If we did routing on the ppp link, remove it */
     if (do_reroute && link_iface != -1)
@@ -276,7 +308,7 @@ void ppp_reroute()
 void ppp_kill()
 {
     if (link_pid)
-    	if (kill(link_pid,SIGINT) == -1 && errno == ESRCH)
+    	if (kill(link_pid,SIGKILL) == -1 && errno == ESRCH)
 	    link_pid = 0;
 }
 

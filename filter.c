@@ -8,6 +8,7 @@
 
 #include "diald.h"
 
+
 int itxtotal = 0;
 int irxtotal = 0;
 
@@ -16,13 +17,7 @@ int irxtotal = 0;
  */
 void filter_setup()
 {
-
-    fwdfd = -1;
-
-    if ((snoopfd = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
-        syslog(LOG_ERR, "Could not get socket to do packet monitoring: %m");
-        die(1);
-    }
+    fwdfd = snoopfd = -1;
 }
 
 /*
@@ -30,36 +25,69 @@ void filter_setup()
  */
 void idle_filter_init()
 {
-    struct sockaddr to;
+    if (snoopfd != -1)
+        close(snoopfd);
+#ifdef HAVE_AF_PACKET
+    if (af_packet && (snoopfd = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0)
+#endif
+    {
+	af_packet = 0;
+	if ((snoopfd = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
+	    mon_syslog(LOG_ERR, "Could not get socket to do packet monitoring: %m");
+	    die(1);
+	}
+    }
+
+    if (fwdfd != -1)
+	close(fwdfd);
+#ifdef HAVE_AF_PACKET
+    if (af_packet)
+	fwdfd = socket(AF_PACKET, SOCK_DGRAM, 0);
+    else
+#endif
+	fwdfd = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL));
+    if (fwdfd < 0) {
+        mon_syslog(LOG_ERR, "Could not get socket to do packet forwarding: %m");
+        die(1);
+    }
 
     if (mode == MODE_SLIP) {
 	sprintf(snoop_dev,"sl%d",link_iface);
      } else if (mode == MODE_PPP) {
        sprintf(snoop_dev,"ppp%d",link_iface);
      } else if (mode == MODE_DEV) {
-       sprintf(snoop_dev,"%s",device);
+       sprintf(snoop_dev,"%s",current_dev);
       }
-    if (debug) syslog(LOG_INFO,"Changed snoop device to %s",snoop_dev);
+    if (debug) mon_syslog(LOG_INFO,"Changed snoop device to %s",snoop_dev);
     txtotal = rxtotal = 0;
 
-    /* try to bind the snooping socket to a particular device */
-    to.sa_family = AF_INET;
-    strcpy(to.sa_data,snoop_dev);
-    /* This bind may fail if the kernel isn't recent enough. */
-    /* This will just mean more work for the kernel. */
-    bind(snoopfd,&to,sizeof(struct sockaddr));
+#ifdef HAVE_AF_PACKET
+    if (af_packet) {
+	struct ifreq ifr;
+	struct sockaddr_ll to;
 
-    if (fwdfd != -1) {
-	close(fwdfd);
-	fwdfd = -1;
+	strncpy(ifr.ifr_name, snoop_dev, IFNAMSIZ);
+	if (ioctl(snoopfd, SIOCGIFINDEX, &ifr) < 0)
+	    mon_syslog(LOG_INFO, "ioctl SIOCGIFINDEX: %m");
+	snoop_index = ifr.ifr_ifindex;
+	memset(&to, 0, sizeof(to));
+	to.sll_family = AF_PACKET;
+	to.sll_protocol = htons(ETH_P_ALL);
+	to.sll_ifindex = snoop_index;
+	if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
+	    mon_syslog(LOG_INFO, "bind snoopfd: %m");
+	bind(fwdfd, (struct sockaddr *)&to, sizeof(to));
+    } else
+#endif
+    {
+	struct sockaddr to;
+
+	to.sa_family = AF_INET;
+	strcpy(to.sa_data, snoop_dev);
+	if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
+	    mon_syslog(LOG_INFO, "bind snoopfd: %m");
+	bind(fwdfd, (struct sockaddr *)&to, sizeof(to));
     }
-    if ((fwdfd = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
-        syslog(LOG_ERR, "Could not get socket to do packet forwarding: %m");
-        die(1);
-    }
-    /* This bind may fail if the kernel isn't recent enough. */
-    /* This will just mean more work for the kernel. */
-    bind(fwdfd,&to,sizeof(struct sockaddr));
 }
 
 /*
@@ -67,23 +95,53 @@ void idle_filter_init()
  */
 void idle_filter_proxy()
 {
-    struct sockaddr to;
-
     if (fwdfd != -1) {
-        if (debug) syslog(LOG_INFO,"Closed fwdfd");
+        if (debug) mon_syslog(LOG_INFO,"Closed fwdfd");
 	close(fwdfd);
 	fwdfd = -1;
     }
-    sprintf(snoop_dev,"sl%d",proxy_iface);
-    if (debug) syslog(LOG_INFO,"Changed snoop device to %s",snoop_dev);
 
-    /* try to bind the snooping socket to a particular device */
-    /* Most likely this should close the old socket and open a new one first */
-    to.sa_family = AF_INET;
-    strcpy(to.sa_data,snoop_dev);
-    /* This bind may fail if the kernel isn't recent enough. */
-    /* This will just mean more work for the kernel. */
-    bind(snoopfd,&to,sizeof(struct sockaddr));
+    if (snoopfd != -1)
+        close(snoopfd);
+#ifdef HAVE_AF_PACKET
+    if (af_packet && (snoopfd = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0)
+#endif
+    {
+	af_packet = 0;
+	if ((snoopfd = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
+    	    mon_syslog(LOG_ERR, "Could not get socket to do packet monitoring: %m");
+    	    die(1);
+	}
+    }
+
+    sprintf(snoop_dev,"sl%d",proxy_iface);
+    if (debug) mon_syslog(LOG_INFO,"Changed snoop device to %s",snoop_dev);
+
+#ifdef HAVE_AF_PACKET
+    if (af_packet) {
+	struct ifreq ifr;
+	struct sockaddr_ll to;
+
+	strncpy(ifr.ifr_name, snoop_dev, IFNAMSIZ);
+	if (ioctl(snoopfd, SIOCGIFINDEX, &ifr) < 0)
+	    mon_syslog(LOG_INFO, "ioctl SIOCGIFINDEX: %m");
+	snoop_index = ifr.ifr_ifindex;
+	memset(&to, 0, sizeof(to));
+	to.sll_family = AF_PACKET;
+	to.sll_protocol = htons(ETH_P_ALL);
+	to.sll_ifindex = snoop_index;
+	if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
+	    mon_syslog(LOG_INFO, "bind snoopfd: %m");
+    } else
+#endif
+    {
+	struct sockaddr to;
+
+	to.sa_family = AF_INET;
+	strcpy(to.sa_data, snoop_dev);
+	if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
+	    mon_syslog(LOG_INFO, "bind snoopfd: %m");
+    }
 }
 
 /*
@@ -93,41 +151,60 @@ void idle_filter_proxy()
  */
 void filter_read()
 {
-    struct sockaddr from;
-    int from_len = sizeof(struct sockaddr);
+    union {
+	struct sockaddr sa;
+#ifdef HAVE_AF_PACKET
+	struct sockaddr_ll sl;
+#endif
+    } from;
+    size_t from_len = sizeof(from);
     int len;
 
-    if ((len = recvfrom(snoopfd,packet,4096,0,&from,&from_len)) > 0) {
+    if ((len = recvfrom(snoopfd,packet,4096,0,(struct sockaddr *)&from,&from_len)) > 0) {
 	/* FIXME: really if the bind succeeds, then I don't need
 	 * this check. How can I shortcut this effectly?
 	 * perhaps two different filter_read routines?
          */
-	if (strcmp(snoop_dev,from.sa_data) == 0) {
-	    if (do_reroute) {
-		/* If we are doing unsafe routing, then we cannot count
-		 * the transmitted packets on the forwarding side of the
-		 * transitter (since there is none!), so we attempt to
-		 * count them here. However, we can only tell packets
-		 * that are leaving our interface from this machine,
-		 * forwarded packets all get counted as received bytes.
-		 */
-		if (((struct iphdr *)packet)->saddr == local_addr) {
-		    txtotal += len;
-		    itxtotal += len;
-		} else {
-		    rxtotal += len;
-		    irxtotal += len;
-		}
+	if (
+#ifdef HAVE_AF_PACKET
+	(af_packet && from.sl.sll_ifindex != snoop_index)
+	||
+#endif
+	(!af_packet && strcmp(from.sa.sa_data, snoop_dev) != 0))
+	    return;
+
+	if (do_reroute) {
+	    /* If we are doing unsafe routing, then we cannot count
+	     * the transmitted packets on the forwarding side of the
+	     * transitter (since there is none!), so we attempt to
+	     * count them here. However, for non AF_PACKET sockets
+	     * we can only tell packets that are leaving our interface
+	     * from this machine, forwarded packets all get counted
+	     * as received bytes.
+	     */
+	    if (
+#ifdef HAVE_AF_PACKET
+	    (af_packet && from.sl.sll_pkttype == PACKET_OUTGOING)
+	    ||
+#endif
+	    (!af_packet && ((struct iphdr *)packet)->saddr == local_addr)) {
+		txtotal += len;
+		itxtotal += len;
 	    } else {
-	    	rxtotal += len;
+		rxtotal += len;
 		irxtotal += len;
 	    }
+	} else {
+	    rxtotal += len;
+	    irxtotal += len;
+	}
 	
-            if ((ntohs(((struct iphdr *)packet)->frag_off) & 0x1fff) == 0) {
-	        /* Mark passage of first packet */
-	        if (check_firewall(fwunit,packet,len) && state == STATE_UP)
-	            state_timeout = -1;
-	    }
+	if ((ntohs(((struct iphdr *)packet)->frag_off) & 0x1fff) == 0) {
+	    /* Mark passage of first packet */
+	    if (check_firewall(fwunit,
+		(af_packet ? (sockaddr_ll_t *)&from : NULL), packet, len)
+	    && state == STATE_UP)
+		state_timeout = -1;
 	}
     }
 }
@@ -178,11 +255,11 @@ int fw_reset_wait()
 void print_filter_queue(int sig)
 {
     struct firewall_req req;
-    syslog(LOG_INFO,"User requested dump of firewall queue.");
-    syslog(LOG_INFO,"--------------------------------------");
+    mon_syslog(LOG_INFO,"User requested dump of firewall queue.");
+    mon_syslog(LOG_INFO,"--------------------------------------");
     req.unit = fwunit;
     ctl_firewall(IP_FW_PCONN,&req);
-    syslog(LOG_INFO,"--------------------------------------");
+    mon_syslog(LOG_INFO,"--------------------------------------");
 }
 
 void monitor_queue()

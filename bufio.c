@@ -8,14 +8,20 @@
 
 #include "diald.h"
 
-void pipe_init(int fd,PIPE *pipe)
+void pipe_init(char *name, int access, int fd, PIPE *pipe, int flush)
 {
     char buf[2];
+    pipe->name = name;
+    pipe->access = access;
     pipe->fd = fd;
     pipe->count = 0;
     fcntl(fd,F_SETFL,fcntl(fd,F_GETFL)|O_NONBLOCK);
-    /* clear out any old garbage from the FIFO */
-    while (read(fd,buf,1) > 0);
+    pipe->next = pipes;
+    pipes = pipe;
+    if (flush) {
+        /* clear out any old garbage from the FIFO */
+        while (read(fd,buf,1) > 0);
+    }
 }
 
 /* Read from the file descriptor, and
@@ -33,11 +39,18 @@ int pipe_read(PIPE *pipe)
     if (i > 0) {
 	pipe->count += i;
 	return pipe->count;
+    } else if (i == 0 || errno == EAGAIN) {
+	/* A close of a pipe is only significant if it is a control
+	 * pipe, not if it is a capture pipe for a script.
+	 */
+	if ((pipe->access & ACCESS_MONITOR)) {
+	    mon_syslog(LOG_INFO, "Closing %s", pipe->name);
+	}
+	return -1;
+    } else if (errno == EINTR) {
+	return 0;
     } else {
-	if (errno == EAGAIN)
-	    syslog(LOG_ERR,"EOF on control fifo. Closing fifo.");
-	else
-	    syslog(LOG_ERR,"Error on control fifo: %m");
+	mon_syslog(LOG_ERR,"Error on %s: %m", pipe->name);
 	return -1;	/* error! shut down reader... */
     }
 }

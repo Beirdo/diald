@@ -1,0 +1,19 @@
+Users of the diald-top program (a third party dctrl like program
+with text displays) and old versions of dctrl should note that
+their connection lists are confusing in that they list destination
+and source columns.
+
+  For 2.1 kernels and above (which have AF_PACKET support) the
+first column is the address on *this* side of the managed link
+and the second column is the address on the *remote* side of
+the managed link.
+
+  For 2.0 kernels (which do not have AF_PACKET support) there
+is no way to easily determine which way packets are going and
+which address is which. Therefore the first column is the
+numerically lowest of the source and destination addresses on
+the connection and the second column is the numerically highest.
+
+  Packets are actually flowing both ways on the connection and we
+do not consider which end inititiated the connection. Therefore
+the idea of source and destination is meaningless. Sorry :-).

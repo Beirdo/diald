@@ -47,7 +47,7 @@ void buffer_packet(unsigned int len,unsigned char *pkt)
 
     buffer_check();
     if (len+6 > buffer_size) {
-	syslog(LOG_ERR,"Can't buffer packet of length %d, buffer to small.",
+	mon_syslog(LOG_ERR,"Can't buffer packet of length %d, buffer to small.",
 	    len);
 	return;
     }
@@ -82,7 +82,7 @@ void buffer_packet(unsigned int len,unsigned char *pkt)
 	    tail = (tail+1)%buffer_size;
 	}
     } else {
-	syslog(LOG_ERR,
+	mon_syslog(LOG_ERR,
 	    "Can't buffer packet of length %d, only %d bytes available.",
 	    len,buffer_size-(used+6));
     }
@@ -93,18 +93,34 @@ void forward_buffer()
     unsigned int clen, i;
     unsigned long stamp;
     unsigned long ctime = timestamp();
-    struct SOCKADDR to;
+    struct sockaddr_pkt sp;
+#ifdef HAVE_AF_PACKET
+    struct sockaddr_ll sl;
+#endif
+    struct sockaddr *to;
+    size_t to_len;
     unsigned char pkt[4096];
 
     buffer_check();
-#ifdef HAS_SOCKADDR_PKT
-    to.spkt_family = AF_INET;
-    strcpy(to.spkt_device,snoop_dev);
-    to.spkt_protocol = htons(ETH_P_IP);
-#else
-    to.sa_family = AF_INET;
-    strcpy(to.sa_data,snoop_dev);
+
+#ifdef HAVE_AF_PACKET
+    if (af_packet) {
+	memset(&sl, 0, sizeof(sl));
+	sl.sll_family = AF_PACKET;
+	sl.sll_protocol = htons(ETH_P_IP);
+	sl.sll_ifindex = snoop_index;
+	to = (struct sockaddr *)&sl;
+	to_len = sizeof(sl);
+    } else
 #endif
+    {
+	memset(&sp, 0, sizeof(sp));
+	sp.spkt_family = AF_INET;
+	strcpy(sp.spkt_device, snoop_dev);
+	sp.spkt_protocol = htons(ETH_P_IP);
+	to = (struct sockaddr *)&sp;
+	to_len = sizeof(sp);
+    }
 
     while (used > 0) {
 	clen = (B(head)<<8) | B(head+1);
@@ -120,8 +136,8 @@ void forward_buffer()
              * on the snoopfd (which points to the same device),
              * then we will never get them back on snoopfd.
              */
-	    if (sendto(snoopfd,pkt,clen,0,(struct sockaddr *)&to,sizeof(struct SOCKADDR)) < 0) {
-		syslog(LOG_ERR,"Error forwarding data packet to physical device from buffer: %m");
+	    if (sendto(snoopfd, pkt, clen, 0, to, to_len) < 0) {
+		mon_syslog(LOG_ERR,"Error forwarding data packet to physical device from buffer: %m");
 	    }
 	}
 	head = (head+6+clen)%buffer_size;

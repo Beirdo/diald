@@ -61,8 +61,8 @@ void parse_init()
 
 void parse_error(char *s)
 {
-    syslog(LOG_ERR,"%s parsing error. Got token '%s'. %s",context,token->str,s);
-    syslog(LOG_ERR,"parse string: '%s'",errstr);
+    mon_syslog(LOG_ERR,"%s parsing error. Got token '%s'. %s",context,token->str,s);
+    mon_syslog(LOG_ERR,"parse string: '%s'",errstr);
     longjmp(unwind,1);
 }
 
@@ -78,7 +78,7 @@ void tokenize(char *cntxt, int argc, char **argv)
     for (len = i = 0; i < argc; i++)
 	len += strlen(argv[i])+1;
     t = errstr = malloc(len);
-    if (errstr == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+    if (errstr == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
     strcpy(errstr,argv[0]);
     for (i = 1; i < argc; i++) { strcat(errstr," "); strcat(errstr,argv[i]); }
 
@@ -86,7 +86,7 @@ void tokenize(char *cntxt, int argc, char **argv)
 
     for (s = errstr; *s;) {
 	new = malloc(sizeof(Token));
-	if (new == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+	if (new == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
         if (prev == 0) tlist = new; else prev->next = new;
 	prev = new;
 	new->next = 0;
@@ -136,12 +136,12 @@ tokerr:
 done:
 	len = (s-errstr)-new->offset;
 	new->str = malloc(len+1);
-	if (new->str == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+	if (new->str == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
 	strncpy(new->str,errstr+new->offset,len);
 	new->str[len] = 0;
     }
     new = malloc(sizeof(Token));
-    if (new == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+    if (new == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
     if (prev == 0) tlist = new; else prev->next = new;
     prev = new;
     new->next = 0;
@@ -155,7 +155,7 @@ void free_tokens(void)
 {
     Token *next;
     if (token && token->type != TOK_EOF)
-	syslog(LOG_ERR,
+	mon_syslog(LOG_ERR,
 	    "Parsing error. Got token '%s' when end of parse was expected.",
 	    token->str);
     while (tlist) {
@@ -171,16 +171,13 @@ void free_tokens(void)
 
 void init_prule(FW_ProtocolRule *rule)
 {
-    rule->protocol = 0;
+    memset(rule,0,sizeof(*rule));
 }
 
 void init_filter(FW_Filter *filter)
 {
+    memset(filter,0,sizeof(*filter));
     filter->times = cslot;
-    filter->prule = 0;
-    filter->log = 0;
-    filter->count = 0;
-    filter->timeout = 0;
 }
 
 void eat_whitespace(void)
@@ -374,18 +371,19 @@ void parse_new_prule_name(void)
 
 void parse_protocol_name(FW_ProtocolRule *prule)
 {
-    struct protoent *proto;
+    int proto;
     if (token->type == TOK_STR) {
 	if (strcmp(token->str,"any") == 0)
 	    { prule->protocol = 255; ADVANCE; return; }
-        if ((proto = getprotobyname(token->str)))
-	    { prule->protocol = proto->p_proto; ADVANCE; return; }
+        if ((proto = getprotocol(token->str)))
+	    { prule->protocol = proto; ADVANCE; return; }
 	parse_error("Expecting a protocol name or 'any'.");
-    } else if (token->type != TOK_NUM) {
+    } else if (token->type == TOK_NUM) {
 	int p;
 	sscanf(token->str,"%i",&p);
 	if (p > 254) parse_error("Expecting number from 0-254.");
 	prule->protocol = p;
+	ADVANCE;
     } else
         parse_error("Expecting a string or a number.");
 }
@@ -452,18 +450,18 @@ int parse_rvalue(void)
 	    parse_error("Bad inet address specification.");
 	ADVANCE; return v;
     } else if (token->type == TOK_STR) {
-	struct protoent *proto;
-	struct servent *serv;
-	if ((proto = getprotobyname(token->str))) {
-	    ADVANCE; return proto->p_proto;
+	int proto;
+	int serv;
+	if ((proto = getprotocol(token->str))) {
+	    ADVANCE; return proto;
 	} else if (strncmp("udp.",token->str,4) == 0) {
-	    if ((serv = getservbyname(token->str+4,"udp"))) {
-	 	ADVANCE; return htons(serv->s_port);
+	    if ((serv = getservice(token->str+4,"udp"))) {
+	 	ADVANCE; return serv;
 	    }
 	    parse_error("Not a known udp service port.");
 	} else if (strncmp("tcp.",token->str,4) == 0) {
-	    if ((serv = getservbyname(token->str+4,"tcp"))) {
-	 	ADVANCE; return htons(serv->s_port);
+	    if ((serv = getservice(token->str+4,"tcp"))) {
+	 	ADVANCE; return serv;
 	    }
 	    parse_error("Not a known tcp service port.");
 	}
@@ -751,7 +749,7 @@ void parse_impulse(void *var, char **argv)
 void parse_var(void *var, char **argv)
 {
     struct var *variable = malloc(sizeof(struct var));
-    if (variable == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+    if (variable == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
     tokenize("var",2,argv);
     if (setjmp(unwind)) { token = 0; free_tokens(); return; }
     parse_var_name(variable);

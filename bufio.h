@@ -6,7 +6,10 @@
  * distributed with this software for terms of use.
  */
 
-typedef struct {
+typedef struct pipe {
+    struct pipe *next;
+    char *name;		/* the name given to this channel */
+    int access;		/* access flags */
     int fd;		/* file descriptor */
     int count;		/* number of characters in the buffer now */
     char buf[1024];

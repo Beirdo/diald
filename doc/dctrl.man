@@ -9,7 +9,10 @@
 dctrl \- graphical diald control utility
 .SH SYNOPSIS
 .B /usr/bin/dctrl
-[-fifo \fI<fifo-path>\fR] [-i] [-animated-icon]
+[-title \fI<title>\fR]
+[-fifo \fI<fifo-path>\fR]
+[-host \fI<host>\fR -port \fI<port>\fR]
+[-i] [-animated-icon]
 [-c] [-control-window] [-iconic] [standard X options]
 .SH DESCRIPTION
 .LP
@@ -30,6 +33,12 @@ is very simple, and should be easy to understand.
 
 .SH OPTIONS
 .TP
+.B -title \fI<title>\fR
+Sets the title used for the
+.B dctrl
+window.
+
+.TP
 .B -fifo \fI<fifo-path>\fR
 Tell
 .B dctrl
@@ -37,6 +46,14 @@ where to find the control fifo for the diald process that
 you wish to control. By default
 .B dctrl
 will use /etc/diald/diald.ctl.
+
+.TP
+.B -host \fI<host>\fR -port \fI<port>\fR
+Tell
+.B dctrl
+to connect to the given port on the given host using TCP rather than
+using a fifo. It is expected that a diald is listening for connections
+on the port.
 
 .TP
 .B -i

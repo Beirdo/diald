@@ -3,12 +3,76 @@
 exec wish "$0" "$@"
 
 # User tunable parameters
-set default_FIFO "/etc/diald/diald.ctl"
+set imagepath "/usr/lib/diald"
+set diald_TITLE ""
+set diald_FIFO ""
+set diald_HOST ""
+set diald_PORT 0
 
 # Default globals
 set monfifo ""
 set monfd ""
 set fifofd ""
+set fifo_counter 0
+
+# Initial values
+set monloglevel 6
+set monlevel 0x0000017f
+set monstate 0.0
+set queue_list [list]
+set max_info_lines 500
+set out_usage bps
+set in_usage bps
+set out_bandwidth [expr 33600 / 8]
+set in_bandwidth [expr 33600 / 8]
+
+# These should be proc static but Tcl has no such concept.
+set txtotal 0
+set status(rx_total) 0.0
+set status(tx_total) 0.0
+set status(rx_load) 0.0
+set status(tx_load) 0.0
+set status(rx_load5) 0.0
+set status(tx_load5) 0.0
+set status(rx_load150) 0.0
+set status(tx_load150) 0.0
+
+
+# Tool tip handling
+proc toolTipSet {w txt} {
+	global toolTip
+	set toolTip($w) $txt
+	bind $w <Enter> "_toolTipStart $w"
+	bind $w <Leave> "_toolTipStop $w"
+}
+
+proc _toolTipStart {w} {
+	global _toolTipTimer
+	destroy .toolTipWin
+	set _toolTipTimer [after 750 "_toolTipShow $w"]
+}
+
+proc _toolTipStop {w} {
+	global _toolTipTimer
+	after cancel $_toolTipTimer
+	destroy .toolTipWin
+}
+
+proc _toolTipShow {w} {
+	global toolTip
+	toplevel .toolTipWin -cursor {top_left_arrow}
+	wm withdraw .toolTipWin
+	wm overrideredirect .toolTipWin 1
+	label .toolTipWin.l -text $toolTip($w) \
+		-bg lemonchiffon -fg black -bd 1 -relief solid \
+		-justify {left} -padx 4 -wraplength 2i
+	pack .toolTipWin.l
+	set x [expr "[winfo rootx $w] + [winfo width $w] / 2"]
+	set y [expr "[winfo rooty $w] + [winfo height $w] + 5"]
+	wm geometry .toolTipWin +$x+$y
+	wm deiconify .toolTipWin
+}
+
 
 # strip chart code
 proc stripchart {win x y label} {
@@ -40,9 +104,11 @@ proc addtick {w val} {
 	# get the new scale
 	set ns [expr "int($val)"]
 	if {$val > $ns} { incr ns }
-	set r [expr "($s+0.0)/$ns"]
-	$win scale all 0 $o 1 $r
-	set s $ns
+	if { $ns > 0 } {
+	    set r [expr "($s+0.0)/$ns"]
+	    $win scale all 0 $o 1 $r
+	    set s $ns
+	}
     } else {
     	# Also trim the window down for a smaller value if needed.
 	# figure out how many ticks are currently spanned by the image
@@ -50,7 +116,7 @@ proc addtick {w val} {
 	set fs [expr "($t*$s*1.0)/$h"]
 	set ns [expr "int($fs)"]
 	if {$fs > $ns} {incr ns}
-	if {$ns != $s} {
+	if {$ns > 0 && $ns != $s} {
 		set r [expr "($s+0.0)/$ns"]
 		$win scale all 0 $o 1 $r
 		set s $ns
@@ -60,7 +126,7 @@ proc addtick {w val} {
     set v [expr "($val*$h)/$s"]
 
     # rescale vertically if needed
-    if {"$o"!="$h"} {
+    if {$o > 0 && "$o"!="$h"} {
 	set sc [expr "($h+0.0)/$o"]
 	$win scale all 0 0 1 $sc
 	set type(height) $h
@@ -139,27 +205,42 @@ set colors(ZOMBIE)	{black black black}
 
 # Set up the basic data for the app
 
-wm title . "Diald Control"
+wm title . "Diald: No link"
 wm iconname . "Diald"
 wm minsize . 1 1
 
 proc print_usage {} {
-	puts {Usage dctrl [-i|-animated-icon] [-c|-control-window] [-iconic] [-fifo <name>] [-dstatus] [-tload] [-gload] [-pqueue] [-dlog]}
+	puts {Usage dctrl [-title <title>] [-fifo <name>] [-host <host> -port <port>] [-i|-animated-icon] [-c|-control-window] [-iconic] [-toolbar] [-dstatus] [-tload] [-gload] [-pqueue] [-dlog]}
 	exit
 }
 
 # Deal with command line options
 set previous ""
 foreach i $argv {
-	if {"$previous"=="-fifo"} {
-		set default_FIFO $i
+	if {"$previous"=="-title"} {
+		set diald_TITLE $i
+		wm title . $i
+    		wm iconname . $i
+		set previous ""
+	} elseif {"$previous"=="-fifo"} {
+		set diald_FIFO $i
+		set previous ""
+	} elseif {"$previous"=="-host"} {
+		set diald_HOST $i
+		set previous ""
+	} elseif {"$previous"=="-port"} {
+		set diald_PORT $i
 		set previous ""
 	} elseif {"$i"=="-i"} { set fancy_icon 1 } \
+	elseif {"$i"=="-title"} { set previous $i } \
 	elseif {"$i"=="-animated-icon"} { set fancy_icon 1 } \
 	elseif {"$i"=="-c"} { set fancy_icon 2 } \
 	elseif {"$i"=="-control-window"} { set fancy_icon 2 } \
 	elseif {"$i"=="-fifo"} { set previous $i } \
+	elseif {"$i"=="-host"} { set previous $i } \
+	elseif {"$i"=="-port"} { set previous $i } \
 	elseif {"$i"=="-iconic"} {wm iconify .} \
+        elseif {"$i"=="-toolbar"} { set toolbar 1 } \
         elseif {"$i"=="-dstatus"} { set dstatus 1 } \
 	elseif {"$i"=="-tload"} { set tload 1 } \
 	elseif {"$i"=="-gload"} { set gload 1 } \
@@ -210,21 +291,195 @@ if {"$fancy_icon"==1} { wm iconwindow . .dctrlIcon }
 # MONITOR_QUEUE           0x0020
 #
 
-proc openFifo {} {
-    global fifofd monfifo monfd default_FIFO
+proc closeMonitor {} {
+    global fifofd monfifo monfd diald_HOST diald_TITLE
+    if { $monfd != "" } {
+	catch { close $monfd }
+	set monfd ""
+    }
+    if { $diald_HOST == "" } {
+        if { $monfifo != "" } {
+	    catch { exec rm -f $monfifo }
+	}
+	set monfifo ""
+    }
+    if { $fifofd != "" } {
+	catch { close $fifofd }
+	set fifofd ""
+    }
+
+    .toolbar.up configure -state disabled
+    .toolbar.down configure -state disabled
+
+    if { $diald_TITLE == "" } {
+	wm title . "Diald: No link"
+	wm iconname . "Diald"
+    }
+}
+
+proc setMonitor {} {
+    global monloglevel monlevel monfifo
+    fifoCmd [format "monitor 0x%x $monfifo" \
+	[expr $monlevel + ($monloglevel << 24)]]
+}
+
+proc openMonitor {} {
+    global monstate monlevel
+    global fifofd monfifo monfd fifo_counter
+    global diald_FIFO diald_HOST diald_PORT diald_TITLE
 
     # Turn off any previous monitoring
-    if {$monfd!=""} {close $monfd}
-    if {$monfifo!=""} {catch {exec rm -f $monfifo}}
+    closeMonitor
 
     # get new monitoring fifo
-    set fifofd [open $default_FIFO w]
+    set monstate 0.0
+    if { $diald_HOST != "" } {
+	# FIXME: should do a catch here?
+        set fifofd [socket $diald_HOST $diald_PORT]
+        set monfd $fifofd
+        set monfifo "TCP [fconfigure $fifofd -sockname]"
+    } elseif { $diald_FIFO != "" } {
+        set fifofd [open $diald_FIFO w]
+        #
+        set fifo_counter [expr "$fifo_counter+1"]
+        set monfifo /tmp/dctrl.[pid]-$fifo_counter
+        # If an event comes along that causes a signal, then
+        # it is possible the exec above gets exited BEFORE
+        # it finishes waiting. Nasty stuff.
+        # so, we do a little loop until we can confirm the fifo exists
+        # before we ask diald to deal with it.
+        catch {exec mkfifo -m 0600 $monfifo}
+        set monfd [open $monfifo r+]
 
-    set monfifo /tmp/dctrl.[pid]
-    catch {exec mkfifo -m 0600 $monfifo}
-    fifoCmd "monitor $monfifo"
-    set monfd [open $monfifo r]
-    fileevent $monfd readable {stateChange}
+	# Apparently some systems need this to avoid a hang???
+	after 500
+    }
+
+    setMonitor
+
+    if { $diald_TITLE == "" } {
+	wm title . "Diald: No link"
+	wm iconname . "Diald"
+    }
+    fileevent $monfd readable {readMonitor}
+    .toolbar.up configure -state active
+    .toolbar.down configure -state active
+}
+
+proc openLocal {} {
+    set my_path ""
+    catch { destroy .openConn }
+    toplevel .openConn
+    wm group .openConn .
+    wm transient .openConn .
+    wm geometry .openConn \
+	+[expr [winfo pointerx .]-100]+[expr [winfo pointery .]-50]
+    wm resizable .openConn 0 0
+    wm title .openConn "Open Connection"
+
+    frame .openConn.input
+    pack .openConn.input -side top -fill x -pady 2m
+    label .openConn.input.l -text "FIFO name:"
+    entry .openConn.input.e -width 40 -relief sunken -bd 2 -textvariable my_path
+    bind .openConn.input.e <Return> {
+	set diald_HOST ""
+	set diald_FIFO $my_path
+	destroy .openConn
+	openMonitor
+    }
+    bind .openConn.input.e <Escape> \
+	"destroy .openConn"
+    focus .openConn.input.e
+    pack .openConn.input.l .openConn.input.e -side left -padx 1m -pady 2m
+
+    frame .openConn.buttons
+    pack .openConn.buttons -side bottom -fill x -pady 2m
+    button .openConn.buttons.ok \
+	-default active \
+	-text "  Ok  " \
+	-command {
+	    set diald_HOST ""
+	    set diald_FIFO $my_path
+	    destroy .openConn
+	    openMonitor
+	}
+    button .openConn.buttons.dismiss \
+	-text "Cancel" \
+	-command {
+	    destroy .openConn
+	}
+    pack .openConn.buttons.ok .openConn.buttons.dismiss -side left -expand 1
+}
+
+proc openRemote {} {
+    set my_host ""
+    set my_port ""
+    catch { destroy .openConn }
+    toplevel .openConn
+    wm group .openConn .
+    wm transient .openConn .
+    wm geometry .openConn \
+	+[expr [winfo pointerx .]-100]+[expr [winfo pointery .]-50]
+    wm resizable .openConn 0 0
+    wm title .openConn "Open Connection"
+
+    frame .openConn.input
+    pack .openConn.input -side top -fill x -pady 2m
+    label .openConn.input.l1 -text "Host:"
+    entry .openConn.input.e1 -width 30 -relief sunken -bd 2 -textvariable my_host
+    label .openConn.input.l2 -text "Port:"
+    entry .openConn.input.e2 -width 10 -relief sunken -bd 2 -textvariable my_port
+    bind .openConn.input.e1 <Return> {
+	if { $my_port == "" } {
+	    focus .openConn.input.e2
+	} else {
+	    set diald_FIFO ""
+	    set diald_HOST $my_host
+	    set diald_PORT $my_port
+	    destroy .openConn
+	    openMonitor
+	}
+    }
+    bind .openConn.input.e1 <Escape> {
+	destroy .openConn
+    }
+    bind .openConn.input.e2 <Return> {
+	if { $my_host == "" } {
+	    focus .openConn.input.e1
+	} else {
+	    set diald_FIFO ""
+	    set diald_HOST $my_host
+	    set diald_PORT $my_port
+	    destroy .openConn
+	    openMonitor
+	}
+    }
+    bind .openConn.input.e2 <Escape> {
+	destroy .openConn
+    }
+    focus .openConn.input.e1
+    pack .openConn.input.l1 .openConn.input.e1 \
+	.openConn.input.l2 .openConn.input.e2 \
+	-side left -padx 1m -pady 2m
+
+    frame .openConn.buttons
+    pack .openConn.buttons -side bottom -fill x -pady 2m
+    button .openConn.buttons.ok \
+	-default active \
+	-text "  Ok  " \
+	-command {
+	    set diald_FIFO ""
+	    set diald_HOST $my_host
+	    set diald_PORT $my_port
+	    destroy .openConn
+	    openMonitor
+	}
+    button .openConn.buttons.dismiss \
+	-text "Cancel" \
+	-command {
+	    destroy .openConn
+	}
+    pack .openConn.buttons.ok .openConn.buttons.dismiss -side left -expand 1
 }
 
 proc fifoCmd {cmd} {
@@ -233,6 +488,7 @@ proc fifoCmd {cmd} {
 	puts $fifofd $cmd
 	catch {flush $fifofd}
     }
+    # FIXME: if we are not connected we should say so
 }
 
 proc cmp {a b} {
@@ -262,83 +518,182 @@ proc updateIcon {} {
 
 
 
-proc stateChange {} {
-    global monfd status trans colors gload tload
-    set foo [gets $monfd]
-    if {$foo=="STATE"} {
-	set status(fsm) [gets $monfd]
-	if {$status(fsm)=="CONNECT"} {.message.vis.text delete 0.0 end}
-        if {$status(fsm)=="UP"} { load_init }
+proc user_number { n } {
+    if { $n > 1073741824 } {
+	format " %4.0fG" [expr $n/1073741824]
+    } elseif { $n > 1048576 } {
+	format " %4.0fM" [expr $n/1048576]
+    } elseif { $n > 1024 } {
+	format " %4.0fk" [expr $n/1024]
+    } else {
+	format " %4.0f " $n
+    }
+}
+
+proc readMonitor {} {
+    global monstate monfd status
+    global queue_list status trans colors gload tload
+    global in_usage out_usage in_bandwidth out_bandwidth
+    global blocked forced max_info_lines
+    global diald_TITLE
+
+    if {[gets $monfd foo] == -1} {
+	closeMonitor
+	return 0
+    }
+
+    switch " $foo" {
+	{ STATE}	{ set monstate 1.0; return 0 }
+	{ STATUS}	{ set monstate 2.0; return 0 }
+	{ STATUS2}	{ set monstate 3.0; return 0 }
+	{ QUEUE}		{ set monstate 4.0
+			set queue_list [list]
+			return 0
+			}
+	{ MESSAGE}	{ set monstate 5.0; return 0 }
+	{ INTERFACE}	{ set monstate 6.0; return 0 }
+	{ LOAD}		{ set monstate 7.0; return 0 }
+	{ END QUEUE}	{ set monstate 0.0
+#			We insert then delete to avoid the creeping
+#			scrollbar problem but then, to avoid lines
+#			dropping off the end, we have to pad with
+#			and extra line before inserting.
+			set i 1
+			foreach foo $queue_list {
+			    .queue.vis.text insert end "\n"
+			    .queue.vis.text insert $i.0 $foo
+			    incr i
+			    .queue.vis.text delete $i.0 $i.0+1l
+			}
+			.queue.vis.text delete $i.0 end
+			set queue_list [list]
+			return 0
+			}
+	{ TITLE}	{ set monstate 8.0; return 0; }
+    }
+
+    if {$monstate < 1.0} {
+#	Monitor idle
+    } elseif {$monstate < 2.0} {
+	set status(fsm) $foo
+        if {$foo == "UP"} { load_init }
 	updateIcon
-    }
-    if {$foo=="STATUS"} {
-	set status(up) [gets $monfd]
-	set status(force) [gets $monfd]
-	set status(impmode) [gets $monfd]
-	set status(imp_itime) [gets $monfd]
-	set status(imp_time) [gets $monfd]
-	set status(imp_fuzz) [gets $monfd]
-	set status(imp_timeout) [gets $monfd]
-	set status(force_timeout) [gets $monfd]
-	set status(timeout) [gets $monfd]
-    }
-    if {$foo=="QUEUE"} {
-    	set foo [gets $monfd]
-	set lst [list]
-	.queue.vis.text delete 0.0 end
-	while {$foo!="END QUEUE"} {
-	    lappend lst $foo
-	    set foo [gets $monfd]
+	set monstate 0.0
+    } elseif {$monstate < 3.0} {
+	switch $monstate {
+	    2.0	{ set status(up) $foo; set monstate 2.1 }
+	    2.1	{ set status(force) $foo; set monstate 2.2 }
+	    2.2	{ set status(impmode) $foo; set monstate 2.3 }
+	    2.3	{ set status(imp_itime) $foo; set monstate 2.4 }
+	    2.4	{ set status(imp_time) $foo; set monstate 2.5 }
+	    2.5	{ set status(imp_fuzz) $foo; set monstate 2.6 }
+	    2.6	{ set status(imp_timeout) $foo; set monstate 2.7 }
+	    2.7	{ set status(force_timeout) $foo; set monstate 2.8 }
+	    2.8	{ set status(timeout) $foo; set monstate 0.0 }
 	}
-	foreach i $lst {
-	    .queue.vis.text insert end $i
-	    .queue.vis.text insert end "\n"
+    } elseif {$monstate < 4.0} {
+	switch $monstate {
+	    3.0	{ set blocked $foo; set monstate 3.1 }
+	    3.1	{ set forced $foo; set monstate 0.0 }
 	}
-    }
-    if {$foo=="MESSAGE"} {
-	set message [gets $monfd]
-	.message.vis.text insert end $message
-	.message.vis.text insert end "\n"
-    }
-    if {$foo=="INTERFACE"} {
-	set status(iface) [gets $monfd]
-	set status(lip) [gets $monfd]
-	set status(rip) [gets $monfd]
-    }
-    if {$foo=="LOAD"} {
+    } elseif {$monstate < 5.0} {
+	set outp 0
+	set outb 0
+	set outtot 0
+	set inp 0
+	set inb 0
+	set intot 0
+	set desc [string range $foo 0 59]
+	scan [string range $foo 61 end] \
+	    "%f %f %f %f %f %f" \
+	    outp outb outtot inp inb intot
+	set foo ""
+	lappend queue_list [append foo $desc \
+	    [switch $in_usage {
+		pps { user_number $inp }
+		bps { user_number $inb }
+		lbp { format " %4.0f%%" [expr $inb*100/$in_bandwidth] }
+		tot { user_number $intot }
+	    }] \
+	    [switch $out_usage {
+		pps { user_number $outp }
+		bps { user_number $outb }
+		lbp { format " %4.0f%%" [expr $outb*100/$out_bandwidth] }
+		tot { user_number $outtot }
+	    }] \
+	"\n" ]
+    } elseif {$monstate < 6.0} {
+	set monstate 0.0
+	if {[.message.vis.text index end] >= $max_info_lines} {
+	    .message.vis.text delete 1.0 2.0
+	}
+	set do_tail 0
+	if {[.message.vis.text index "end-1c"] > 1.0} {
+	    if {[lindex [.message.vis.yscroll get] 1] == 1} {
+		set do_tail 1
+	    }
+	    .message.vis.text insert end "\n"
+	}
+	.message.vis.text insert end $foo
+	if {$do_tail == 1} {
+	    .message.vis.text see end
+	}
+    } elseif {$monstate < 7.0} {
+	switch $monstate {
+	    6.0	{ set status(iface) $foo; set monstate 6.1 }
+	    6.1	{ set status(lip) $foo; set monstate 6.2 }
+	    6.2	{ set status(rip) $foo; set monstate 0.0 }
+	}
+    } elseif {$monstate < 8.0} {
 	if {$status(fsm)=="UP"} {
-	    set txtotal [gets $monfd]
-	    set rxtotal [gets $monfd]
-	    set e5 ".81873075307798185867"
-	    set e150 ".99335550625503441537"
-	    set fp "1"
-	    set status(rx_load5) [expr {$status(rx_load5)*$e5+$rxtotal*($fp-$e5)}]
-	    set status(tx_load5) [expr {$status(tx_load5)*$e5+$txtotal*($fp-$e5)}]
-	    if {$tload} {
-	    set status(rx_load150) [expr {$status(rx_load150)*$e150+$rxtotal*($fp-$e150)}]
-	    set status(tx_load150) [expr {$status(tx_load150)*$e150+$txtotal*($fp-$e150)}]
-	    set status(rx_load) [format "%.3f %.3f" [expr {$status(rx_load5)/1000}] [expr {$status(rx_load150)/1000}]]
-	    set status(tx_load) [format "%.3f %.3f" [expr {$status(tx_load5)/1000}] [expr {$status(tx_load150)/1000}]]
+	    global txtotal
+	    switch $monstate {
+		7.0	{ set txtotal $foo; set monstate 7.1 }
+		7.1	{
+			set rxtotal $foo
+			set monstate 0.0
+			set e5 ".81873075307798185867"
+			set e150 ".99335550625503441537"
+			set fp "1"
+			set status(rx_load5) \
+			    [expr {$status(rx_load5)*$e5+$rxtotal*($fp-$e5)}]
+			set status(tx_load5) \
+			    [expr {$status(tx_load5)*$e5+$txtotal*($fp-$e5)}]
+			set status(rx_load150) \
+			    [expr {$status(rx_load150)*$e150+$rxtotal*($fp-$e150)}]
+			set status(tx_load150) \
+			    [expr {$status(tx_load150)*$e150+$txtotal*($fp-$e150)}]
+			set status(rx_load) \
+			    [format "%.3f %.3f" \
+				[expr {$status(rx_load5)/1000}] \
+				[expr {$status(rx_load150)/1000}]]
+			set status(tx_load) \
+			    [format "%.3f %.3f" \
+				[expr {$status(tx_load5)/1000}] \
+				[expr {$status(tx_load150)/1000}]]
+			update
+			addtick .lm.tx [expr {$status(tx_load5)/1000}]
+			addtick .lm.rx [expr {$status(rx_load5)/1000}]
+			set status(tx_total) [expr {$status(tx_total)+$txtotal}]
+			set status(rx_total) [expr {$status(rx_total)+$rxtotal}]
+		}
 	    }
-	    if {$gload} {
-		    update
-		    addtick .lm.tx [expr {$status(tx_load5)/1000}]
-		    addtick .lm.rx [expr {$status(rx_load5)/1000}]
-	    }
-	    set status(tx_total) [expr {$status(tx_total)+$txtotal}]
-	    set status(rx_total) [expr {$status(rx_total)+$rxtotal}]
+	}
+    } elseif {$monstate < 9.0} {
+	set monstate 0.0
+	if { $diald_TITLE == "" } {
+	    wm title . "Diald: $foo"
+	    wm iconname . "$foo"
 	}
     }
     update
 }
 
 proc dctrlQuit {} {
-    global fifofd monfifo fancy_icon
+    global fancy_icon
 
-    if {$fifofd!=""} {
-    	if {$monfifo!=""} {catch {exec rm -f $monfifo}}
-    	catch {flush $fifofd}
-    }
+    closeMonitor
+
     if {"$fancy_icon" != 0} {
         bind .dctrlIcon <Destroy> {}
     }
@@ -352,15 +707,25 @@ proc dctrlQuit {} {
 frame .menu -relief raised -bd 2
 pack .menu -side top -fill x -expand 0
 
-frame .spacer -width 480 -height 0
+frame .spacer -width 560 -height 0
 pack .spacer -side top
 
 menubutton .menu.file -text "File" -menu .menu.file.m -underline 0
 menu .menu.file.m
-.menu.file.m add command -label "Restart monitoring" \
-	-command openFifo -underline 0
+.menu.file.m add command -label "Reconnect" \
+	-command openMonitor -underline 0
+.menu.file.m add cascade -label "Connect" \
+	-menu .menu.file.m.open
+.menu.file.m add command -label "Disconnect" \
+	-command closeMonitor -underline 0
 .menu.file.m add command -label "Quit" -command dctrlQuit -underline 0
 pack .menu.file -side left
+
+menu .menu.file.m.open
+.menu.file.m.open add command -label "Local  (FIFO)" \
+	-command openLocal -underline 0
+.menu.file.m.open add command -label "Remote (TCP)" \
+	-command openRemote -underline 0
 
 menubutton .menu.control -text "Control" -menu .menu.control.m -underline 0
 menu .menu.control.m
@@ -385,6 +750,8 @@ pack .menu.control -side left
 
 menubutton .menu.options -text "Options" -menu .menu.options.m -underline 0
 menu .menu.options.m
+.menu.options.m add check -label "Tool Bar" -underline 0 \
+	-variable toolbar -command { repack }
 .menu.options.m add check -label "Detailed Status" -underline 0 \
 	-variable dstatus -command { repack }
 .menu.options.m add check -label "Numeric Load Monitor" -underline 0 \
@@ -393,12 +760,47 @@ menu .menu.options.m
 	-variable gload -command { repack}
 .menu.options.m add check -label "Packet Queue" -underline 0 \
 	-variable pqueue -command { repack }
-.menu.options.m add check -label "Dialing Log" -underline 8 \
+.menu.options.m add check -label "Information" -underline 8 \
 	-variable dlog -command { repack }
 pack .menu.options -side left
 
+# Toolbar
+frame .toolbar -relief raised -bd 2
+button .toolbar.up -command { fifoCmd up } \
+	-state disabled \
+	-image [image create photo -file "$imagepath/up.gif" ]
+toolTipSet .toolbar.up {Link up}
+button .toolbar.down -command { fifoCmd down } \
+	-state disabled \
+	-image [image create photo -file "$imagepath/down.gif" ]
+toolTipSet .toolbar.down {Link down}
+checkbutton .toolbar.dstatus -variable dstatus -command { repack } \
+	-indicatoron 0 \
+	-image [image create photo -file "$imagepath/dstatus.gif" ]
+toolTipSet .toolbar.dstatus {Detailed status}
+checkbutton .toolbar.tload -variable tload -command { repack } \
+	-indicatoron 0 \
+	-image [image create photo -file "$imagepath/tload.gif" ]
+toolTipSet .toolbar.tload {Numeric load}
+checkbutton .toolbar.gload -variable gload -command { repack } \
+	-indicatoron 0 \
+	-image [image create photo -file "$imagepath/gload.gif" ]
+toolTipSet .toolbar.gload {Graphical load}
+checkbutton .toolbar.pqueue -variable pqueue -command { repack } \
+	-indicatoron 0 \
+	-image [image create photo -file "$imagepath/pqueue.gif" ]
+toolTipSet .toolbar.pqueue {Packet queue}
+checkbutton .toolbar.dlog -variable dlog -command { repack } \
+	-indicatoron 0 \
+	-image [image create photo -file "$imagepath/dlog.gif" ]
+toolTipSet .toolbar.dlog {Information}
+pack .toolbar.up .toolbar.down \
+	.toolbar.dstatus .toolbar.tload .toolbar.gload \
+	.toolbar.pqueue .toolbar.dlog \
+	-side left
+
 # Basic status display
-frame .basic
+frame .basic -relief groove -bd 2
 label .basic.p1 -text "Interface "
 label .basic.p2 -textvar status(iface)
 label .basic.p3 -text " from "
@@ -416,11 +818,9 @@ pack .basic.p6 -side left
 pack .basic.p7 -side left
 pack .basic.p8 -side left
 
-frame .bar1 -bor 1 -rel sunken -height 2
-
 
 # Link status display
-frame .status -bor 0
+frame .status -relief groove -bd 2
 
 set col1 {"Link Status" "Next Alarm" "Forcing Rule"}
 set col2 {status(up) status(timeout) status(force)}
@@ -484,11 +884,10 @@ foreach i $col6 {
     incr i0
 }
 
-frame .bar2 -bor 1 -rel sunken -height 2
 
 # Textual load monitor...
 
-frame .tlm -bor 0
+frame .tlm -relief groove -bd 2
 label .tlm.l1 -text "RX Load/Total"
 message .tlm.l2l -textvar status(rx_load) -width 100 -bor 1 -rel sunken
 message .tlm.l2t -textvar status(rx_total) -width 100 -bor 1 -rel sunken
@@ -502,10 +901,9 @@ pack .tlm.l3 -side left -expand 0 -fill x
 pack .tlm.l4l -side left -expand 1 -fill x
 pack .tlm.l4t -side left -expand 1 -fill x
 
-frame .bar3 -bor 1 -rel sunken -height 2
 
 # Graphical load monitor...
-frame .lm -bor 0
+frame .lm -relief groove -bd 2
 # 60 is a good height. Divisible by 1 through 6 evenly, but high enough to see.
 stripchart .lm.tx 100 60 "TX"
 frame .lm.sep -width 2 -bor 2 -rel sunken
@@ -514,72 +912,115 @@ pack .lm.rx -side left -expand 1 -fill both -pady 0
 pack .lm.sep -side left -fill y -pady 0
 pack .lm.tx -side left -expand 1 -fill both -pady 0
 
-frame .bar4 -bor 1 -rel sunken -height 2
 
 # Connection queue
-frame .queue -bor 0
-label .queue.label -text "Connection Queue"
-frame .queue.bar -height 2 -bor 1 -rel sunken
+frame .queue -relief groove -bd 2
+frame .queue.menu -relief raised -bd 2
+pack .queue.menu -side top -anchor nw -fill x -expand 0
+  label .queue.menu.label -text "Connection Queue"
+  menubutton .queue.menu.in_traffic -text "Traffic In" -menu .queue.menu.in_traffic.m -underline 0
+  menu .queue.menu.in_traffic.m
+  .queue.menu.in_traffic.m add radiobutton -label {Packets per second} \
+	-variable in_usage -value pps
+  .queue.menu.in_traffic.m add radiobutton -label {Bytes per second} \
+	-variable in_usage -value bps
+  .queue.menu.in_traffic.m add radiobutton -label {Link Bandwidth %} \
+	-variable in_usage -value lbp
+  .queue.menu.in_traffic.m add radiobutton -label {Bytes Total} \
+	-variable in_usage -value tot
+
+  menubutton .queue.menu.out_traffic -text "Traffic Out" -menu .queue.menu.out_traffic.m -underline 0
+  menu .queue.menu.out_traffic.m
+  .queue.menu.out_traffic.m add radiobutton -label {Packets per second} \
+	-variable out_usage -value pps
+  .queue.menu.out_traffic.m add radiobutton -label {Bytes per second} \
+	-variable out_usage -value bps
+  .queue.menu.out_traffic.m add radiobutton -label {Link Bandwidth %} \
+	-variable out_usage -value lbp
+  .queue.menu.out_traffic.m add radiobutton -label {Bytes total} \
+	-variable out_usage -value tot
+  pack .queue.menu.label -side left
+  pack .queue.menu.out_traffic .queue.menu.in_traffic -side right
 frame .queue.vis -bor 0
-text .queue.vis.text -bor 0 -yscrollcommand ".queue.vis.scroll set" -height 6 -width 60 -highlightthickness 0
-scrollbar .queue.vis.scroll -relief sunken -command ".queue.vis.text yview" -highlightthickness 0
+text .queue.vis.text -bor 0 -yscrollcommand ".queue.vis.yscroll set" -height 6 -width 72 -highlightthickness 0 -wrap none -insertontime 0
+scrollbar .queue.vis.yscroll -relief sunken -command ".queue.vis.text yview" -highlightthickness 0
 pack .queue.vis.text -side left -fill both -expand 1 -pady 0
-pack .queue.vis.scroll -side right -fill y -pady 0
-pack .queue.label -side top -anchor nw -pady 0
-pack .queue.bar -side top -fill x -pady 0
+pack .queue.vis.yscroll -side right -fill y -pady 0
 pack .queue.vis -side top -fill both -expand 1 -pady 0
 
-frame .bar5 -bor 1 -rel sunken -height 2
 
-#Dialing log
-frame .message -bor 0
-label .message.label -text "Dialing Log"
-frame .message.bar -height 2 -bor 1 -rel sunken
+# Information
+frame .message -relief groove -bd 2
+frame .message.menu -relief raised -bd 2
+pack .message.menu -side top -anchor nw -fill x -expand 0
+  label .message.menu.label -text "Information"
+  menubutton .message.menu.loglevel -text "Log Level" -menu .message.menu.loglevel.m -underline 0
+  menu .message.menu.loglevel.m
+  .message.menu.loglevel.m add radiobutton -label {Emergency} \
+	-variable monloglevel -value 0 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Alert} \
+	-variable monloglevel -value 1 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Critical} \
+	-variable monloglevel -value 2 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Error} \
+	-variable monloglevel -value 3 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Warning} \
+	-variable monloglevel -value 4 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Notice} \
+	-variable monloglevel -value 5 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Info} \
+	-variable monloglevel -value 6 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Debug} \
+	-variable monloglevel -value 7 -command { setMonitor }
+  pack .message.menu.label -side left
+  pack .message.menu.loglevel -side right
 frame .message.vis
-text .message.vis.text -bor 0 -yscrollcommand ".message.vis.scroll set" -height 8 -width 60 -highlightthickness 0
-scrollbar .message.vis.scroll -relief sunken -command ".message.vis.text yview" -highlightthickness 0
+text .message.vis.text -bor 0 \
+	-height 8 -width 60 -highlightthickness 0 -insertontime 0 \
+	-yscrollcommand ".message.vis.yscroll set" \
+	-wrap none -xscrollcommand ".message.vis.xscroll set"
+scrollbar .message.vis.yscroll -relief sunken -highlightthickness 0 \
+	-command ".message.vis.text yview"
+scrollbar .message.vis.xscroll -relief sunken -highlightthickness 0 \
+	-orient horizontal \
+	-command ".message.vis.text xview"
+pack .message.vis.yscroll -side right -fill y
+pack .message.vis.xscroll -side bottom -anchor s -fill x
 pack .message.vis.text -side left -fill both -padx 2 -pady 2 -expand 1
-pack .message.vis.scroll -side right -fill y
-pack .message.label -side top -anchor nw -pady 0
-pack .message.bar -side top -fill x -pady 0
 pack .message.vis -side top -fill both -expand 1 -pady 0
 
 proc repack {} {
-    global dstatus tload gload pqueue dlog
+    global toolbar dstatus tload gload pqueue dlog
 
+    pack forget .toolbar
     pack forget .basic
-    pack forget .bar1
     pack forget .status
-    pack forget .bar2
     pack forget .tlm
-    pack forget .bar3
     pack forget .lm
-    pack forget .bar4
     pack forget .queue
-    pack forget .bar5
     pack forget .message
 
+    if {$toolbar} {
+    	pack .toolbar -side top -fill both -expand 0 -pady 0
+    }
     pack .basic -anchor nw -expand 0 -fill x -side top
     if {$dstatus} {
-    	pack .bar1 -fill x -side top
     	pack .status -side top -fill both -expand 0 -pady 0
     }
     if {$tload} {
-        pack .bar2 -fill x -side top
         pack .tlm -side top -fill both -expand 0 -pady 0
     }
     if {$gload} {
-	pack .bar3 -fill x -side top
     	pack .lm -side top -fill both -expand 0 -pady 0
     }
     if {$pqueue} {
-    	pack .bar4 -fill x -side top
     	pack .queue -side top -fill both -expand 1 -pady 0
     }
     if {$dlog} {
-    	pack .bar5 -fill x -side top
         pack .message -side top -fill both -expand 1 -pady 0
     }
+
+    wm geometry .
 }
 
 repack
@@ -600,4 +1041,6 @@ proc load_init {} {
 load_init
 
 update
-openFifo
+if { $diald_FIFO != "" || $diald_HOST != "" } {
+    openMonitor
+}

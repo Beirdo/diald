@@ -24,17 +24,18 @@ static void start_bootp()
 
     idle_filter_init();
 
-    sprintf(buf,"%s --dev sl%d",PATH_BOOTPC,link_iface);
+    sprintf(buf,"%s --dev sl%d",path_bootpc,link_iface);
     /* FIXME: there is still some possibility of a bad
      * interaction between the signal handlers and the command
      * running on the far side of the pipe. Probably I should
      * write my own popen() call the same way I have my open system() call.
      */
     if ((bootpfp = popen(buf,"r"))==NULL) {
-	syslog(LOG_ERR,"Could not run command '%s': %m",buf);
+	mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	die(1);
     }
-    pipe_init(fileno(bootpfp),&bootp_pipe);
+    pipe_init("BOOTP", (ACCESS_CONTROL|ACCESS_MESSAGE|ACCESS_DYNAMIC),
+	fileno(bootpfp),&bootp_pipe, 0);
     have_local = 0;
     have_remote = 0;
     waiting_for_bootp = 1;
@@ -52,11 +53,11 @@ static int grab_addr(char **var)
     while (1) {
 	if ((len = read(modem_fd,&c,1)) < 0) {
 	    if (fail) {
-		syslog(LOG_ERR,"Timeout waiting for dynamic slip addresses");
+		mon_syslog(LOG_ERR,"Timeout waiting for dynamic slip addresses");
 		return 0;
 	    }
 	    if (errno != EINTR || terminate) {
-	        syslog(LOG_ERR,"Error reading from modem: %m");
+	        mon_syslog(LOG_ERR,"Error reading from modem: %m");
 	        return 0;
             }
         }
@@ -79,9 +80,10 @@ static int grab_addr(char **var)
 		}
 		break;
 	    }
-	    if (i >= 128)
-		syslog(LOG_ERR,"Buffer overflow when reading IP address"),
+	    if (i >= 128) {
+		mon_syslog(LOG_ERR,"Buffer overflow when reading IP address"),
 		die(1);
+	    }
 	}
     }
 done:
@@ -96,7 +98,7 @@ done:
  */
 
 
-static void slip_start_fail(unsigned long data)
+void slip_start_fail(void * data)
 {
    fail = 1;
 }
@@ -113,7 +115,7 @@ void slip_start(void)
 
     if (dynamic_addrs && !force_dynamic) {
 	if (debug&DEBUG_VERBOSE)
-	    syslog(LOG_INFO,"Fetching IP addresses from SLIP server");
+	    mon_syslog(LOG_INFO,"Fetching IP addresses from SLIP server");
 	if (dynamic_mode != DMODE_BOOTP) {
 	    fail = 0;
 	    failt.data = 0;
@@ -127,67 +129,65 @@ void slip_start(void)
 	    if (dynamic_mode == DMODE_LOCAL_REMOTE)
 		if (!grab_addr(&remote_ip)) return;
 	    del_timer(&failt);
-	    syslog(LOG_INFO,"New addresses: local %s, remote %s.",
+	    mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 		local_ip,remote_ip);
 	}
     }
 
     if (ioctl(modem_fd, TIOCGETD, &start_disc) < 0)
-	syslog(LOG_ERR,"Can't get line discipline on proxy device: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get line discipline on proxy device: %m"), die(1);
 
     /* change line disciple to SLIP and set the SLIP encapsulation */
     disc = N_SLIP;
     if ((link_iface = ioctl(modem_fd, TIOCSETD, &disc)) < 0) {
 	if (errno == ENFILE) {
-	   syslog(LOG_ERR,"No free slip device available for link."), die(1);
+	   mon_syslog(LOG_ERR,"No free slip device available for link."), die(1);
 	} else if (errno == EEXIST) {
-	    syslog(LOG_ERR,"Link device already in slip mode!?");
+	    mon_syslog(LOG_ERR,"Link device already in slip mode!?");
 	} else if (errno == EINVAL) {
-	    syslog(LOG_ERR,"SLIP not supported by kernel, can't build link.");
+	    mon_syslog(LOG_ERR,"SLIP not supported by kernel, can't build link.");
 	    die(1);
 	} else
-	   syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
+	   mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
     }
 
     if (ioctl(modem_fd, SIOCSIFENCAP, &slip_encap) < 0)
-	syslog(LOG_ERR,"Can't set encapsulation: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't set encapsulation: %m"), die(1);
 
 #ifdef SIOCSKEEPALIVE
     if (keepalive && (ioctl(modem_fd, SIOCSKEEPALIVE, &keepalive) < 0))
-      syslog(LOG_ERR, "Can't set keepalive: %m (ignoring error)");
+      mon_syslog(LOG_ERR, "Can't set keepalive: %m (ignoring error)");
 #endif
 
 #ifdef SIOCSOUTFILL
     if (outfill && (ioctl(modem_fd, SIOCSOUTFILL, &outfill) < 0))
-      syslog(LOG_ERR, "Can't set outfill: %m (ignoring error)");
+      mon_syslog(LOG_ERR, "Can't set outfill: %m (ignoring error)");
 #endif
 
     /* verify that it worked */
     if (ioctl(modem_fd, TIOCGETD, &disc) < 0)
-	syslog(LOG_ERR,"Can't get line discipline: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get line discipline: %m"), die(1);
     if (ioctl(modem_fd, SIOCGIFENCAP, &sencap) < 0)
-	syslog(LOG_ERR,"Can't get encapsulation: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get encapsulation: %m"), die(1);
 
     if (disc != N_SLIP || sencap != slip_encap)
-        syslog(LOG_ERR,"Couldn't set up the slip link correctly!"), die(1);
+        mon_syslog(LOG_ERR,"Couldn't set up the slip link correctly!"), die(1);
 
     if (debug&DEBUG_VERBOSE)
-        syslog(LOG_INFO,"Slip link established on interface sl%d",
+        mon_syslog(LOG_INFO,"Slip link established on interface sl%d",
 	    link_iface);
 
     /* mark the interface as up */
-    if (netmask) {
-        sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    PATH_IFCONFIG,link_iface,local_ip,remote_ip,netmask,mtu);
-    } else {
-        sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    PATH_IFCONFIG,link_iface,local_ip,remote_ip,mtu);
-    }
+    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
+	path_ifconfig,link_iface,local_ip,remote_ip,
+	netmask ? netmask : "255.255.255.255",mtu);
     res = system(buf);
     report_system_result(res,buf);
 
+#if 1
     /* Set the routing for the new slip interface */
     set_ptp("sl",link_iface,remote_ip,0);
+#endif
 
     /* run bootp if it is asked for */
     if (dynamic_addrs && dynamic_mode == DMODE_BOOTP && !force_dynamic) start_bootp();
@@ -233,7 +233,7 @@ int slip_set_addrs()
 
     if (waiting_for_bootp) {
         pclose(bootpfp);
-	syslog(LOG_INFO,"New addresses: local %s, remote %s.",
+	mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 	    local_ip,remote_ip);
     	waiting_for_bootp = 0;
     }
@@ -247,31 +247,34 @@ int slip_set_addrs()
     }
 
     /* redo the interface marking and the routing since BOOTP will change it */
-    if (netmask) {
-        sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    PATH_IFCONFIG,link_iface,local_ip,remote_ip,netmask,mtu);
-    } else {
-        sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    PATH_IFCONFIG,link_iface,local_ip,remote_ip,mtu);
-    }
+    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
+	path_ifconfig,link_iface,local_ip,remote_ip,
+	netmask ? netmask : "255.255.255.255",mtu);
     res = system(buf);
     report_system_result(res,buf);
 
+#if 1
     /* Set the routing for the new slip interface */
     set_ptp("sl",link_iface,remote_ip,0);
+#endif
 
     if (dynamic_addrs || force_dynamic) {
 	local_addr = inet_addr(local_ip);
-	/* have to reset the proxy if we won't be rerouting... */
-	if (!do_reroute) {
-	    proxy_config(local_ip,remote_ip);
-    	    set_ptp("sl",proxy_iface,remote_ip,1);
-	    add_routes("sl",proxy_iface,local_ip,remote_ip,1);
-	}
     }
 
-    if (do_reroute)
+    /* have to reset the proxy if we won't be rerouting... */
+    if (!do_reroute
+    && ((dynamic_addrs || force_dynamic) || (blocked && !blocked_route))) {
+	proxy_config(local_ip,remote_ip);
+	set_ptp("sl",proxy_iface,remote_ip,1);
+	del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	add_routes("sl",proxy_iface,local_ip,remote_ip,1);
+    }
+
+    if (do_reroute) {
         add_routes("sl",link_iface,local_ip,remote_ip,0);
+	del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
 
     return 1;
 }
@@ -297,8 +300,12 @@ void slip_reroute()
 {
     /* Restore the original proxy routing */
     proxy_config(orig_local_ip,orig_remote_ip);
-    set_ptp("sl",proxy_iface,orig_remote_ip,1);
-    add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    if (blocked && !blocked_route)
+	del_ptp("sl",proxy_iface,orig_remote_ip);
+    else {
+	set_ptp("sl",proxy_iface,orig_remote_ip,1);
+	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
     local_addr = inet_addr(orig_local_ip);
     /* If we did routing on the slip link, remove it */
     if (do_reroute && link_iface != -1) /* just in case we get called twice */
@@ -311,9 +318,9 @@ int slip_rx_count()
     char buf[128];
     int packets = 0;
     FILE *fp;
-    sprintf(buf,"%s sl%d",PATH_IFCONFIG,link_iface);
+    sprintf(buf,"%s sl%d",path_ifconfig,link_iface);
     if ((fp = popen(buf,"r"))==NULL) {
-        syslog(LOG_ERR,"Could not run command '%s': %m",buf);
+        mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	return 0;	/* assume half dead in this case... */
     }
 

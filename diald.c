@@ -28,9 +28,18 @@
 #include "diald.h"
 #include "version.h"
 
+#ifdef TCP_WRAPPERS
+#  include <tcpd.h>
+
+   int allow_severity = LOG_INFO;
+   int deny_severity = LOG_NOTICE;
+#endif
+
 /* intialized variables. */
+int af_packet = 1;		/* kernel has AF_PACKET sockets */
 int modem_fd = -1;		/* modem device fp (for proxy reads) */
 MONITORS *monitors = 0;		/* Monitor pipes */
+PIPE *pipes = 0;		/* Command pipes */
 int modem_hup = 0;		/* have we seen a modem HUP? */
 int sockfd = -1;		/* controling socket */
 int delayed_quit = 0;		/* has the user requested a delayed quit? */
@@ -51,12 +60,23 @@ int dial_failures = 0;		/* count of dialing failures */
 int ppp_half_dead = 0;		/* is the ppp link half dead? */
 int terminate = 0;
 char *pidfile = 0;
-static PIPE fifo_pipe;
+static PIPE *fifo_pipe;
 int argc_save;
 char **argv_save;
 
 void do_config(void)
 {
+#ifdef SCHED_OTHER
+    struct sched_param sp;
+#endif
+    if (deinitializer) {
+	int res;
+	if (devices && devices[0])
+		setenv("MODEM", devices[0], 1);
+	res = system(deinitializer);
+	report_system_result(res, deinitializer);
+    }
+
     init_vars();
     flush_prules();
     flush_vars();
@@ -71,28 +91,47 @@ void do_config(void)
     /* FIXME: minor memory leak here */
     orig_local_ip = strdup(local_ip);
     orig_remote_ip = strdup(remote_ip);
+
+    if (initializer) {
+        int res;
+	if (devices && devices[0])
+	    setenv("MODEM", devices[0], 1);
+	res = system(initializer);
+	report_system_result(res, initializer);
+    }
+
+#ifdef SCHED_OTHER
+    sp.sched_priority = (scheduler == SCHED_OTHER ? 0 : priority);
+    sched_setscheduler(0, scheduler, &sp);
+    if (scheduler == SCHED_OTHER)
+#endif
+#ifdef PRIO_PROCESS
+	setpriority(PRIO_PROCESS, 0, priority);
+#else
+	nice(priority - nice(0));
+#endif
 }
 
-void main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
     int sel;
     struct timeval timeout;
     fd_set readfds;
+    long tstamp = ticks();
+    long ts;
 
     argc_save = argc;
     argv_save = argv;
 
     /* initialize system log interface */
-    openlog("diald", LOG_PID | LOG_NDELAY | LOG_PERROR,  LOG_LOCAL2);
+    openlog("diald", LOG_PID | LOG_NDELAY,  LOG_LOCAL2);
 
     /* initialize a firewall unit so we can store our options */
     /* If I get things into a device this should be an "open" */
     fwunit = ctl_firewall(IP_FW_OPEN,0);
 
     parse_init();
-    do_config();
-
-    become_daemon();
 
     /* Get an internet socket for doing socket ioctls. */
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -102,12 +141,16 @@ void main(int argc, char *argv[])
 	die(1);
       }
 
-    open_fifo();
-
     if (debug&DEBUG_VERBOSE)
         syslog(LOG_INFO,"Starting diald version %s",VERSION);
 
     signal_setup();
+    do_config();
+
+    become_daemon();
+
+    FD_ZERO(&ctrl_fds);
+    open_fifo();
     filter_setup();
 
     /* get a pty and open up a proxy link on it */
@@ -117,22 +160,87 @@ void main(int argc, char *argv[])
     idle_filter_proxy();
 
     if (debug&DEBUG_VERBOSE)
-	syslog(LOG_INFO,"Diald initial setup completed.");
+	mon_syslog(LOG_INFO,"Diald initial setup completed.");
 
     /* main loop */
-    timeout.tv_sec = PAUSETIME;
-    timeout.tv_usec = 0;
     while (!terminate) {
 	/* wait up to a second for an event */
-        FD_ZERO(&readfds);
-	if (fifo_fd != -1)
-	    FD_SET(fifo_fd,&readfds);
+        readfds = ctrl_fds;
         FD_SET(proxy_mfd,&readfds);
         FD_SET(snoopfd,&readfds);
-	sel = select(100,&readfds,0,0,&timeout);
-	if (sel > 0) {
-	    /* read user commands off the fifo */
-	    if (fifo_fd != -1 && FD_ISSET(fifo_fd,&readfds)) fifo_read();
+	/* Compute the likely timeout for the next second boundary */
+	ts = tstamp + PAUSETIME*CLK_TCK - ticks();
+	if (ts < 0) ts = 0;
+    	timeout.tv_sec = ts/CLK_TCK;
+    	timeout.tv_usec = 1000*(ts%CLK_TCK)/CLK_TCK;
+	sel = select(256,&readfds,0,0,&timeout);
+	if (sel < 0 && errno == EBADF) {
+	    PIPE *p;
+	    /* Yuk, one of the pipes is probably broken. It seems to
+	     * happen on unnamed pipes created with pipe(). Named
+	     * pipes used by dctrl etc. seem ok.
+	     * Is this correct select behaviour or is it a bug either
+	     * in the kernel or glibc?
+	     */
+	    p = pipes;
+	    while (p) {
+		PIPE *tmp = p->next;
+		if (!(p->access & ACCESS_CONTROL))
+		    ctrl_read(p);
+		p = tmp;
+	    }
+	} else if (sel > 0) {
+	    PIPE *p;
+	    if (tcp_fd != -1) {
+		if (FD_ISSET(tcp_fd,&readfds)) {
+		    struct sockaddr_in sa;
+		    int flags, len, fd;
+		    flags = fcntl(tcp_fd, F_GETFL, 0);
+		    fcntl(tcp_fd, F_SETFL, flags|O_NONBLOCK);
+		    len = sizeof(sa);
+		    fd = accept(tcp_fd, (struct sockaddr *)&sa, &len);
+		    fcntl(tcp_fd, F_SETFL, flags);
+		    if (fd >= 0) {
+			PIPE *p;
+#ifdef TCP_WRAPPERS
+			struct request_info rq;
+			request_init(&rq,
+				RQ_DAEMON, "diald",
+				RQ_FILE, fd,
+				0);
+			fromhost(&rq);
+			if (!hosts_access(&rq)) {
+				close(fd);
+				mon_syslog(LOG_INFO, "Connection from TCP %s:%d - DENIED",
+				    inet_ntoa(sa.sin_addr), sa.sin_port);
+			} else
+#endif
+			if ((p = malloc(sizeof(PIPE)))) {
+			    char buf[1024];
+			    int n;
+			    n = snprintf(buf, sizeof(buf)-2, "TCP %s:%d",
+					inet_ntoa(sa.sin_addr), sa.sin_port);
+			    buf[n] = '\0';
+			    pipe_init(strdup(buf), CONFIG_DEFAULT_ACCESS,
+					fd, p, 0);
+			    FD_SET(fd, &ctrl_fds);
+			    mon_syslog(LOG_INFO, "Connection from %s", buf);
+			} else {
+			    close(fd);
+			    mon_syslog(LOG_INFO, "malloc: %m");
+			}
+		    } else
+			mon_syslog(LOG_INFO, "accept: %m");
+		}
+	    }
+
+	    p = pipes;
+	    while (p) {
+		PIPE *tmp = p->next;
+		if (FD_ISSET(p->fd, &readfds))
+		    ctrl_read(p);
+		p = tmp;
+	    }
 
 	    /* update the connection filters */
 	    if (FD_ISSET(snoopfd,&readfds)) filter_read();
@@ -140,18 +248,28 @@ void main(int argc, char *argv[])
 	    /* deal with packets coming into the pty proxy link */
 	    if (FD_ISSET(proxy_mfd,&readfds)) proxy_read();
 	}
-	if (timeout.tv_sec == 0 && timeout.tv_usec == 0) {
-	    /* advance the clock 1 second */
-	    timeout.tv_sec = PAUSETIME;
-	    timeout.tv_usec = 0;
+	/* check if ticks() has advanced a second since last check.
+	 * This is immune to wall clock skew because we use the ticks count.
+	 */
+	ts = tstamp + PAUSETIME*CLK_TCK - ticks();
+	if (ts <= 0) {
+	    tstamp = ticks();
+	    fire_timers();
+	    /* Advance a second on state machine timeouts.
+	     * Under high load this can get stretched out.
+	     * Even under low load it is likely to have 1% error.
+	     * This doesn't bother me enough to bother changing things.
+	     */
 	    if (state_timeout > 0) state_timeout--;
 	    if (debug&DEBUG_TICK)
-	        syslog(LOG_DEBUG,"--- tick --- state %d block %d state_timeout %d",state,blocked,state_timeout);
+	        mon_syslog(LOG_DEBUG,"--- tick --- state %d block %d state_timeout %d",state,blocked,state_timeout);
 	    monitor_queue();
 	}
 	change_state();
     }
     die(0);
+
+    return 0;
 }
 
 /*
@@ -164,7 +282,7 @@ void become_daemon()
 {
     int pid;
     FILE *fp;
-    if (daemon) {
+    if (daemon_flag) {
         close(0);
         close(1);
         close(2);
@@ -176,8 +294,8 @@ void become_daemon()
 	/* parent process is finished */
 	if (pid != 0) exit(0);
     }
-    pidfile = malloc(strlen(RUN_PREFIX) + strlen(pidlog) + 2);
-    sprintf(pidfile,"%s/%s",RUN_PREFIX,pidlog);
+    pidfile = malloc(strlen(run_prefix) + strlen(pidlog) + 2);
+    sprintf(pidfile,"%s/%s",run_prefix,pidlog);
     if ((fp = fopen(pidfile,"w")) != NULL) {
         fprintf(fp,"%d\n",getpid());
         fclose(fp);
@@ -205,10 +323,17 @@ void open_fifo()
 	 * are no writers on the remote side of the command fifo.
 	 * This guarantees that there is always at least one writer...
          */
-	if ((fifo_fd = open(fifoname, O_RDWR | O_NDELAY)) >= 0) {
-	    if (debug&DEBUG_VERBOSE)
-	   	 syslog(LOG_INFO,"Using fifo %s",fifoname);
-	    pipe_init(fifo_fd,&fifo_pipe);
+	if ((fifo_fd = open(fifoname, O_RDWR)) >= 0) {
+            fifo_pipe = (PIPE *)malloc(sizeof(PIPE));
+            if (fifo_pipe) {
+	        if (debug&DEBUG_VERBOSE)
+	   	    syslog(LOG_INFO,"Using fifo %s",fifoname);
+	        pipe_init("FIFO", -1, fifo_fd, fifo_pipe, 1);
+		FD_SET(fifo_fd, &ctrl_fds);
+            } else {
+	        syslog(LOG_ERR,"Could not open fifo pipe %m");
+	        fifo_fd = -1;
+            }
 	} else {
 	    syslog(LOG_ERR,"Could not open fifo file %s",fifoname);
 	    fifo_fd = -1;
@@ -217,6 +342,30 @@ void open_fifo()
 	/* make sure to invalidate the fifo_fd if we don't open one. */
 	fifo_fd = -1;
     }
+
+    if (tcpport) {
+	if ((tcp_fd = socket(AF_INET, SOCK_STREAM, 0)) >= 0) {
+	    struct sockaddr_in sa;
+	    sa.sin_family = AF_INET;
+	    sa.sin_addr.s_addr = INADDR_ANY;
+	    sa.sin_port = htons(tcpport);
+	    if (!bind(tcp_fd, (struct sockaddr *)&sa, sizeof(sa))
+	    && !listen(tcp_fd, 5)) {
+		if (debug&DEBUG_VERBOSE)
+	   	    syslog(LOG_INFO,"Using TCP port %d", tcpport);
+		FD_SET(tcp_fd, &ctrl_fds);
+	    } else {
+		close(tcp_fd);
+		tcp_fd = -1;
+	    }
+	}
+	if (tcp_fd < 0) {
+	    syslog(LOG_ERR,"Could not open TCP socket: %m");
+	    tcp_fd = -1;
+	}
+    } else {
+	tcp_fd = -1;
+    }
 }
 
 
@@ -224,6 +373,10 @@ void open_fifo()
  * Set up the signal handlers.
  */
 static sigset_t sig_mask;
+void stray_signal(int sig)
+{
+	mon_syslog(LOG_ERR, "Stray signal %d ignored", sig);
+}
 
 void signal_setup()
 {
@@ -237,28 +390,46 @@ void signal_setup()
     sigaddset(&sig_mask, SIGUSR1);
     sigaddset(&sig_mask, SIGUSR2);
     sigaddset(&sig_mask, SIGCHLD);
-    sigaddset(&sig_mask, SIGALRM);
     sigaddset(&sig_mask, SIGPIPE);
 
 #define SIGNAL(s, handler)      { \
         sa.sa_handler = handler; \
         if (sigaction(s, &sa, NULL) < 0) { \
-            syslog(LOG_ERR, "sigaction(%d): %m", s); \
+            mon_syslog(LOG_ERR, "sigaction(%d): %m", s); \
             die(1); \
         } \
     }
 
+    memset(&sa, 0, sizeof(sa));
     sa.sa_mask = sig_mask;
     sa.sa_flags = 0;
 
     SIGNAL(SIGHUP, sig_hup);            /* Hangup: modem went down. */
     SIGNAL(SIGINT, sig_intr);           /* Interrupt: take demand dialer down */
-    SIGNAL(SIGTERM, sig_term);          /* Terminate: user take link down */
+    SIGNAL(SIGQUIT, stray_signal);
+    SIGNAL(SIGILL, stray_signal);
+    SIGNAL(SIGABRT, stray_signal);
+    SIGNAL(SIGFPE, stray_signal);
     SIGNAL(SIGUSR1, linkup);            /* User requests the link to go up */
+#if 0 /* if we do these we probably loop madly on crashes! */
+    SIGNAL(SIGIOT, stray_signal);
+    SIGNAL(SIGBUS, stray_signal);
+    SIGNAL(SIGSEGV, stray_signal);
+    SIGNAL(SIGSTKFLT, stray_signal);
+#endif
     SIGNAL(SIGUSR2, print_filter_queue); /* dump the packet queue to the log */
-    SIGNAL(SIGCHLD, sig_chld);		/* reap dead kids */
-    SIGNAL(SIGALRM, alrm_timer);	/* Deal with a timer expired */
     SIGNAL(SIGPIPE, SIG_IGN);
+    SIGNAL(SIGTERM, sig_term);          /* Terminate: user take link down */
+    SIGNAL(SIGCHLD, sig_chld);		/* reap dead kids */
+    SIGNAL(SIGURG, stray_signal);
+    SIGNAL(SIGXCPU, stray_signal);
+    SIGNAL(SIGXFSZ, stray_signal);
+    SIGNAL(SIGVTALRM, stray_signal);
+    SIGNAL(SIGPROF, stray_signal);
+    SIGNAL(SIGWINCH, stray_signal);
+    SIGNAL(SIGIO, stray_signal);
+    SIGNAL(SIGPOLL, stray_signal);
+    SIGNAL(SIGPWR, stray_signal);
 }
 
 void block_signals()
@@ -269,6 +440,7 @@ void block_signals()
 void default_sigacts()
 {
     struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
     sa.sa_mask = sig_mask;
     sa.sa_flags = 0;
 
@@ -297,6 +469,8 @@ void get_pty(int *mfd, int *sfd)
     int i,c;
     static char buf[128];
 
+    /* FIXME: this is a crudy way to find a pty.
+     */
     for (c = 'p'; c <= 's'; c++)
         for (i = 0; i < 16; i++) {
 	    sprintf(buf,"/dev/pty%c%c",c,ptys[i]);
@@ -309,10 +483,13 @@ void get_pty(int *mfd, int *sfd)
 		return;
 	    }
         }
+    syslog(LOG_ERR,"No pty found in range pty[p-s][0-9a-f]\n");
+    die(1);
 }
 
-/* Read a request off the fifo.
+/* Read a request from the command pipe.
  * Valid requests are:
+ *	config		- modify diald configuration.
  *	block		- block diald from calling out.
  *	unblock		- unblock diald from calling out.
  *	down		- bring the link down.
@@ -334,90 +511,128 @@ void get_pty(int *mfd, int *sfd)
  *      reset		- reread the configuration information.
  */
 
-void fifo_read()
+void ctrl_read(PIPE *pipe)
 {
     int i;
-    int pid, dev, j,k,l;
+    int pid, dev, j,k,l = 0;
     char *buf, *tail;
 
-    i = pipe_read(&fifo_pipe);
-    buf = tail = fifo_pipe.buf;
+    i = pipe_read(pipe);
+    buf = tail = pipe->buf;
     if (i < 0) {
-	fifo_fd = -1;
+	PIPE **tmp;
+	FD_CLR(pipe->fd, &ctrl_fds);
+	close(pipe->fd);
+        tmp = &pipes;
+        while (*tmp) {
+            if (pipe == *tmp) {
+                *tmp = pipe->next;
+                free(pipe);
+		break;
+            }
+            tmp = &(*tmp)->next;
+        }
 	return;
     }
     if (i == 0) return;
 
     while (i--) {
-        if (*tail == '\n') {
+        if (*tail == '\n' || *tail == '\r') {
             *tail = '\0';
 	    /* Ok, we've got a line, now we need to "parse" it. */
-	    if (strcmp(buf,"block") == 0) {
-		syslog(LOG_INFO, "FIFO: Block request received.");
-		blocked = 1;
-	    } else if (strcmp(buf,"unblock") == 0) {
-		syslog(LOG_INFO, "FIFO: Unblock request received.");
-		blocked = 0;
-	    } else if (strcmp(buf,"force") == 0) {
-		syslog(LOG_INFO, "FIFO: Force request received.");
+	    if (!*buf) {
+		/* Empty line. Probably \r\n? */
+	    } else if (!(pipe->access & ACCESS_CONTROL)) {
+		/* Not a control pipe - just messages from a script */
+		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
+#ifdef CONFIG_REMOTE_CONFIG
+	    } else if ((pipe->access & ACCESS_CONFIG)
+	    && strncmp(buf, "config ", 7) == 0) {
+		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
+		parse_options_line(buf+7);
+#endif
+	    } else if ((pipe->access & ACCESS_BLOCK)
+	    && strcmp(buf,"block") == 0) {
+		mon_syslog(LOG_INFO, "%s: block request", pipe->name);
+		parse_options_line(buf);
+	    } else if ((pipe->access & ACCESS_UNBLOCK)
+	    && strcmp(buf,"unblock") == 0) {
+		mon_syslog(LOG_INFO, "%s: unblock request", pipe->name);
+		parse_options_line(buf);
+	    } else if ((pipe->access & ACCESS_FORCE)
+	    && strcmp(buf,"force") == 0) {
+		mon_syslog(LOG_INFO, "%s: force request", pipe->name);
 		forced = 1;
-	    } else if (strcmp(buf,"unforce") == 0) {
-		syslog(LOG_INFO, "FIFO: Unforce request received.");
+	    } else if ((pipe->access & ACCESS_UNFORCE)
+	    && strcmp(buf,"unforce") == 0) {
+		mon_syslog(LOG_INFO, "%s: unforce request", pipe->name);
 		forced = 0;
-	    } else if (strcmp(buf,"down") == 0) {
-		syslog(LOG_INFO, "FIFO: Link down request received.");
+	    } else if ((pipe->access & ACCESS_DOWN)
+	    && strcmp(buf,"down") == 0) {
+		mon_syslog(LOG_INFO, "%s: link down request", pipe->name);
     		request_down = 1;
     		request_up = 0;
-	    } else if (strcmp(buf,"up") == 0) {
-    		syslog(LOG_INFO, "FIFO: Link up request received.");
+	    } else if ((pipe->access & ACCESS_UP)
+	    && strcmp(buf,"up") == 0) {
+    		mon_syslog(LOG_INFO, "%s: link up request", pipe->name);
     		request_down = 0;
     		request_up = 1;
-	    } else if (strcmp(buf,"delayed-quit") == 0) {
-    		syslog(LOG_INFO, "FIFO. Delayed termination request received.");
+	    } else if ((pipe->access & ACCESS_DELQUIT)
+	    && strcmp(buf,"delayed-quit") == 0) {
+    		mon_syslog(LOG_INFO, "%s: delayed termination request", pipe->name);
     		delayed_quit = 1;
-	    } else if (strcmp(buf,"quit") == 0) {
-    		syslog(LOG_INFO, "FIFO. Termination request received.");
+	    } else if ((pipe->access & ACCESS_QUIT)
+	    && strcmp(buf,"quit") == 0) {
+    		mon_syslog(LOG_INFO, "%s: termination request", pipe->name);
     		terminate = 1;
-	    } else if (strcmp(buf,"reset") == 0) {
-    		syslog(LOG_INFO, "FIFO. Reset request received. Re-reading configuration.");
+	    } else if ((pipe->access & ACCESS_RESET)
+	    && strcmp(buf,"reset") == 0) {
+    		mon_syslog(LOG_INFO, "%s: reset request received - re-reading configuration", pipe->name);
 		do_config();
-	    } else if (strcmp(buf,"queue") == 0) {
+	    } else if ((pipe->access & ACCESS_QUEUE)
+	    && strcmp(buf,"queue") == 0) {
     		struct firewall_req req;
-    		syslog(LOG_INFO,"FIFO. User requested dump of firewall queue.");
-    		syslog(LOG_INFO,"--------------------------------------");
+    		mon_syslog(LOG_INFO,"%s: user requested dump of firewall queue", pipe->name);
+    		mon_syslog(LOG_INFO,"--------------------------------------");
     		req.unit = fwunit;
     		ctl_firewall(IP_FW_PCONN,&req);
-    		syslog(LOG_INFO,"--------------------------------------");
-	    } else if (sscanf(buf,"debug %d", &pid) == 1) {
-    		syslog(LOG_INFO,"FIFO. Changing debug flags to %d.",pid);
+    		mon_syslog(LOG_INFO,"--------------------------------------");
+	    } else if ((pipe->access & ACCESS_DEBUG)
+	    && sscanf(buf,"debug %d", &pid) == 1) {
+    		mon_syslog(LOG_INFO,"%s: changing debug flags to 0x%x",
+		    pipe->name, pid);
 		debug = pid;
-	    } else if (sscanf(buf,"dynamic %n%*s%n %n",&j,&k,&l) == 1) {
+	    } else if ((pipe->access & ACCESS_DYNAMIC)
+	    && (sscanf(buf,"dynamic %n%*s%n %n",&j,&k,&l) >= 0) && l) {
 		buf[k] = 0;
 		if (inet_addr(buf+j) == (unsigned long)0xffffffff
 		||  inet_addr(buf+l) == (unsigned long)0xffffffff) {
-		    syslog(LOG_INFO,"FIFO: bad parameters '%s' and '%s' to dynamic command ignored", buf+j,buf+l);
+		    mon_syslog(LOG_INFO,"%s: bad parameters '%s' and '%s' to dynamic command ignored",
+			pipe->name, buf+j, buf+l);
 		} else {
 		    local_ip = strdup(buf+j);
 		    remote_ip = strdup(buf+l);
 		    force_dynamic = 1;
 		}
-	    } else if (strncmp(buf,"monitor", 7) == 0) {
+	    } else if ((pipe->access & ACCESS_MONITOR)
+	    && strncmp(buf,"monitor", 7) == 0) {
     		struct stat sbuf;
 		int fd;
 		MONITORS *new;
 
 		k = 0;
-		if (sscanf(buf,"monitor %d %n",&j,&k) == 1) {
-		    syslog(LOG_INFO,"FIFO: monitor connection at info level %d to %s requested",
-			    j,buf+k);
+		if (sscanf(buf,"monitor %i %n",&j,&k) == 1) {
+		    mon_syslog(LOG_INFO,"%s: monitor connection at info level 0x%08x to %s requested",
+			    pipe->name, j, buf+k);
 		} else if (buf[7] != 0 && buf[7] == ' ') {
-		    syslog(LOG_INFO,"FIFO: full monitor connection to %s requested",
-			buf+k);
+		    mon_syslog(LOG_INFO,"%s: full monitor connection to %s requested",
+			pipe->name, buf+8);
 		    j = 255;	/* Heavy weight connection requested */
 		    k = 8;
 		}
 		if (k >= 8) {
 		    /* Check list to see if this is just a status change */
+		    block_signals();	/* don't let anything mess up the data */
 		    new = monitors;
 		    while (new) {
 			if (strcmp(new->name,buf+k) == 0) {
@@ -428,63 +643,86 @@ void fifo_read()
 			new = new->next;
 		    }
 		    if (!new) {
-			if (stat(fifoname,&sbuf) < 0 || !sbuf.st_mode&S_IFIFO) {
-			    syslog(LOG_INFO,"FIFO: %s not a pipe.",
-				buf+k);
-			} else if ((fd = open(buf+k,O_WRONLY))<0) {
-			    syslog(LOG_INFO,"FIFO: could not open pipe %s: %m",
-				buf+k);
+			if (pipe == fifo_pipe
+			&& (stat(fifoname,&sbuf) < 0 || !sbuf.st_mode&S_IFIFO)) {
+			    mon_syslog(LOG_INFO, "%s: %s not a pipe.",
+				pipe->name, buf+k);
+			} else if ((pipe != fifo_pipe && (fd=dup(pipe->fd)) < 0)
+			|| (pipe == fifo_pipe && (fd = open(buf+k,O_WRONLY|O_NDELAY))<0)) {
+			    mon_syslog(LOG_INFO, "%s: could not open pipe %s: %m",
+				pipe->name, buf+k);
 			} else {
+			    struct firewall_req req;
 			    new = (MONITORS *)malloc(sizeof(MONITORS));
 			    new->name = strdup(buf+k);
 			    new->next = monitors;
 			    new->fd = fd;
 			    new->level = j;
+			    if (!monitors) ctl_firewall(IP_FW_MCONN_INIT,&req);
 			    monitors = new;
+			    req.unit = fwunit;
 			    output_state();
 			}
 		    }
+		    unblock_signals();
 		} else {
-		    syslog(LOG_INFO,"FIFO: empty monitor request ignored");
+		    mon_syslog(LOG_INFO, "%s: empty monitor request ignored",
+			pipe->name);
 		}
-	    } else if (strncmp(buf,"message ",8) == 0) {
+	    } else if ((pipe->access & ACCESS_MESSAGE)
+	    && strncmp(buf,"message ",8) == 0) {
 		/* pass a message from the connector on to the monitor */
 		if (monitors) {
 		    mon_write(MONITOR_MESSAGE,"MESSAGE\n",8);
 		    mon_write(MONITOR_MESSAGE,buf+8,strlen(buf+8));
 		    mon_write(MONITOR_MESSAGE,"\n",1);
 		}
-            } else if (sscanf(buf,"connect %d %n", &pid, &dev) == 1) {
-                if (pid > 1) {
-		    if ((state != STATE_DOWN && state != STATE_CLOSE
-			&& !give_way)
-		    || state==STATE_UP || req_pid) {
-                        /* somebody else already has this diald, tell 'em */
-                        kill(pid, SIGTERM);
-			syslog(LOG_INFO,"FIFO: link up requested but denied");
+            } else if ((pipe->access & ACCESS_CONNECT)
+	    && sscanf(buf,"connect %d %n", &pid, &dev) == 1) {
+#if 0
+/* XXX */mon_syslog(LOG_INFO,"%s: up request on %s state=%d, dial=%d, dev=%s", pipe->name, buf+dev, state, dial_pid, current_dev ? current_dev : "none");
+#endif
+		/* Damn ISDN has no blocking dial. If we get a request up
+		 * where the request device matches the current device we
+		 * ignore it. (Perhaps we should take it as a dial
+		 * completion?)
+		 */
+		if (state == STATE_CONNECT && current_dev
+		&& !strcmp(current_dev, buf+dev)) {
+		    mon_syslog(LOG_INFO, "%s: link up request on current device ignored",
+			pipe->name);
+		} else if ((state != STATE_DOWN && state != STATE_CLOSE
+		    && !give_way)
+		|| state==STATE_UP || req_pid) {
+                    /* somebody else already has this diald, tell 'em */
+                    if (pid) kill(pid, SIGTERM);
+		    mon_syslog(LOG_INFO, "%s: link up requested but denied",
+			pipe->name);
+                } else {
+                    req_pid = pid;
+                    req_dev = (char *)malloc(tail-(buf+dev)+1);
+                    if (req_dev == 0) {
+                        req_pid = 0;
+                        mon_syslog(LOG_ERR, "%s: no memory to store requested devce!",
+			    pipe->name);
                     } else {
-                        req_pid = pid;
-                        req_dev = (char *)malloc(tail-(buf+dev)+1);
-                        if (req_dev == 0) {
-                            req_pid = 0;
-                            syslog(LOG_ERR,"FIFO: no memory to store requested devce!");
-                        } else {
-                            strcpy(req_dev, buf+dev);
-                            request_down = 0;
-                            request_up = 1;
-                            syslog(LOG_INFO,"FIFO: link up requested on device %s", req_dev);
-                        }
+                        strcpy(req_dev, buf+dev);
+                        request_down = 0;
+                        request_up = 1;
+                        mon_syslog(LOG_INFO, "%s: link up requested on device %s",
+			    pipe->name, req_dev);
                     }
                 }
             } else {
-		syslog(LOG_ERR,"Unknown request '%s' made.", buf);
+		mon_syslog(LOG_ERR,"%s: Ignored request '%s'",
+		    pipe->name, buf);
 	    }
 	   buf = tail+1;
        }
        tail++;
     }
 
-    pipe_flush(&fifo_pipe,buf-fifo_pipe.buf);
+    pipe_flush(pipe, buf-pipe->buf);
 }
 
 /*
@@ -494,7 +732,6 @@ void proxy_read()
 {
     char buffer[4096];
     int len;
-    struct SOCKADDR to;
 
     /* read the SLIP packet */
     len = recv_packet(buffer,4096);
@@ -523,6 +760,13 @@ void proxy_read()
 
     /* if the external iface is up then probably we can send it on */
     if (link_iface != -1 && fwdfd != -1) {
+	struct sockaddr_pkt sp;
+#ifdef HAVE_AF_PACKET
+	struct sockaddr_ll sl;
+#endif
+	struct sockaddr *to;
+	size_t to_len;
+
 	/* Make sure we try to restore the link to working condition now... */
 	if (do_reroute && mode == MODE_PPP) {
 	    /* Check if a route exists at this point through the ppp device. */
@@ -544,18 +788,29 @@ void proxy_read()
 	 * between the route switching and the forwarding I think.)
 	 */
 
-#ifdef HAS_SOCKADDR_PKT
-	to.spkt_family = AF_INET;
-	strcpy(to.spkt_device,snoop_dev);
-	to.spkt_protocol = htons(ETH_P_IP);
-#else
-	to.sa_family = AF_INET;
-	strcpy(to.sa_data,snoop_dev);
+#ifdef HAVE_AF_PACKET
+	if (af_packet) {
+	    memset(&sl, 0, sizeof(sl));
+	    sl.sll_family = AF_PACKET;
+	    sl.sll_protocol = htons(ETH_P_IP);
+	    sl.sll_ifindex = snoop_index;
+	    to = (struct sockaddr *)&sl;
+	    to_len = sizeof(sl);
+	} else
 #endif
+	{
+	    memset(&sp, 0, sizeof(sp));
+	    sp.spkt_family = AF_INET;
+	    strcpy(sp.spkt_device, snoop_dev);
+	    sp.spkt_protocol = htons(ETH_P_IP);
+	    to = (struct sockaddr *)&sp;
+	    to_len = sizeof(sp);
+	}
+
 	if (debug&DEBUG_VERBOSE)
-	    syslog(LOG_DEBUG,"Forwarding packet of length %d",len);
-	if (sendto(fwdfd,buffer,len,0,(struct sockaddr *)&to,sizeof(struct SOCKADDR)) < 0) {
-	    syslog(LOG_ERR,
+	    mon_syslog(LOG_DEBUG,"Forwarding packet of length %d",len);
+	if (sendto(fwdfd, buffer, len, 0, to, to_len) < 0) {
+	    mon_syslog(LOG_ERR,
 		"Error forwarding data packet to physical device: %m");
 	}
     } else {
@@ -574,8 +829,11 @@ static int in_die = 0;
 void die(int i)
 {
     int count;
+    char tmp[128];
 
     if (!in_die) {
+        sprintf(tmp,"Diald is dieing with code %d",i);
+        mon_syslog(LOG_INFO, tmp);
 	in_die = 1;
 	/* We're killing without a care here. Uhggg. */
 	if (link_pid) kill(link_pid,SIGINT);
@@ -590,9 +848,22 @@ void die(int i)
 	if (running_pid) kill(running_pid,SIGKILL);
 	/* Give the system a second to send the signals */
 	if (link_pid || dial_pid || running_pid) sleep(1);
+
 	close_modem();
 	interface_down();
     	proxy_down();
+
+	if (deinitializer) {
+		int res;
+		if (devices && devices[0])
+			setenv("MODEM", devices[0], 1);
+		res = system(deinitializer);
+		report_system_result(res, deinitializer);
+	}
+
+	if (tcp_fd >= 0)
+		close(tcp_fd);
+
 	unlink(pidfile);
     	exit(i);
     }
@@ -607,7 +878,7 @@ void die(int i)
  */
 void sig_hup(int sig)
 {
-    syslog(LOG_INFO, "SIGHUP: modem got hung up on.");
+    mon_syslog(LOG_INFO, "SIGHUP: modem got hung up on.");
     modem_hup = 1;
 }
 
@@ -617,7 +888,7 @@ void sig_hup(int sig)
  */
 void sig_intr(int sig)
 {
-    syslog(LOG_INFO, "SIGINT: Link down request received.");
+    mon_syslog(LOG_INFO, "SIGINT: Link down request received.");
     request_down = 1;
     request_up = 0;
 }
@@ -627,7 +898,7 @@ void sig_intr(int sig)
  */
 void linkup(int sig)
 {
-    syslog(LOG_INFO, "SIGUSR1. External link up request received.");
+    mon_syslog(LOG_INFO, "SIGUSR1. External link up request received.");
     request_down = 0;
     request_up = 1;
 }
@@ -642,7 +913,7 @@ void sig_chld(int sig)
     ++seq;
     while ((pid = waitpid(-1,&status,WNOHANG)) > 0) {
         if (debug&DEBUG_VERBOSE)
-	    syslog( LOG_DEBUG, "SIGCHLD[%d]: pid %d %s, status %d", seq, pid,
+	    mon_syslog( LOG_DEBUG, "SIGCHLD[%d]: pid %d %s, status %d", seq, pid,
 		    pid == link_pid ? "link"
 		   	: pid == dial_pid ? "dial"
 			: pid == running_pid ? "system"
@@ -652,19 +923,19 @@ void sig_chld(int sig)
 	else if (pid == dial_pid) { dial_status = status; dial_pid = 0; }
 	else if (pid == running_pid) { running_status = status; running_pid = 0; }
 	else if (!WIFEXITED(status))
-   	    syslog(LOG_ERR,"Abnormal exit (status %d) on pid %d",status,pid);
+   	    mon_syslog(LOG_ERR,"Abnormal exit (status %d) on pid %d",status,pid);
 	else if (WEXITSTATUS(status) != 0)
-	    syslog(LOG_ERR,"Nonzero exit status (%d) on pid %d",
+	    mon_syslog(LOG_ERR,"Nonzero exit status (%d) on pid %d",
 		WEXITSTATUS(status),pid);
 	if (pid > 0) {
 	    if (WIFSIGNALED(status)) {
-		syslog(LOG_WARNING, "child process %d terminated with signal %d",
+		mon_syslog(LOG_WARNING, "child process %d terminated with signal %d",
 		       pid, WTERMSIG(status));
 	    }
 	}
     }
     if (pid && errno != ECHILD)
-	syslog(LOG_ERR, "waitpid: %m");
+	mon_syslog(LOG_ERR, "waitpid: %m");
     return;
 }
 
@@ -673,18 +944,18 @@ void sig_chld(int sig)
  */
 void sig_term(int sig)
 {
-    syslog(LOG_INFO, "SIGTERM. Termination request received.");
+    mon_syslog(LOG_INFO, "SIGTERM. Termination request received.");
     terminate = 1;
 }
 
 int report_system_result(int res,char *buf)
 {
     if (res == -1)
-   	syslog(LOG_ERR,"System call failure on command '%s'",buf);
+   	mon_syslog(LOG_ERR,"System call failure on command '%s'",buf);
     else if (!WIFEXITED(res))
-   	syslog(LOG_ERR,"Abnormal exit (status %d) on command '%s'",res,buf);
+   	mon_syslog(LOG_ERR,"Abnormal exit (status %d) on command '%s'",res,buf);
     else if (WEXITSTATUS(res) != 0)
-	syslog(LOG_ERR,"Nonzero exit status (%d) on command '%s'",WEXITSTATUS(res),buf);
+	mon_syslog(LOG_ERR,"Nonzero exit status (%d) on command '%s'",WEXITSTATUS(res),buf);
     else
 	return 0;
     return 1;
@@ -692,18 +963,21 @@ int report_system_result(int res,char *buf)
 
 int system(const char *buf)
 {
-    int fd;
+    int d, p[2];
+    FILE *fd;
 
     block_signals();
     if (debug&DEBUG_VERBOSE)
-	syslog(LOG_DEBUG,"running '%s'",buf);
+	mon_syslog(LOG_DEBUG,"running '%s'",buf);
+
+    if (pipe(p))
+	p[0] = p[1] = -1;
 
     running_pid = fork();
 
-    if (running_pid != 0) unblock_signals();
-
     if (running_pid < 0) {
-        syslog(LOG_ERR, "failed to fork and run '%s': %m",buf);
+	unblock_signals();
+        mon_syslog(LOG_ERR, "failed to fork and run '%s': %m",buf);
 	return -1;
     }
 
@@ -718,13 +992,26 @@ int system(const char *buf)
         (void) chdir ("/"); /* no current directory. */
 
 	/* close all fd's the child should not see */
+#if 1
+	/* FIXME: These should not be open to std{in,out,err} anyway
+	 * unless we are not in daemon mode...
+	 */
 	close(0);
 	close(1);
 	close(2);
+#endif
 	if (modem_fd >= 0) close(modem_fd);
 	close(proxy_mfd);      /* close the master pty endpoint */
 	close(proxy_sfd);      /* close the slave pty endpoint */
 	if (fifo_fd != -1) close(fifo_fd);
+	if (tcp_fd != -1) close(tcp_fd);
+	if (pipes) {
+	    PIPE *c = pipes;
+	    while (c) {
+		close(c->fd);
+		c = c->next;
+	    }
+	}
 	if (monitors) {
 	    MONITORS *c = monitors;
 	    while (c) {
@@ -734,24 +1021,41 @@ int system(const char *buf)
 	}
 
 	/* make sure the stdin, stdout and stderr get directed to /dev/null */
-	fd = open("/dev/null", O_RDWR);
-        if (fd >= 0) {
-	    if (fd != 0) {
-	    	dup2(fd, 0);
-		close(fd);
+	d = open("/dev/null", O_RDWR);
+        if (d >= 0) {
+	    if (d != 0) {
+	    	dup2(d, 0);
+		close(d);
 	    }
-	    dup2(0, 1);
-            dup2(0, 2);
+	    dup2(p[1] >= 0 ? p[1] : 0, 1);
+            dup2(p[1] >= 0 ? p[1] : 0, 2);
+	    if (p[0] >= 0) close(p[0]);
         }
 
         execl("/bin/sh", "sh", "-c", buf, (char *)0);
-        syslog(LOG_ERR, "could not exec /bin/sh: %m");
+        mon_syslog(LOG_ERR, "could not exec /bin/sh: %m");
         _exit(127);
         /* NOTREACHED */
     }
-    while (running_pid) {
-	pause();
+
+    unblock_signals();
+
+    if (p[1] >= 0) close(p[1]);
+    if (p[0] >= 0 && (fd = fdopen(p[0], "r"))) {
+	char buf[1024];
+
+	while (fgets(buf, sizeof(buf)-2, fd)) {
+	    buf[sizeof(buf)-2] = '\n';
+	    buf[sizeof(buf)-1] = '\0';
+	    mon_syslog(LOG_DEBUG, "%s", buf);
+	}
+
+	fclose(fd);
     }
+
+    while (running_pid)
+	    pause();
+
     return running_status;
 }
 
@@ -761,14 +1065,13 @@ void background_system(const char *buf)
 
     block_signals();
     if (debug&DEBUG_VERBOSE)
-	syslog(LOG_DEBUG,"running '%s'",buf);
+	mon_syslog(LOG_DEBUG,"running '%s'",buf);
 
     pid = fork();
 
-    if (pid != 0) unblock_signals();
-
     if (pid < 0) {
-        syslog(LOG_ERR, "failed to fork and run '%s': %m",buf);
+        unblock_signals();
+        mon_syslog(LOG_ERR, "failed to fork and run '%s': %m",buf);
 	return;
     }
 
@@ -783,13 +1086,26 @@ void background_system(const char *buf)
         (void) chdir ("/"); /* no current directory. */
 
 	/* close all fd's the child should not see */
+#if 1
+	/* FIXME: These should not be open to std{in,out,err} anyway
+	 * unless we are not in daemon mode...
+	 */
 	close(0);
 	close(1);
 	close(2);
+#endif
 	if (modem_fd >= 0) close(modem_fd);
 	close(proxy_mfd);      /* close the master pty endpoint */
 	close(proxy_sfd);      /* close the slave pty endpoint */
 	if (fifo_fd != -1) close(fifo_fd);
+	if (tcp_fd != -1) close(tcp_fd);
+	if (pipes) {
+	    PIPE *c = pipes;
+	    while (c) {
+		close(c->fd);
+		c = c->next;
+	    }
+	}
 	if (monitors) {
 	    MONITORS *c = monitors;
 	    while (c) {
@@ -810,32 +1126,45 @@ void background_system(const char *buf)
         }
 
         execl("/bin/sh", "sh", "-c", buf, (char *)0);
-        syslog(LOG_ERR, "could not exec /bin/sh: %m");
+        mon_syslog(LOG_ERR, "could not exec /bin/sh: %m");
         _exit(127);
         /* NOTREACHED */
     }
+    unblock_signals();
 }
 
-void mon_write(int level, char *message,int len)
+/*
+ * UGH. Pulling stuff out of the monitors list is full of races.
+ */
+void mon_write(unsigned int level, char *message, int len)
 {
+    int pri = 6<<24;
     MONITORS *c = monitors, *p = 0, *cn;
+    if ((level & MONITOR_MESSAGE) && message[0] == '<') {
+	pri = (message[1] - '0')<<24;
+	message += 3;
+	len -= 3;
+    }
+    block_signals();	/* don't let anything mess up the data */
     while (c) {
 	cn = c->next;
-	if (c->level&level) {
+	if ((c->level & level) == level
+	&& (!(level & MONITOR_MESSAGE) || pri <= (c->level & 0xff000000))) {
 	    if (write(c->fd,message,len) < 0) {
-		if (errno == EPIPE) {
-		    syslog(LOG_INFO,"Monitor pipe %s closed.",c->name);
-		} else {
+		if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+		    syslog(LOG_INFO,"Writing error on pipe %s: %m.",c->name);
 		    /* Write error. The reader probably got swapped out
 		     * or something and the pipe flooded. We'll just "loose"
 		     * the data.
 		     */
 		     p = c;
+		     c = cn;
 		     continue;
 		}
 		close(c->fd);
 		if (p) p->next = c->next;
 		else monitors = c->next;
+		mon_syslog(LOG_INFO,"Monitor pipe %s closed.",c->name);
 		free(c->name);
 		free(c);
 	    } else {
@@ -844,4 +1173,5 @@ void mon_write(int level, char *message,int len)
 	}
 	c = cn;
     }
+    unblock_signals();	/* don't let anything mess up the data */
 }

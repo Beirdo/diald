@@ -7,6 +7,11 @@
  */
 
 #include "diald.h"
+#if defined(__GLIBC__) && __GLIBC_MINOR__ < 1
+typedef u_int8_t __u8;
+typedef u_int16_t __u16;
+typedef u_int32_t __u32;
+#endif
 
 static FW_unit units[FW_NRUNIT];
 static int initialized = 0;
@@ -14,7 +19,7 @@ int impulse_init_time = 0;
 int impulse_time = 0;
 int impulse_fuzz = 0;
 
-static void del_connection(FW_Connection *);
+void del_connection(FW_Connection *);
 
 /*
  * Initialize the units.
@@ -24,6 +29,7 @@ static void init_units(void)
 {
     int i;
 
+    memset(units,0,sizeof(units));
     for (i = 0; i < FW_NRUNIT; i++) {
 	units[i].used = 0;
 	units[i].filters = NULL;
@@ -32,7 +38,7 @@ static void init_units(void)
 	units[i].nrules = 0;
 	units[i].nfilters = 0;
 	if (!units[i].connections) {
-	    syslog(LOG_ERR,"Out of memory! AIIEEE!");
+	    mon_syslog(LOG_ERR,"Out of memory! AIIEEE!");
 	    die(1);
 	}
 	units[i].connections->next = units[i].connections->prev
@@ -48,15 +54,15 @@ static unsigned int in_slot(FW_Timeslot *slot, time_t *clock)
     struct tm *ltime = localtime(clock);
     int ctime = ltime->tm_hour*60*60+ltime->tm_min*60+ltime->tm_sec; 
 
-#ifdef 0
-    syslog(LOG_INFO,"slot check: %d %d %d %d",
+#if 0
+    mon_syslog(LOG_INFO,"slot check: %d %d %d %d",
 	ltime->tm_sec+ltime->tm_min*60+ltime->tm_hour*60*60, ltime->tm_wday,
 	ltime->tm_mday, ltime->tm_mon);
 #endif
 
     while (slot) {
-#ifdef 0
-    syslog(LOG_INFO,"slot def: %d %d %x %x %x",
+#if 0
+    mon_syslog(LOG_INFO,"slot def: %d %d %x %x %x",
 	slot->start, slot->end, slot->wday, slot->mday, slot->month);
 #endif 0
 	if ((slot->start <= ctime)
@@ -146,6 +152,42 @@ static unsigned int slot_end_timeout(FW_Timeslot *slot, time_t *clock)
     	return maxtime;
 }
 
+/* Generate a connection description */
+static char *
+desc_connection(FW_Connection *c)
+{
+    struct in_addr addr;
+    char saddr[20], daddr[20];
+    int sport, dport;
+    char *pent;
+    char proto[20];
+    char *buf;
+
+    addr.s_addr = c->id.id[1] + (c->id.id[2]<<8)
+		+ (c->id.id[3]<<16) + (c->id.id[4]<<24);
+    strcpy(saddr,inet_ntoa(addr));
+    sport = c->id.id[10]+(c->id.id[9]<<8);
+
+    addr.s_addr = c->id.id[5] + (c->id.id[6]<<8)
+		+ (c->id.id[7]<<16) + (c->id.id[8]<<24);
+    strcpy(daddr,inet_ntoa(addr));
+    dport = c->id.id[12]+(c->id.id[11]<<8);
+
+    pent = getprotonumber(c->id.id[0]);
+    if (pent)
+	strcpy(proto,pent);
+    else
+	sprintf(proto,"%d",c->id.id[0]);
+
+    buf = malloc(64);
+    if (buf) {
+	sprintf(buf, "%-4s  %15s/%-5d  %15s/%-5d",
+		proto, saddr, sport, daddr, dport);
+    }
+
+    return buf;
+}
+
 /* Find a connection in the queue */
 static FW_Connection *find_connection(FW_unit *unit, FW_ID *id)
 {
@@ -169,8 +211,9 @@ static FW_Connection *find_connection(FW_unit *unit, FW_ID *id)
  * Add/update a connection in the queue.
  */
 
-static void add_connection(
-    FW_unit *unit, FW_Connection *c, FW_ID *id, unsigned int timeout, TCP_STATE lflags)
+static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
+			unsigned int timeout, TCP_STATE lflags,
+			int direction, int len)
 {
     /* look for a connection that matches this one */
     if (c == NULL) {
@@ -178,15 +221,27 @@ static void add_connection(
 	    /* no matching connection, add one */
 	    c = malloc(sizeof(FW_Connection));
 	    if (c == 0) {
-	       syslog(LOG_ERR,"Out of memory! AIIEEE!");
+	       mon_syslog(LOG_ERR,"Out of memory! AIIEEE!");
 	       die(1);
 	    }
 	    c->id = *id;
+	    c->description = NULL;
+	    c->packets[0] = c->packets[1] = 0;
+	    c->bytes[0] = c->bytes[1] = 0;
+	    c->bytes_total[0] = c->bytes_total[1] = 0;
+	    c->packets[direction] = 1;
+	    c->bytes[direction] = len;
 	    init_timer(&c->timer);
             c->tcp_state = lflags;
 	    c->unit = unit;
-	    c->timer.data = (int)c;
-	    c->timer.function = (void *)(int)del_connection;
+	    c->timer.data = (void *)c;
+	    c->timer.function = (void *)(void *)del_connection;
+	    if (unit->connections->next == unit->connections && monitors
+	    && state != STATE_UP && !blocked) {
+		c->description = desc_connection(c);
+		if (c->description)
+		    mon_syslog(LOG_INFO, "Trigger: %s", c->description);
+	    }
 	    c->next = unit->connections->next;
 	    c->prev = unit->connections;
 	    unit->connections->next->prev = c;
@@ -194,7 +249,7 @@ static void add_connection(
 	    c->timer.expires = timeout;
 	    add_timer(&c->timer);
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-    		syslog(LOG_INFO,"Adding connection %d @ %ld - timeout %d",(int)c,
+    		mon_syslog(LOG_INFO,"Adding connection %p @ %ld - timeout %d",c,
 			time(0),timeout);
 	}
     } else {
@@ -202,10 +257,12 @@ static void add_connection(
 	if (timeout > 0) {
 	    /* reanimating a ghost? */
 	    del_timer(&c->timer);
+	    c->packets[direction]++;
+	    c->bytes[direction] += len;
 	    c->timer.expires = timeout;
 	    add_timer(&c->timer);
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-    		syslog(LOG_INFO,"Adding connection %d @ %ld - timeout %d",(int)c,
+    		mon_syslog(LOG_INFO,"Adding connection %p @ %ld - timeout %d",c,
 			time(0),timeout);
 	} else {
 	    /* timeout = 0, so toss the connection */
@@ -219,38 +276,39 @@ static void add_connection(
  * Get a connection out of a queue.
  */
 
-static void del_connection(FW_Connection *c)
+void del_connection(FW_Connection *c)
 {
     if (debug&DEBUG_CONNECTION_QUEUE)
-	syslog(LOG_INFO,"Deleting connection %d @ %ld",(int)c,time(0));
+	mon_syslog(LOG_INFO,"Deleting connection %p @ %ld",c,time(0));
 
     c->next->prev = c->prev;
     c->prev->next = c->next;
+    if (c->description) free(c->description);
     free(c);
 }
 
-static void del_impulse(FW_unit *unit)
+void del_impulse(FW_unit *unit)
 {
 
     if (unit->impulse_mode) {
 	unit->impulse_mode = 0;
 	if (impulse_time > 0) {
-	    unit->impulse.data = (int)unit;
-	    unit->impulse.function = (void *)(int)del_impulse;
+	    unit->impulse.data = (void *)unit;
+	    unit->impulse.function = (void *)(void *)del_impulse;
 	    unit->impulse.expires = impulse_time;
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-		syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
+		mon_syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
 	    add_timer(&unit->impulse);
 	}
     } else {
 	unit->impulse_mode = 1;
 	impulse_init_time = 0;	/* zero the initial impulse time */
 	if (impulse_fuzz > 0) {
-	    unit->impulse.data = (int)unit;
-	    unit->impulse.function = (void *)(int)del_impulse;
+	    unit->impulse.data = (void *)unit;
+	    unit->impulse.function = (void *)(void *)del_impulse;
 	    unit->impulse.expires = impulse_fuzz;
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-		syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
+		mon_syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
 	    add_timer(&unit->impulse);
 	}
     }
@@ -337,7 +395,11 @@ static void fw_impulse_update(FW_unit *unit, int force)
 		timeout = slot_end_timeout(fw->filt.times,&clock);
 		ifuzz = fw->filt.fuzz;
 		itimeout = fw->filt.timeout;
+		if (timeout < itimeout)	/* chop impulse at change boundary */
+		    itimeout = timeout;
 		ftimeout = fw->filt.timeout2;
+		if (timeout < itimeout)	/* chop impulse at change boundary */
+		    ftimeout = timeout;
 		if (timeout < mintime)
 		    mintime = timeout;
 	    }
@@ -358,12 +420,16 @@ next_rule: /* try the next filter */
    	impulse_init_time = ftimeout;
     	impulse_fuzz = ifuzz;
     	unit->impulse_mode = 0;
-    	unit->impulse.data = (int)unit;
-    	unit->impulse.function = (void *)(int)del_impulse;
+    	unit->impulse.data = (void *)unit;
+    	unit->impulse.function = (void *)(void *)del_impulse;
     	unit->impulse.expires = (force)?ftimeout:itimeout;
     	add_timer(&unit->impulse);
 	if (debug&DEBUG_CONNECTION_QUEUE)
-	    syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
+	    mon_syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
+    } else {
+	/* set these so that the monitor output is sane */
+	unit->impulse_mode = 1;
+	impulse_init_time = 0;
     }
 }
 
@@ -384,7 +450,7 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
 	sport = ntohs(udp->source), dport = ntohs(udp->dest);
 
     if (pkt->protocol == IPPROTO_TCP) {
-	syslog(LOG_INFO,
+	mon_syslog(LOG_INFO,
 	    "filter %s rule %d proto %d len %d seq %lx ack %lx flags %s%s%s%s%s%s packet %s,%d => %s,%d",
 	    (accept)?"accepted":"ignored",rule,
 	    pkt->protocol,
@@ -398,7 +464,7 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
 	    (tcp->urg) ? " URG" : "",
 	    saddr, sport, daddr, dport);
     } else {
-	syslog(LOG_INFO,
+	mon_syslog(LOG_INFO,
 	    "filter %s rule %d proto %d len %d packet %s,%d => %s,%d",
 	    (accept)?"accepted":"ignored",rule,
 	    pkt->protocol,
@@ -438,11 +504,11 @@ static void ip_swap_addrs(struct iphdr *pkt)
 void print_filter(FW_Filter *filter)
 {
     int i;
-    syslog(LOG_INFO,"filter: prl %d log %d type %d cnt %d tm %d",
+    mon_syslog(LOG_INFO,"filter: prl %d log %d type %d cnt %d tm %d",
 	filter->prule,filter->log,filter->type,
 	filter->count,filter->timeout);
     for (i = 0; i < filter->count; i++) {
-	syslog(LOG_INFO,"    term: shift %d op %d off %d%c msk %x tst %x",
+	mon_syslog(LOG_INFO,"    term: shift %d op %d off %d%c msk %x tst %x",
 	    filter->terms[i].shift, filter->terms[i].op,
 	    filter->terms[i].offset&0x7f,
 	    (filter->terms[i].offset&0x80)?'d':'h',
@@ -450,8 +516,102 @@ void print_filter(FW_Filter *filter)
     }
 }
 
+__u16 checksum(__u16 *buf, int nwords)
+{
+   unsigned long sum;
+
+   /* WARNING: possible endianess assumptions here! */
+   for (sum = 0; nwords > 0; nwords--)
+      sum += *buf++;
+   sum = (sum >> 16) + (sum & 0xffff);
+   sum += (sum >> 16);
+   return ~sum ;
+}
+
+
+void forge_tcp_reset(struct iphdr *iph, int len)
+{
+    struct tcphdr *tcph,*ntcph;
+    struct iphdr *niph;
+    struct pseudo {
+	__u32 saddr;
+	__u32 daddr;
+	__u8  zero;
+	__u8  ptcl;
+	__u16 len;
+    } *pseudo;
+
+    tcph = (struct tcphdr *)((char *)iph + 4*iph->ihl);
+
+    if (iph == 0 || iph->frag_off&htons(0x1fff) || tcph->rst)
+	return;
+
+    niph = malloc(sizeof(struct tcphdr)+sizeof(struct iphdr)
+		+sizeof(struct pseudo));
+    if (niph == 0) return;
+
+    niph->ihl = 5;	/* Header length in octets. */
+    niph->tot_len = htons(sizeof(struct tcphdr)+sizeof(struct iphdr));
+    niph->version = 4;
+    niph->tos = (iph->tos & 0x1E) | 0xC0;
+    niph->id = iph->id;
+    niph->frag_off = 0;
+    niph->ttl = 16;
+    niph->protocol = IPPROTO_TCP;
+    niph->saddr = iph->daddr; /* We may be lying. Shrugh. */
+    niph->daddr = iph->saddr; /* Were we sent the reject message */
+    niph->check = 0;
+    niph->check = checksum((__u16 *)niph, sizeof(struct iphdr)>>1);
+
+    /* We should also be copying the ip options at this point.
+     * (More major barf bag material.)
+     */
+
+    ntcph = (struct tcphdr *)((char *)niph + sizeof(struct iphdr));
+
+    ntcph->source = tcph->dest;
+    ntcph->dest = tcph->source;
+    ntcph->res1 = 0;
+    ntcph->res2 = 0;
+    ntcph->doff = sizeof(struct tcphdr)/4;
+    ntcph->fin = 0;
+    ntcph->syn = 0;
+    ntcph->rst = 1;
+    ntcph->psh = 0;
+    ntcph->urg = 0;
+    ntcph->window = 0;
+    ntcph->urg_ptr = 0;
+    if (tcph->ack) {
+	    ntcph->ack = 0;
+	    ntcph->seq = tcph->ack_seq;
+	    ntcph->ack_seq = 0;
+    } else {
+	    ntcph->ack = 1;
+	    ntcph->seq = 0;
+	    if (!tcph->syn)
+		    ntcph->ack_seq = tcph->seq;
+	    else
+		    ntcph->ack_seq = htonl(ntohl(tcph->seq)+1);
+    }
+    pseudo = (struct pseudo*)(ntcph + 1);
+    pseudo->saddr = niph->saddr;
+    pseudo->daddr = niph->daddr;
+    pseudo->zero = 0;
+    pseudo->ptcl = niph->protocol;
+    pseudo->len = ntohs(sizeof(struct tcphdr));
+    ntcph->check = 0;
+    ntcph->check = checksum((__u16 *)ntcph,(sizeof(struct tcphdr)+sizeof(struct pseudo))>>1);
+
+    /*
+     * OK, send the packet now.
+     */
+    send_packet((unsigned char *)niph,sizeof(struct tcphdr)+sizeof(struct iphdr));
+
+    free((void *)niph);
+}
+
 /* Check if a packet passes the filters */
-int check_firewall(int unitnum, unsigned char *pkt, int len)
+int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 {
     FW_unit *unit;
     FW_Filters *fw;
@@ -466,13 +626,12 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
     FW_Connection *conn;
     struct iphdr * ip_pkt = (struct iphdr *)pkt;
 
-    block_timer();
 
+    memset(&lflags,0,sizeof(lflags));
     if (!initialized) init_units();
 
     if (unitnum < 0 || unitnum >= FW_NRUNIT) {
 	/* FIXME: set an errorno? */
-	unblock_timer();
 	return -1;
     }
 
@@ -490,19 +649,45 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
     }
 
     if (pprule == 0) {
-	unblock_timer();
 	return -1;	/* No protocol rules? */
     }
 
+     /* If we have the "strict-forwarding" option set then unless one of
+     * the two addresses matches the local address we should ignore it.
+     */
+    if (strict_forwarding && ip_pkt->saddr != local_addr && ip_pkt->daddr != local_addr) {
+	/* We forge resets for TCP protocol stuff that has been
+	 * shut down do to a link failure.
+	 */
+	if (ip_pkt->protocol == IPPROTO_TCP)
+	    forge_tcp_reset(ip_pkt,len);
+	
+	goto skip;
+    }
+
     /* Build the connection ID, and set the direction flag */
-    direction = ip_direction(ip_pkt);
-    if (direction == 2) ip_swap_addrs(ip_pkt);
+#ifdef HAVE_AF_PACKET
+    if (af_packet) {
+	direction = 1;
+	if (sll->sll_pkttype != PACKET_OUTGOING) {
+	    direction = 2;
+	    ip_swap_addrs(ip_pkt);
+	}
+    } else
+#endif
+    {
+	direction = ip_direction(ip_pkt);
+	if (direction == 2) ip_swap_addrs(ip_pkt);
+    }
+
+    memset(&id,0,sizeof(id));
     for (i = 0; i < FW_ID_LEN; i++)
 	id.id[i] = (FW_IN_DATA(pprule->codes[i])?data:pkt)
 		    [FW_OFFSET(pprule->codes[i])];
     if (direction == 2) ip_swap_addrs(ip_pkt);
     conn = find_connection(unit,&id);
     opdir = (direction==1)?2:1;
+
 
     /* Do the TCP liveness changes */
     if (ip_pkt->protocol == IPPROTO_TCP) {
@@ -544,7 +729,7 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 
     rule = 1;
     while (fw) {
-#ifdef 0
+#if 0
 	print_filter(&fw->filt);
 #endif
 	/* is this rule currently applicable? */
@@ -576,8 +761,8 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 	        v = (ntohl(*(int *)(&(FW_IN_DATA(term->offset)?data:pkt)
 				  [FW_OFFSET(term->offset)]))
 		    >> term->shift) & term->mask;
-#ifdef 0
-	    syslog(LOG_INFO,"testing ip %x:%x data %x:%x mask %x shift %x test %x v %x",
+#if 0
+	    mon_syslog(LOG_INFO,"testing ip %x:%x data %x:%x mask %x shift %x test %x v %x",
 		ntohl(*(int *)(&pkt[FW_OFFSET(term->offset)])),
 		*(int *)(&pkt[FW_OFFSET(term->offset)]),
 		ntohl(*(int *)(&data[FW_OFFSET(term->offset)])),
@@ -595,7 +780,7 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 	    }
 	}
 	/* Ok, we matched a rule. What are we suppose to do? */
-#ifdef 0
+#if 0
 	if (fw->filt.log)
 #endif
         if (debug&DEBUG_FILTER_MATCH)
@@ -603,7 +788,14 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 
 	/* Check if this entry goes into the queue or not */
 	if (fw->filt.type != FW_TYPE_IGNORE && fw->filt.type != FW_TYPE_WAIT) {
-	    add_connection(unit,conn,&id,fw->filt.timeout,lflags);
+	    add_connection(
+		unit,
+		conn,
+		&id,
+		fw->filt.timeout,
+		lflags,
+		direction-1,
+		len);
 	}
 	/* check if we are no longer waiting */
 	if (fw->filt.type == FW_TYPE_WAIT) {
@@ -614,7 +806,6 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 		goto next_rule;
 	}
 
-	unblock_timer();
 	/* Return 1 if accepting rule with non zero timeout, 0 otherwise */
 	return ((fw->filt.type != FW_TYPE_IGNORE || fw->filt.type != FW_TYPE_WAIT) && fw->filt.timeout > 0);
 
@@ -622,18 +813,21 @@ next_rule: /* try the next filter */
 	fw = fw->next;
 	rule++;
     }
+
+skip:
     /* Failed to match any rule. This means we ignore the packet */
     if (debug&DEBUG_FILTER_MATCH)
         log_packet(0,ip_pkt,len,0);
-    unblock_timer();
     return 1;
 }
 
-static void pcountdown(int level, long secs)
+static char * pcountdown(char *buf, long secs)
 {
-    char buf[10];
-    sprintf(buf,"%02ld:%02ld:%02ld\n",secs/3600,(secs/60)%60,secs%60);
-    if (monitors) mon_write(level,buf,9);
+    /* Make sure that we don't try to print values that overflow our buffer */
+    if (secs < 0) secs = 0;
+    if (secs > 359999) secs = 359999;
+    sprintf(buf,"%02ld:%02ld:%02ld",secs/3600,(secs/60)%60,secs%60);
+    return buf;
 }
 
 int ctl_firewall(int op, struct firewall_req *req)
@@ -696,7 +890,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 	{
 	    FW_Filters *filters = malloc(sizeof(FW_Filters));
 	    if (filters == 0) {
-		syslog(LOG_ERR,"Out of memory! AIIEEE!");
+		mon_syslog(LOG_ERR,"Out of memory! AIIEEE!");
 		return -1; /* ERRNO */
 	    }
 	    filters->next = 0;
@@ -721,7 +915,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    FW_Connection *c;
 	    char saddr[20], daddr[20];
     	    struct in_addr addr;
-	    syslog(LOG_INFO,"up = %d, forcing = %d, impulse = %d, iitime = %d, itime = %d, ifuzz = %d, itimeout = %ld, timeout = %ld, next alarm = %d",
+	    mon_syslog(LOG_INFO,"up = %d, forcing = %d, impulse = %d, iitime = %d, itime = %d, ifuzz = %d, itimeout = %ld, timeout = %ld, next alarm = %d",
 		unit->up,unit->force, unit->impulse_mode, impulse_init_time, impulse_time,
 		impulse_fuzz,
 		unit->impulse.expected-tstamp,unit->force_etime-atime,
@@ -734,7 +928,7 @@ int ctl_firewall(int op, struct firewall_req *req)
                 addr.s_addr = c->id.id[5] + (c->id.id[6]<<8)
                         + (c->id.id[7]<<16) + (c->id.id[8]<<24);
                 strcpy(daddr,inet_ntoa(addr));
-                syslog(LOG_INFO,
+                mon_syslog(LOG_INFO,
                         "ttl %ld, %d - %s/%d => %s/%d (tcp state ([%lx,%lx] %d,%d))",
                         c->timer.expected-tstamp, c->id.id[0],
                         saddr, c->id.id[10]+(c->id.id[9]<<8),
@@ -747,50 +941,63 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    return 0;
 	}
 	return 0;
+    case IP_FW_MCONN_INIT:
+	if (!req) return -1;
+	{
+	    FW_Connection *c;
+	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
+		c->bytes_total[0] += c->bytes[0];
+		c->bytes_total[1] += c->bytes[1];
+		c->packets[0] = c->packets[1] = c->bytes[0] = c->bytes[1] = 0;
+	    }
+	}
+	return 0;
     case IP_FW_MCONN:
 	if (!req || !monitors) return -1; /* ERRNO */
 	{
 	    unsigned long atime = time(0);
             unsigned long tstamp = timestamp();
 	    FW_Connection *c;
-	    char saddr[20], daddr[20];
-  	    int sport, dport;
-	    char proto[20];
-    	    struct protoent *pent;
-    	    struct in_addr addr;
+	    char tbuf1[10], tbuf2[10], tbuf3[10];
             char buf[1024];
 
-	    sprintf(buf,"STATUS\n%d\n%d\n%d\n%d\n%d\n%d\n",
+	    sprintf(buf,"STATUS\n%d\n%d\n%d\n%d\n%d\n%d\n%s\n%s\n%s\n",
 		unit->up, unit->force, unit->impulse_mode,
 		impulse_init_time, impulse_time,
-		impulse_fuzz);
-	    if (monitors) mon_write(MONITOR_STATUS,buf,strlen(buf));
+		impulse_fuzz,
+		((unit->impulse.expected-tstamp > 0)
+		    ? pcountdown(tbuf1, unit->impulse.expected-tstamp)
+		    : pcountdown(tbuf1, 0)),
+		pcountdown(tbuf2, unit->force_etime-atime),
+		pcountdown(tbuf3, next_alarm())
+	    );
+	    mon_write(MONITOR_STATUS, buf, strlen(buf));
 
-	    pcountdown(MONITOR_STATUS,(unit->impulse_mode)?(unit->impulse.expected-tstamp):0);
-	    pcountdown(MONITOR_STATUS,unit->force_etime-atime);
-	    pcountdown(MONITOR_STATUS,next_alarm());
-	    if (monitors) mon_write(MONITOR_QUEUE,"QUEUE\n",6);
+	    sprintf(buf,"STATUS2\n%c\n%c\n",
+		(blocked ? '1' : '0'),
+		(forced ? '1' : '0')
+	    );
+	    mon_write(MONITOR_VER2|MONITOR_STATUS, buf, 12);
+
+	    mon_write(MONITOR_QUEUE,"QUEUE\n",6);
 	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
 		if (c->timer.next == 0) continue;
-                addr.s_addr = c->id.id[1] + (c->id.id[2]<<8)
-                        + (c->id.id[3]<<16) + (c->id.id[4]<<24);
-                strcpy(saddr,inet_ntoa(addr));
-                addr.s_addr = c->id.id[5] + (c->id.id[6]<<8)
-                        + (c->id.id[7]<<16) + (c->id.id[8]<<24);
-                strcpy(daddr,inet_ntoa(addr));
-		pent = getprotobynumber(c->id.id[0]);
-		if (pent) strcpy(proto,pent->p_name);
-		else sprintf(proto,"%d",c->id.id[0]);
-		sport = c->id.id[10]+(c->id.id[9]<<8);
-		dport = c->id.id[12]+(c->id.id[11]<<8);
-                sprintf(buf,
-                        "%-4s  %15s/%-5d  %15s/%-5d  ",
-                        proto, saddr, sport,
-                        daddr, dport);
-                if (monitors) mon_write(MONITOR_QUEUE,buf,strlen(buf));
-		pcountdown(MONITOR_QUEUE,c->timer.expected-tstamp);
+		if (!c->description) c->description = desc_connection(c);
+		strcpy(buf, c->description);
+                sprintf(buf+50,
+                        "  %8.8s %ld %ld %ld %ld %ld %ld\n",
+			pcountdown(tbuf1, c->timer.expected-tstamp),
+			c->packets[0], c->bytes[0], c->bytes_total[0],
+			c->packets[1], c->bytes[1], c->bytes_total[1]);
+		c->bytes_total[0] += c->bytes[0];
+		c->bytes_total[1] += c->bytes[1];
+		c->packets[0] = c->packets[1] = c->bytes[0] = c->bytes[1] = 0;
+                mon_write(MONITOR_VER2|MONITOR_QUEUE, buf, strlen(buf));
+		buf[60] = '\n';
+		buf[61] = '\0';
+                mon_write(MONITOR_VER1|MONITOR_QUEUE, buf, strlen(buf));
 	    }
-	    if (monitors) mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
+	    mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
 	    return 0;
 	}
 	return 0;
@@ -841,6 +1048,8 @@ int ctl_firewall(int op, struct firewall_req *req)
 	unit->up = 0;
 	/* turn off the impulse generator */
 	del_timer(&unit->impulse);
+	unit->impulse_mode = 1;
+	impulse_init_time = 0;
 	return 0;
     case IP_FW_WAIT:
 	return unit->waiting;

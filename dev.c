@@ -1,5 +1,5 @@
 /*
- * dev.c - A ethernet Device.
+ * dev.c - An ethernet-like device (e.g. ISDN).
  *
  * Copyright (c) 1994, 1995, 1996 Eric Schenk.
  * All rights reserved. Please see the file LICENSE which should be
@@ -16,6 +16,8 @@
 
 #include "diald.h"
 
+static char device_node[9];
+
 static int dead = 1;
 
 /* internal flag to shortcut repeated calls to setaddr */
@@ -25,7 +27,7 @@ void dev_start()
 {
     link_iface = -1 ;
     rx_count = -1;
-    syslog(LOG_INFO, "Open device %s%d",device_node,device_iface);
+    mon_syslog(LOG_INFO, "Open device %s", current_dev);
     dead = 0;
 }
 
@@ -48,24 +50,26 @@ void dev_start()
 int dev_set_addrs()
 {
     ulong laddr = 0, raddr = 0;
+    struct ifreq   ifr; 
 
     /* Try to get the interface number if we don't know it yet. */
     if (link_iface == -1) {
-	link_iface = device_iface;
-	syslog(LOG_INFO,"Old %s , New device : %s %d",device,device_node,device_iface); 
+	int n;
+	n = strcspn(current_dev, "0123456789" );
+	link_iface = atoi(current_dev + n);
+	if (n > sizeof(device_node)-1)
+		n = sizeof(device_node)-1;
+	strncpy(device_node, current_dev, n);
+	device_node[n] = '\0';
     }
 
-
-    /* Ok then, see if pppd has upped the interface yet. */
-    if (link_iface != -1) {
-	struct ifreq   ifr; 
 
 	SET_SA_FAMILY (ifr.ifr_addr,    AF_INET); 
 	SET_SA_FAMILY (ifr.ifr_dstaddr, AF_INET); 
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
-	sprintf(ifr.ifr_name, device);
+	sprintf(ifr.ifr_name, current_dev);
 	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
-	   syslog(LOG_ERR,"failed to read interface status from device %s",device);
+	   mon_syslog(LOG_ERR,"failed to read interface status from device %s",current_dev);
 	   return 0;
 	}
 	if (!(ifr.ifr_flags & IFF_UP))
@@ -81,17 +85,23 @@ int dev_set_addrs()
 
 	/* Ok, the interface is up, grab the addresses. */
 	if (ioctl(snoopfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
-		syslog(LOG_ERR,"failed to get local address from device %s: %m",device);
+		mon_syslog(LOG_ERR,"failed to get local address from device %s: %m",current_dev);
 	else
        	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
 	if (ioctl(snoopfd, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
-	   syslog(LOG_ERR,"failed to get remote address: %m");
+	   mon_syslog(LOG_ERR,"failed to get remote address: %m");
 	else
 	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
-	/* Set the ptp routing for the new interface */
-    	set_ptp(device_node,link_iface,remote_ip,0);
+	/* KLUDGE 1:
+	 * If we do not have a valid remote address yet the interface
+	 * is not really up. We assume that a non-blocking connect
+	 * method was used (e.g. isdnctrl dial ...) and that something
+	 * like ippp will reconfigure the interface when it comes up.
+	 */
+	if (raddr == INADDR_ANY || raddr == INADDR_LOOPBACK)
+	    return 0;
 
 	if (dynamic_addrs) {
 	    /* only do the configuration in dynamic mode. */
@@ -101,20 +111,31 @@ int dev_set_addrs()
 	    addr.s_addr = laddr;
 	    strcpy(local_ip,inet_ntoa(addr));
 	    local_addr = laddr;
-	    syslog(LOG_INFO,"New addresses: local %s, remote %s.",
+	    mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 		local_ip,remote_ip);
-	    if (!do_reroute) {
-	        proxy_config(local_ip,remote_ip);
-    		set_ptp("sl",proxy_iface,remote_ip,1);
-                add_routes("sl",proxy_iface,local_ip,remote_ip,1);
-	    }
 	}
 
-	if (do_reroute)
+	if (!do_reroute
+	&& (dynamic_addrs || (blocked && !blocked_route))) {
+	    proxy_config(local_ip,remote_ip);
+	    set_ptp("sl",proxy_iface,remote_ip,1);
+	    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	    add_routes("sl",proxy_iface,local_ip,remote_ip,1); 
+	} 
+
+#if 1
+	/* Set the ptp routing for the new interface */
+	/* this was moved from about 15 lines above by ajy so that for */
+	/* dynamic addresses, we have the remote address when we make */
+	/* the call to setup the route */
+	set_ptp(device_node,link_iface,remote_ip,0);
+#endif
+
+	if (do_reroute) {
              add_routes(device_node,link_iface,local_ip,remote_ip,0);
+	     del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	}
         return 1;
-    }
-    return 0;
 }
 
 int dev_dead()
@@ -129,9 +150,9 @@ int dev_rx_count()
     char buf[128];
     int packets = 0;
     FILE *fp;
-    sprintf(buf,"%s %s%d",PATH_IFCONFIG,device_node,link_iface);
+    sprintf(buf,"%s %s",path_ifconfig, current_dev);
     if ((fp = popen(buf,"r"))==NULL) {
-        syslog(LOG_ERR,"Could not run command '%s': %m",buf);
+        mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
         return 0;       /* assume half dead in this case... */
     }
 
@@ -157,16 +178,20 @@ void dev_stop()
 
 void dev_reroute()
 {
+    /* Restore the original proxy routing */
+    proxy_config(orig_local_ip,orig_remote_ip);
+    if (blocked && !blocked_route)
+	del_ptp("sl",proxy_iface,orig_remote_ip);
+    else {
+	set_ptp("sl",proxy_iface,orig_remote_ip,1);
+	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
+    local_addr = inet_addr(orig_local_ip);
+
     /* Kill the alternate routing */
     if (do_reroute && link_iface != -1)
         del_routes(device_node,link_iface,local_ip,remote_ip,0);
     link_iface = -1;
-
-    /* Restore the original proxy routing */
-    proxy_config(orig_local_ip,orig_remote_ip);
-    set_ptp("sl",proxy_iface,orig_remote_ip,1);
-    add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
-    local_addr = inet_addr(orig_local_ip);
 }
 
 /* Dummy proc. This should never get called */

@@ -1,0 +1,96 @@
+When passing snooped packets through the firewall rules pass
+sll_protocol as well. We need to figure out a syntax for specifying
+protocols in rules etc.
+-- Now passing the whole sockaddr_sll through check_firewall and
+   using it to get the direction of the packet. Now addresses are
+   always ordered with those beyond the managed link on the right
+   which is better than the previous numerical ordering.
+
+Use a dummy interface rather than slip. It will give us access to
+arbitrary protocols and doesn't have to muck around passing packets
+as byte streams through a pseudo-terminal.
+
+Add mechanisms for manual start/stop of other links when bandwidth
+thresholds are crossed. (e.g. slave ISDN links or equal-cost routes).
+
+If we are blocked it may sometimes be better to remove the proxy
+routes to avoid unnecessary timeouts. There should be an option
+for this.
+-- Added a blocked-route option which defaults to on. If it is on
+   you get routes through the proxy when blocked, if it is off
+   you get no routes. Note that currently this only changes routes
+   when the interface goes up and down, not when blocked or
+   blocked-route changes.
+   Now it changes routes when blocked-route changes but not
+   when blocked changes.
+
+Because the snoop gets packets as they go out to the device we
+only see masqueraded versions of packets on masqueraded connections.
+Sometimes we might want to know the real addresses for admin or
+even link time control. The only way I can think of doing it is to
+snoop the incoming interface(s) as well - but that means we need
+a router in diald to figure out whether this packet would actually
+go out our link or not, plus it implies a massive system load!
+There seem to be no easy solutions to this one :-(.
+
+The diald/dctrl combination makes a useful little traffic monitor
+for an interface. Perhaps we could use it as such without all the
+dial up and proxy baggage?
+-- Added support to diald and dctrl to show packets per second,
+   bytes per second, percentage of link bandwidth (currently
+   hardcoded in dctrl to 33k6) and total bytes in and out for
+   each connection. Cute :-).
+
+Allow monitors to pass configuration commands to diald for on the
+fly reconfiguration? Security?
+-- Done. Use "config <option>". No security yet...
+
+Add authentication on control connections with user/password login,
+maybe SSL?
+
+Add a toolbar to dctrl.
+-- Done.
+
+Use monitor messages for more than just dial messages?
+-- Started...
+
+In dctrl the connection queue, dialling log etc. should be
+independently resizable.
+
+Now using STATUS2 message to pass flags (blocked, forced etc.). This
+happens at the same time as STATUS. Really it only needs to happen
+when we get a new monitor connection or when the flags change.
+
+Should we be able to specify a metric for the routes through the
+link/proxy?
+
+The behaviour of the horizontal scrollbar on the dctrl information
+window is "unpleasant".
+
+Need a menu on the dctrl information window to select log level.
+
+If we have ISDN ippp links that are both dial out and dial in there
+is no way to get locking right. If we have more than one link there
+are all kinds of races when adding phone numbers to links, dialling
+and accepting incoming calls that seem unavoidable. Mainly because
+the ISDN layers don't have any form of blocking dial.
+
+We currently have several ways of forking scripts in diald, most
+of which are very similar. There must be opportunity for rationalization
+here?
+
+Rewrite dctrl in Java...
+
+90% of the packets that trigger a link up are DNS queries. Consider
+parsing the request out and displaying it meaningfully.
+
+It doesn't make sense to buffer some types of packets (e.g. ntp?).
+Does diald allow us to (not) do that?
+
+The chat I have doesn't flush stderr at appropriate times (i.e.
+when waiting for a response) nor does it report all fails to
+stderr.
+
+If we get an EAGAIN back on writing to a monitor pipe we should
+try and flush the pipe in order to avoid a stalled monitor from
+causing diald to suck resources.

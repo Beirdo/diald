@@ -20,9 +20,9 @@ passing over the link.
 Getting Diald
 
 The file is called diald-0.16.tar.gz. I've uploaded it to
-sunsite.unc.edu:/pub/Linux/Incoming. It should move to
-sunsite.unc.edu:/pub/Linux/system/Network/serial after a suitable interval.
-It can also be obtained from the diald home page at
+sunsite.unc.edu:/pub/Linux/incoming. It should move to
+sunsite.unc.edu:/pub/Linux/system/network/serial/diald-0.16.tar.gz after a
+suitable interval. It can also be obtained from the diald home page at
 "http://www.dna.lth.se/~erics/diald.html". Note that the diald home page has
 moved from its old location at the University of Toronto.
 
@@ -32,21 +32,23 @@ David S. Miller provides a mailing for the discussion of diald on his
 Majordomo server at vger.rutgers.edu. Send mail containing the line
 "subscribe linux-diald" in the BODY of the message to
 Majordomo@vger.rutgers.edu to join the list. Send mail with the word "help"
-in the body to get help on the correct use of the Majordomo list server.
-Announcements of new releases are made on the mailing list, and its a good
-place to ask questions of users who already have diald up and running. I
-would prefer the mailing list to be my primary channel of communication with
-users. This gives you the added benefit of asking your questions of everyone
-on the list, many of whom may have the same question, or some of who may
-have already solved your problem. This minimizes the time I have to spend
-answering questions about diald, and gives me more time to spend improving
-the program. Let me repeat that. Please, if at all possible, use the mailing
-list to ask questions! I read the list every day, sometimes more than once,
-and your question will not be answered any more quickly if it is sent
-directly to me, in fact, if I don't see the answer to your question right
-away, then it may just get filed until I have time to deal with it. Someone
-on the mailing list will probably be able to suggest a solution to your
-problem well before that.
+in the body to get help on the correct use of the Majordomo list server. The
+mailing list is also mirrored in the USENET news linux hierarchy in the
+group "linux.dev.diald" for those who have news servers that get this
+hierarchy. Announcements of new releases are made on the mailing list, and
+its a good place to ask questions of users who already have diald up and
+running. I would prefer the mailing list to be my primary channel of
+communication with users. This gives you the added benefit of asking your
+questions of everyone on the list, many of whom may have the same question,
+or some of who may have already solved your problem. This minimizes the time
+I have to spend answering questions about diald, and gives me more time to
+spend improving the program. Let me repeat that. Please, if at all possible,
+use the mailing list to ask questions! I read the list every day, sometimes
+more than once, and your question will not be answered any more quickly if
+it is sent directly to me, in fact, if I don't see the answer to your
+question right away, then it may just get filed until I have time to deal
+with it. Someone on the mailing list will probably be able to suggest a
+solution to your problem well before that.
 
 The mailing list is being archived by Jeremy Hall . Copies of the archive
 can be obtained at ftp://rex.isdn.net/pub/diald. Currently the archives are
@@ -73,8 +75,10 @@ dialing.
 Configuring Diald
 
 Various pathnames that diald needs to know can be configured in "config.h".
-Edit this file appropriately. The eventual installation location for the
-diald binaries, the man pages and the diald definitions files can be
+Edit this file appropriately. Most of what is here can be changed at run
+time, but it's nice to not have to specify extra runtime options because you
+where to lazy to edit the config.h file. The eventual installation location
+for the diald binaries, the man pages and the diald definitions files can be
 configured in the Makefile.
 
 Basic Installation (First Time Users)

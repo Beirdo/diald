@@ -11,12 +11,8 @@
 #include "diald.h"
 
 /*
- * SLIP PACKET READING CODE FROM RFC 1055 by J. Romkey.
+ * SLIP PACKET READING AND WRITING CODE FROM RFC 1055 by J. Romkey.
  *
- * RECV_PACKET: receives a packet into the buffer located at "p".
- *      If more than len bytes are received, the packet will
- *      be truncated.
- *      Returns the number of bytes stored in the buffer.
  */
 
 /* SLIP special character codes */
@@ -25,7 +21,60 @@
 #define ESC_END         0334    /* ESC ESC_END means END data byte */
 #define ESC_ESC         0335    /* ESC ESC_ESC means ESC data byte */
 
-int recv_packet(unsigned char *p, int len)
+/* SEND_PACKET: sends a packet of length "len", starting at
+ * location "p".
+ */
+void send_packet(unsigned char *p, size_t len)
+{
+    /* send an initial END character to flush out any data that may
+     * have accumulated in the receiver due to line noise
+     */
+    putc(END,proxy_mfp);
+
+    /* for each byte in the packet, send the appropriate character
+     * sequence
+     */
+    while(len--) {
+	switch(*p) {
+	/* if it's the same code as an END character, we send a
+	 * special two character code so as not to make the
+	 * receiver think we sent an END
+	 */
+	case END:
+	    putc(ESC,proxy_mfp);
+	    putc(ESC_END,proxy_mfp);
+	    break;
+
+	/* if it's the same code as an ESC character,
+	 * we send a special two character code so as not
+	 * to make the receiver think we sent an ESC
+	 */
+	case ESC:
+	    putc(ESC,proxy_mfp);
+	    putc(ESC_ESC,proxy_mfp);
+	    break;
+	/* otherwise, we just send the character
+	 */
+	default:
+	    putc(*p,proxy_mfp);
+	}
+
+	p++;
+    }
+
+    /* tell the receiver that we're done sending the packet
+     */
+    putc(END,proxy_mfp);
+}
+
+/*
+ * RECV_PACKET: receives a packet into the buffer located at "p".
+ *      If more than len bytes are received, the packet will
+ *      be truncated.
+ *      Returns the number of bytes stored in the buffer.
+ */
+
+int recv_packet(unsigned char *p, size_t len)
 {
     int c;
     int received = 0;
@@ -109,43 +158,47 @@ void proxy_up(void)
     set_up_tty(proxy_sfd,1, 38400);
 
     if (ioctl(proxy_sfd, TIOCGETD, &orig_disc) < 0)
-	syslog(LOG_ERR,"Can't get line discipline on proxy device: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get line discipline on proxy device: %m"), die(1);
 
     /* change line disciple to SLIP and set the SLIP encapsulation */
     disc = N_SLIP;
     if ((proxy_iface = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
 	if (errno == ENFILE) {
-	   syslog(LOG_ERR,"No free slip device available for proxy."), die(1);
+	   mon_syslog(LOG_ERR,"No free slip device available for proxy."), die(1);
 	} else if (errno == EEXIST) {
-	    syslog(LOG_ERR,"Proxy device already in slip mode!?");
+	    mon_syslog(LOG_ERR,"Proxy device already in slip mode!?");
 	} else if (errno == EINVAL) {
-	    syslog(LOG_ERR,"SLIP not supported by kernel, can't build proxy.");
+	    mon_syslog(LOG_ERR,"SLIP not supported by kernel, can't build proxy.");
 	    die(1);
 	} else
-	   syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
+	   mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
     }
 
     if (ioctl(proxy_sfd, SIOCSIFENCAP, &sencap) < 0)
-	syslog(LOG_ERR,"Can't set encapsulation: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't set encapsulation: %m"), die(1);
 
     /* verify that it worked */
     if (ioctl(proxy_sfd, TIOCGETD, &disc) < 0)
-	syslog(LOG_ERR,"Can't get line discipline: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get line discipline: %m"), die(1);
     if (ioctl(proxy_sfd, SIOCGIFENCAP, &sencap) < 0)
-	syslog(LOG_ERR,"Can't get encapsulation: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get encapsulation: %m"), die(1);
 
     if (disc != N_SLIP || sencap != 0)
-        syslog(LOG_ERR,"Couldn't set up the proxy link correctly!"), die(1);
+        mon_syslog(LOG_ERR,"Couldn't set up the proxy link correctly!"), die(1);
 
     if (debug&DEBUG_VERBOSE)
-        syslog(LOG_INFO,"Proxy device established on interface sl%d",
+        mon_syslog(LOG_INFO,"Proxy device established on interface sl%d",
 	    proxy_iface);
 
     /* Mark the interface as up */
     proxy_config(orig_local_ip,orig_remote_ip);
     /* set the routing to the interface */
-    set_ptp("sl",proxy_iface,orig_remote_ip,1);
-    add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    if (blocked && !blocked_route)
+	del_ptp("sl",proxy_iface,orig_remote_ip);
+    else {
+	set_ptp("sl",proxy_iface,orig_remote_ip,1);
+	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
 }
 
 /*
@@ -158,13 +211,9 @@ void proxy_config(char *lip, char *rip)
     int res;
 
     /* mark the interface as up */
-    if (netmask) {
-        sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    PATH_IFCONFIG,proxy_iface,lip,rip,netmask,mtu);
-    } else {
-        sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    PATH_IFCONFIG,proxy_iface,lip,rip,mtu);
-    }
+    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
+	path_ifconfig,proxy_iface,lip,rip,
+	netmask ? netmask : "255.255.255.255",mtu);
     res = system(buf);
     report_system_result(res,buf);
 }
@@ -174,12 +223,21 @@ void proxy_config(char *lip, char *rip)
  */
 void proxy_down()
 {
+    char buf[128];
+    int res;
+
     if (debug&DEBUG_VERBOSE)
-	syslog(LOG_INFO,"taking proxy device down");
+	mon_syslog(LOG_INFO,"taking proxy device down");
     del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+
+    /* mark the interface as down */
+    sprintf(buf,"%s sl%d down", path_ifconfig,proxy_iface);
+    res = system(buf);
+    report_system_result(res,buf);
+
     /* clear the line discipline */
     if ((proxy_iface = ioctl(proxy_sfd, TIOCSETD, &orig_disc)) < 0)
-	syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
 }
 
 void run_ip_up()
@@ -194,7 +252,7 @@ void run_ip_up()
 	    local_ip,
 	    remote_ip);
 	if (debug&DEBUG_VERBOSE)
-	    syslog(LOG_INFO,"running ip-up script '%s'",buf);
+	    mon_syslog(LOG_INFO,"running ip-up script '%s'",buf);
         background_system(buf);
     }
 }
@@ -211,7 +269,7 @@ void run_ip_down()
 	    local_ip,
 	    remote_ip);
 	if (debug&DEBUG_VERBOSE)
-	    syslog(LOG_INFO,"running ip-down script '%s'",buf);
+	    mon_syslog(LOG_INFO,"running ip-down script '%s'",buf);
         background_system(buf);
     }
 }

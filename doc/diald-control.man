@@ -16,7 +16,9 @@ The simplest way is to send it signals. This is, by necessity, somewhat
 limited. If it is necessary to send more complex commands to diald
 the
 .B fifo
-command can be used.
+or
+.B tcpport
+commands can be used.
 
 .B Diald
 can be controlled by the following signals.
@@ -40,9 +42,21 @@ If the
 .B fifo
 command is used, then additional commands can be issued to diald as follows.
 Suppose the command "fifo /etc/diald/diald.ctl" is specified in diald's
-configuration. Then programs can write the following commands to
+configuration. Then programs can write the commands to
 the named pipe /etc/diald/diald.ctl, which will then be acted upon by diald.
 Note that diald will create the named pipe if it does not exist.
+.LP
+The
+.B tcpport
+is similar but tells diald to listen on a given port for TCP connections.
+Connections may made to the specified port by remote systems in order
+to issue commands to diald or monitor its status. If diald has been
+compiled with tcp wrapper support connections via TCP are accepted
+under control of rules for diald in /etc/hosts.allow.
+.LP
+Diald may be configured to listen on a fifo and a TCP port simultaneously.
+.LP
+The following commands may be sent to diald via the fifo or TCP port:
 .TP
 .B block
 Block diald from making outgoing calls until a unblock command is issued.
