@@ -27,9 +27,13 @@
 #  include <syslog.h>
 #endif
 #include <signal.h>
-#include <time.h>
 #if HAVE_SYS_TIME_H
 #  include <sys/time.h>
+#  if TIME_WITH_SYS_TIME
+#    include <time.h>
+#  endif
+#else
+#  include <time.h>
 #endif
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #  include <sched.h>
