@@ -564,7 +564,7 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
 	    saddr, sport, daddr, dport);
     } else {
 	mon_syslog(LOG_DEBUG,
-	    "filter %s rule %d proto %d len %d packet %s,%d => %s,%d",
+	    "filter %s rule %d proto %s len %d packet %s,%d => %s,%d",
 	    (accept)?"accepted":"ignored",
 	    rule,
 	    getprotonumber(pkt->protocol),

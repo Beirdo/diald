@@ -1,3 +1,8 @@
+Major changes between version 0.99.4 and 0.99.5.
+------------------------------------------------
+  - Fixed a %d which should have been a %s in a debug message.
+
+
 Major changes between version 0.99.3 and 0.99.4.
 ------------------------------------------------
   - Fix to the TCP close detection from Fedor.
