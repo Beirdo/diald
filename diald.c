@@ -373,9 +373,17 @@ void open_fifo()
  * Set up the signal handlers.
  */
 static sigset_t sig_mask;
+
 void stray_signal(int sig)
 {
 	mon_syslog(LOG_ERR, "Stray signal %d ignored", sig);
+}
+
+void fatal_signal(int sig, struct sigcontext_struct sc)
+{
+	mon_syslog(LOG_ERR, "Fatal signal %d, eip=0x%08lx",
+		sig, sc.eip);
+	die(1);
 }
 
 void signal_setup()
@@ -402,6 +410,16 @@ void signal_setup()
 
     memset(&sa, 0, sizeof(sa));
     sa.sa_mask = sig_mask;
+
+    sa.sa_flags = SA_RESETHAND | SA_NODEFER;
+
+    SIGNAL(SIGIOT, fatal_signal);
+    SIGNAL(SIGBUS, fatal_signal);
+    SIGNAL(SIGSEGV, fatal_signal);
+#ifdef SIGSTKFLT
+    SIGNAL(SIGSTKFLT, fatal_signal);
+#endif
+
     sa.sa_flags = 0;
 
     SIGNAL(SIGHUP, sig_hup);            /* Hangup: modem went down. */
@@ -411,12 +429,6 @@ void signal_setup()
     SIGNAL(SIGABRT, stray_signal);
     SIGNAL(SIGFPE, stray_signal);
     SIGNAL(SIGUSR1, linkup);            /* User requests the link to go up */
-#if 0 /* if we do these we probably loop madly on crashes! */
-    SIGNAL(SIGIOT, stray_signal);
-    SIGNAL(SIGBUS, stray_signal);
-    SIGNAL(SIGSEGV, stray_signal);
-    SIGNAL(SIGSTKFLT, stray_signal);
-#endif
     SIGNAL(SIGUSR2, print_filter_queue); /* dump the packet queue to the log */
     SIGNAL(SIGPIPE, SIG_IGN);
     SIGNAL(SIGTERM, sig_term);          /* Terminate: user take link down */
