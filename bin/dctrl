@@ -4,6 +4,7 @@ exec wish "$0" "$@"
 
 # User tunable parameters
 set imagepath "/usr/lib/diald"
+set diald_TITLE ""
 set diald_FIFO ""
 set diald_HOST ""
 set diald_PORT 0
@@ -214,7 +215,9 @@ proc print_usage {} {
 set previous ""
 foreach i $argv {
 	if {"$previous"=="-title"} {
+		set diald_TITLE $i
 		wm title . $i
+    		wm iconname . $i
 		set previous ""
 	} elseif {"$previous"=="-fifo"} {
 		set diald_FIFO $i
@@ -286,7 +289,7 @@ if {"$fancy_icon"==1} { wm iconwindow . .dctrlIcon }
 #
 
 proc closeMonitor {} {
-    global fifofd monfifo monfd diald_HOST
+    global fifofd monfifo monfd diald_HOST diald_TITLE
     if { $monfd != "" } {
 	catch { close $monfd }
 	set monfd ""
@@ -305,13 +308,16 @@ proc closeMonitor {} {
     .toolbar.up configure -state disabled
     .toolbar.down configure -state disabled
 
-    wm title . "Diald: No link"
-    wm iconname . "Diald"
+    if { $diald_TITLE == "" } {
+	wm title . "Diald: No link"
+	wm iconname . "Diald"
+    }
 }
 
 proc openMonitor {} {
     global monstate monlevel
-    global fifofd monfifo monfd diald_FIFO diald_HOST diald_PORT fifo_counter
+    global fifofd monfifo monfd fifo_counter
+    global diald_FIFO diald_HOST diald_PORT diald_TITLE
 
     # Turn off any previous monitoring
     closeMonitor
@@ -337,6 +343,10 @@ proc openMonitor {} {
         set monfd [open $monfifo r+]
     }
     fifoCmd "monitor $monlevel $monfifo"
+    if { $diald_TITLE == "" } {
+	wm title . "Diald: No link"
+	wm iconname . "Diald"
+    }
     fileevent $monfd readable {readMonitor}
     .toolbar.up configure -state active
     .toolbar.down configure -state active
@@ -511,6 +521,7 @@ proc readMonitor {} {
     global queue_list status trans colors gload tload
     global in_usage out_usage in_bandwidth out_bandwidth
     global blocked forced max_info_lines
+    global diald_TITLE
 
     if {[gets $monfd foo] == -1} {
 	closeMonitor
@@ -660,8 +671,10 @@ proc readMonitor {} {
 	}
     } elseif {$monstate < 9.0} {
 	set monstate 0.0
-	wm title . "Diald: $foo"
-	wm iconname . "$foo"
+	if { $diald_TITLE == "" } {
+	    wm title . "Diald: $foo"
+	    wm iconname . "$foo"
+	}
     }
     update
 }
