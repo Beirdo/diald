@@ -1,0 +1,36 @@
+Note: tun is not available in 2.2 kernels so don't bother looking :-).
+
+If you use tun you need to build a kernel with tun support.
+
+If you build tun as a module you need to add a line:
+
+        alias char-major-10-200 tun
+
+to your /etc/modules.conf.
+
+Configuration:
+
+  Create the device node:
+     mkdir /dev/net (if it doesn't exist already)
+     mknod /dev/net/tun c 10 200
+
+  Set permissions:
+     e.g. chmod 0700 /dev/net/tun
+     if you want the device only accesible by root. Giving regular users the
+     right to assign network devices is NOT a good idea. Users could assign
+     bogus network interfaces to trick firewalls or administrators.
+
+  -------------------------------------- 
+  (see Documentation/networking/tuntap.txt in the Linux kernel source).
+
+
+  TUN/TAP provides packet reception and transmission for user space programs.
+  It can be seen as a simple Point-to-Point or Ethernet device, which,
+  instead of receiving packets from physical media, receives them from
+  user space program and instead of sending packets via physical media
+  writes them to the user space program.
+
+  What is the difference between TUN driver and TAP driver?
+  TUN works with IP frames. TAP works with Ethernet frames.
+  This means that you have to read/write IP packets when you are using tun and
+  ethernet frames when using tap.
