@@ -76,15 +76,6 @@ proxy_dev_recv(proxy_t *proxy, unsigned char *p, size_t len)
     if (len <= 0)
 	return 0;
 
-    /* FIXME: We only care about packets *sent* on the interface
-     * not those received. But how can we tell for non AF_PACKET
-     * sockets?
-     */
-#ifdef HAVE_AF_PACKET
-    if ((af_packet && from.sl.sll_pkttype != PACKET_OUTGOING))
-	return 0;
-#endif
-
     *(unsigned short *)p =
 #ifdef HAVE_AF_PACKET
 	af_packet ? from.sl.sll_protocol :
