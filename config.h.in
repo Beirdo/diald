@@ -60,6 +60,9 @@
 /* Define if you have the <sys/time.h> header file.  */
 #undef HAVE_SYS_TIME_H
 
+/* Define if you have the <linux/if_tun.h> header file.  */
+#undef HAVE_LINUX_IF_TUN_H
+
 /* Define if you have the <pty.h> header file.  */
 #undef HAVE_PTY_H
 
