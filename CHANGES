@@ -1,3 +1,9 @@
+Major changes between version 0.99.1 and 0.99.2.
+------------------------------------------------
+  - Use a local netlink.h so we can compile with, hopefully, any
+    kernel/libc combination.
+
+
 Major changes between version 0.99 and 0.99.1.
 ------------------------------------------------
   - "make depend" now runs cc with -MM instead of -M to ignore

@@ -15,8 +15,7 @@
 #ifdef AF_NETLINK
 
 #include <sys/uio.h>
-#include <linux/types.h>
-#include <linux/netlink.h>
+#include "netlink.h"
 
 
 static char *proxy_lock;
