@@ -27,19 +27,17 @@ Major changes between version 0.98.2 and 0.98.3.
   - If we are in dynamic mode the buffered packets are sent back to
     the kernel via the proxy so that they will go back through the
     firewall/masquerading before being sent out again. Masquerading
-    should be *enabled* in your ip-up script and *disabled* in your
-    ip-down. You do not want packets to be masqueraded before being
+    should be *enabled* in your addroute script and *disabled* in your
+    delroute. You do not want packets to be masqueraded before being
     sent on diald's proxy. You don't know the address to masquerade
     as at that point and masquerading a packet which was previously
     masqueraded incorrectly will not magically make it work!
       Note that when the link is down the proxy must be allowed to
     see packets from your internal network. When the link is up both
     the proxy *and* the real interface should be masquerading packets.
-      There are unavoidable races when the link goes up and down
-    during which unmasqueraded packets may be sent on the real
-    interface and masqueraded packets may be received by diald on
-    the proxy. A true expert may be able to avoid this with some
-    fancy firewall rules. Maybe.
+      There may be races when the link goes up and down during which
+    unmasqueraded packets may be sent on the real interface and
+    masqueraded packets may be received by diald on the proxy.
 
 
 Major changes between version 0.98.1 and 0.98.2.
