@@ -51,6 +51,17 @@ int lock(char *dev)
 		    } else
 			mon_syslog(LOG_WARNING, "Couldn't remove stale lock on %s",
 			       dev);
+#if 1
+		} else if (pid == getpid()) {
+		    if (unlink(lock_file) == 0) {
+			close(fd);
+			mon_syslog(LOG_ERR, "Removed stale lock on %s (pid %d - ME?!?)",
+			       dev, pid);
+			continue;
+		    } else
+			mon_syslog(LOG_WARNING, "Couldn't remove stale lock on %s (pid %d - ME?!?)",
+			       dev);
+#endif
 		} else
 		    mon_syslog(LOG_NOTICE, "Device %s is locked by pid %d",
 			   dev, pid);
