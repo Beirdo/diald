@@ -705,6 +705,8 @@ proc dctrlQuit {} {
 }
 
 proc ctrlAccess {} {
+    global my_name
+
     set my_name ""
     catch { destroy .ctrlAccess }
     toplevel .ctrlAccess
@@ -718,10 +720,11 @@ proc ctrlAccess {} {
     frame .ctrlAccess.input
     pack .ctrlAccess.input -side top -fill x -pady 2m
     label .ctrlAccess.input.l -text "Name:"
-    entry .ctrlAccess.input.e -show -width 40 \
+    entry .ctrlAccess.input.e -show '*' -width 40 \
 	-relief sunken -bd 2 -textvariable my_name
     bind .ctrlAccess.input.e <Return> {
 	fifoCmd "auth simple $my_name"
+	set my_name ""
 	destroy .ctrlAccess
     }
     bind .ctrlAccess.input.e <Escape> \
@@ -736,11 +739,13 @@ proc ctrlAccess {} {
 	-text "  Ok  " \
 	-command {
 	    fifoCmd "auth simple $my_name"
+	    set my_name ""
 	    destroy .ctrlAccess
 	}
     button .ctrlAccess.buttons.dismiss \
 	-text "Cancel" \
 	-command {
+	    set my_name ""
 	    destroy .ctrlAccess
 	}
     pack .ctrlAccess.buttons.ok .ctrlAccess.buttons.dismiss -side left -expand 1
