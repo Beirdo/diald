@@ -189,15 +189,22 @@ iface_stop(char *mode, char *iftype, int ifunit,
      * nothing. For non-transient interfaces we delete the address.
      * We do not simply down the interface because it may be required
      * to up (ISDN, for instance, will not answer an incoming call if
-     * there is not up interface).
+     * the interface is not up).
      * Deleting the addresses has the effect of deleting routes as well
      * but we still call del_routes first because the user delroutes
      * scripts may have been abused to do something "special".
+     * 2.0.x kernels have a different behaviour when the address is
+     * set to 0.0.0.0 so we down the interface and hope the user has
+     * set some of the support scripts to do the right thing.
      */
     del_routes(desc, iface, lip, rip);
 
     sprintf(buf, "%s %s %s",
 	path_ifconfig, iface,
+#ifdef HAVE_AF_PACKET
+	(af_packet && current_mode == MODE_DEV) ? "0.0.0.0" : "down");
+#else
 	current_mode == MODE_DEV ? "0.0.0.0" : "down");
+#endif
     run_shell(SHELL_WAIT, desc, buf, -1);
 }

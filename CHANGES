@@ -1,9 +1,13 @@
-Major changes between version 0.98.3 and 0.99.1.
+Major changes between version 0.99 and 0.99.1.
 ------------------------------------------------
-  - Do not ifconfig transient interfaces (ppp<n> and sl<n>) to
-    delete the address. This simply reallocates them and leaves
-    them hanging around, up but with no addresses. In this state
-    they are never reused and we leak interfaces.
+  - If we have no AF_PACKET support we are probably running on
+    a 2.0 kernel so must always down interfaces rather than
+    trying to delete addresses by setting the interface to 0.0.0.0.
+    The all zeros address has special meaning for 2.0 kernels.
+  - Transient interfaces (slip and ppp) should be downed rather
+    than set to 0.0.0.0 otherwise they are considered to be in
+    use by the kernel and never reused which leads to a resource
+    leak.
 
 
 Major changes between version 0.98.3 and 0.99.
