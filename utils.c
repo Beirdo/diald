@@ -83,13 +83,16 @@ int getprotocol(const char *name)
 
 char *getprotonumber(int proto)
 {
+    static char buf[16];
     int i;
+
     if (!proto_init)
 	init_protos();
     for (i = 0; i < proto_lines; i++)
 	if (protos[i].proto == proto)
 	    return protos[i].name;
-    return 0;
+    sprintf(buf, "%d", proto);
+    return buf;
 }
 
 struct serv {

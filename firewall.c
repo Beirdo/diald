@@ -554,9 +554,9 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
 
     if (pkt->protocol == IPPROTO_TCP) {
 	mon_syslog(LOG_DEBUG,
-	    "filter %s rule %d proto %d len %d seq %lx ack %lx flags %s%s%s%s%s%s packet %s,%d => %s,%d",
-	    (accept)?"accepted":"ignored",rule,
-	    pkt->protocol,
+	    "filter %s rule %d proto tcp len %d seq %lx ack %lx flags %s%s%s%s%s%s packet %s,%d => %s,%d",
+	    (accept)?"accepted":"ignored",
+	    rule,
 	    ntohs(pkt->tot_len),
 	    ntohl(tcp->seq), ntohl(tcp->ack_seq),
 	    (tcp->fin) ? " FIN" : "",
@@ -569,8 +569,9 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
     } else {
 	mon_syslog(LOG_DEBUG,
 	    "filter %s rule %d proto %d len %d packet %s,%d => %s,%d",
-	    (accept)?"accepted":"ignored",rule,
-	    pkt->protocol,
+	    (accept)?"accepted":"ignored",
+	    rule,
+	    getprotonumber(pkt->protocol),
 	    htons(pkt->tot_len),
 	    saddr, sport, daddr, dport);
     }
