@@ -64,6 +64,7 @@ CONTRIBFILES=contrib
 DISTFILES=Makefile $(SOURCEFILES) $(HFILES) $(DOCFILES) $(CONTRIBFILES)
 
 diald: $(OBJFILES)
+	./fixwrappers
 	$(CC) $(LDFLAGS) -o diald $(OBJFILES) $(LIBS)
 
 install: diald
