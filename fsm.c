@@ -313,6 +313,8 @@ void trans_UP(void)
     if (!forced && queue_empty() && state_timeout == -1) {
 	mon_syslog(LOG_NOTICE,"Closing down idle link.");
 take_link_down:
+	if (ip_goingdown)
+	    run_state_script("ip-goingdown", ip_goingdown, 0);
 	current_retry_count = 0;
 	flush_timeout_queue();
 	/* WARNING: You MUST do this before calling idle_filter_proxy(),

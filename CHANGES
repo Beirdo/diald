@@ -1,5 +1,6 @@
 Major changes between version 0.16 and 0.98.1.
 ----------------------------------------------
+  - Added the ip-goingdown script patch.
   - Removed the fatal and stray signal trapping completely. It just
     doesn't seem worth it.
   - Hybrid mode support. If the device used starts with '/' the

@@ -36,6 +36,7 @@ char *addroute = 0;
 char *delroute = 0;
 char *ip_up = 0;
 char *ip_down = 0;
+char *ip_goingdown = 0;
 char *acctlog = 0;
 char *pidlog = "diald.pid";
 char *fifoname = 0;
@@ -158,6 +159,7 @@ struct {
 #endif
     {"ip-up","<script>",1,&ip_up,set_str},
     {"ip-down","<script>",1,&ip_down,set_str},
+    {"ip-goingdown","<script>",1,&ip_goingdown,set_str},
     {"reroute","",0,&do_reroute,set_flag},
     {"-reroute","",0,&do_reroute,clear_flag},
 #ifdef SIOCSKEEPALIVE
@@ -254,6 +256,7 @@ void init_vars()
     delroute = 0;
     ip_up = 0;
     ip_down = 0;
+    ip_goingdown = 0;
     acctlog = 0;
     pidlog = "diald.pid";
     fifoname = 0;

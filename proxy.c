@@ -240,36 +240,23 @@ void proxy_down()
 	mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
 }
 
-void run_ip_up()
+void run_state_script(char *name, char *script, int background)
 {
     char buf[128];
 
-    if (ip_up) {
-	sprintf(buf,"%s %s %s %s %s",
-	    ip_up,
-	    snoop_dev,
-	    (netmask)?netmask:"255.255.255.255",
-	    local_ip,
-	    remote_ip);
-	if (debug&DEBUG_VERBOSE)
-	    mon_syslog(LOG_INFO,"running ip-up script '%s'",buf);
-        background_system(buf);
-    }
-}
+    snprintf(buf, sizeof(buf)-1, "%s %s %s %s %s",
+	script,
+	snoop_dev,
+	netmask ? netmask : "255.255.255.255",
+	local_ip,
+	remote_ip);
+    buf[sizeof(buf)-1] = '\0';
 
-void run_ip_down()
-{
-    char buf[128];
+    if (debug&DEBUG_VERBOSE)
+	mon_syslog(LOG_INFO,"running %s script '%s'", name, buf);
 
-    if (ip_down) {
-	sprintf(buf,"%s %s %s %s %s",
-	    ip_down,
-	    snoop_dev,
-	    (netmask)?netmask:"255.255.255.255",
-	    local_ip,
-	    remote_ip);
-	if (debug&DEBUG_VERBOSE)
-	    mon_syslog(LOG_INFO,"running ip-down script '%s'",buf);
-        background_system(buf);
-    }
+    if (background)
+	background_system(buf);
+    else
+	system(buf);
 }

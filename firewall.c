@@ -1144,13 +1144,15 @@ int ctl_firewall(int op, struct firewall_req *req)
 	}
     case IP_FW_UP:
 	unit->up = 1;
-	run_ip_up();
+	if (ip_up)
+	    run_state_script("ip-up", ip_up, 1);
 	fw_force_update(unit);
 	fw_impulse_update(unit,1);
 	return 0;
 
     case IP_FW_DOWN:
-	if (unit->up) run_ip_down();
+	if (unit->up && ip_down)
+	    run_state_script("ip-down", ip_down, 1);
 	unit->up = 0;
 	/* turn off the impulse generator */
 	del_timer(&unit->impulse);
