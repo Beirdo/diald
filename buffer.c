@@ -88,6 +88,7 @@ void buffer_packet(unsigned int len,unsigned char *pkt)
 
 void forward_buffer()
 {
+    int forwarding = 0;
     unsigned int clen, i;
     unsigned long stamp;
     unsigned long ctime = timestamp();
@@ -98,6 +99,21 @@ void forward_buffer()
     struct sockaddr *to;
     size_t to_len;
     unsigned char pkt[4096];
+
+#ifdef __linux__
+    /* If we are using dynamic addresses we need to know whether we
+     * are forwarding or not.
+     */
+    int d;
+    if (dynamic_addrs
+    && (d = open("/proc/sys/net/ipv4/ip_forward", O_RDONLY)) >= 0) {
+	char c;
+
+	if (read(d, &c, 1) == 1 && c != '0')
+	    forwarding = 1;
+	close(d);
+    }
+#endif
 
     buffer_check();
 
@@ -135,14 +151,18 @@ void forward_buffer()
 	    dpkt = pkt + sizeof(unsigned short);
 	    dlen = clen - sizeof(unsigned short);
 
-	    /* If we are using dynamic addresses we send the packet back
-	     * in to the kernel on the proxy so that it will go through
-	     * the firewall/masquerading rules again. It is up to the
-	     * user to enable and disable masquerading in ip-up/ip-down.
-	     * Masquerading a packet which was incorrectly masqueraded
-	     * to start with will never work :-).
+	    /* If we are using dynamic addresses and forwarding traffic
+	     * we send the packet back in to the kernel on the proxy so
+	     * that it will go through the firewall/masquerading rules
+	     * again. It is up to the user to enable and disable
+	     * masquerading in ip-up/ip-down. Masquerading a packet
+	     * which was incorrectly masqueraded to start with will
+	     * never work :-).
+	     * Note that if we push packets back to the kernel we
+	     * probably lose the initial local traffic. If we send
+	     * them directly we lose the initial masqueraded traffic.
 	     */
-	    if (dynamic_addrs) {
+	    if (dynamic_addrs && forwarding) {
 		if (send_packet(wprot, dpkt, dlen) < 0)
 		    mon_syslog(LOG_ERR,"Error bouncing packet to kernel from buffer: %m");
 	    } else {
