@@ -35,11 +35,11 @@ rm -rf "$RPM_BUILD_ROOT"
 %files
 %doc BUGS CHANGES LICENSE NOTES TODO TODO.budget doc/diald-faq.txt
 %doc README README.ethertap README.masq README.pam
-%doc %{_mandir}/man1/dctrl.1
-%doc %{_mandir}/man5/diald-examples.5
-%doc %{_mandir}/man5/diald-control.5
-%doc %{_mandir}/man5/diald-monitor.5
-%doc %{_mandir}/man8/diald.8
+%doc %{_mandir}/man1/dctrl.1*
+%doc %{_mandir}/man5/diald-examples.5*
+%doc %{_mandir}/man5/diald-control.5*
+%doc %{_mandir}/man5/diald-monitor.5*
+%doc %{_mandir}/man8/diald.8*
 /usr/sbin/diald
 /usr/bin/dctrl
 /etc/pam.d/diald
