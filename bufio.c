@@ -8,11 +8,11 @@
 
 #include "diald.h"
 
-void pipe_init(char *name, int is_ctrl, int fd, PIPE *pipe, int flush)
+void pipe_init(char *name, int access, int fd, PIPE *pipe, int flush)
 {
     char buf[2];
     pipe->name = name;
-    pipe->is_ctrl = is_ctrl;
+    pipe->access = access;
     pipe->fd = fd;
     pipe->count = 0;
     fcntl(fd,F_SETFL,fcntl(fd,F_GETFL)|O_NONBLOCK);
@@ -43,7 +43,7 @@ int pipe_read(PIPE *pipe)
 	/* A close of a pipe is only significant if it is a control
 	 * pipe, not if it is a capture pipe for a script.
 	 */
-	if (pipe->is_ctrl) {
+	if ((pipe->access & ACCESS_MONITOR)) {
 	    mon_syslog(LOG_INFO, "Closing %s", pipe->name);
 	}
 	return -1;

@@ -185,7 +185,7 @@ main(int argc, char *argv[])
 	    p = pipes;
 	    while (p) {
 		PIPE *tmp = p->next;
-		if (!p->is_ctrl)
+		if (!(p->access & ACCESS_CONTROL))
 		    ctrl_read(p);
 		p = tmp;
 	    }
@@ -219,9 +219,10 @@ main(int argc, char *argv[])
 			    char buf[1024];
 			    int n;
 			    n = snprintf(buf, sizeof(buf)-2, "TCP %s:%d",
-				inet_ntoa(sa.sin_addr), sa.sin_port);
+					inet_ntoa(sa.sin_addr), sa.sin_port);
 			    buf[n] = '\0';
-			    pipe_init(strdup(buf), 1, fd, p, 0);
+			    pipe_init(strdup(buf), CONFIG_DEFAULT_ACCESS,
+					fd, p, 0);
 			    FD_SET(fd, &ctrl_fds);
 			    mon_syslog(LOG_INFO, "Connection from %s", buf);
 			} else {
@@ -327,7 +328,7 @@ void open_fifo()
             if (fifo_pipe) {
 	        if (debug&DEBUG_VERBOSE)
 	   	    syslog(LOG_INFO,"Using fifo %s",fifoname);
-	        pipe_init("FIFO", 1, fifo_fd, fifo_pipe, 1);
+	        pipe_init("FIFO", -1, fifo_fd, fifo_pipe, 1);
 		FD_SET(fifo_fd, &ctrl_fds);
             } else {
 	        syslog(LOG_ERR,"Could not open fifo pipe %m");
@@ -541,55 +542,68 @@ void ctrl_read(PIPE *pipe)
 	    /* Ok, we've got a line, now we need to "parse" it. */
 	    if (!*buf) {
 		/* Empty line. Probably \r\n? */
-	    } else if (!pipe->is_ctrl) {
+	    } else if (!(pipe->access & ACCESS_CONTROL)) {
 		/* Not a control pipe - just messages from a script */
 		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
 #ifdef CONFIG_REMOTE_CONFIG
-	    } else if (strncmp(buf, "config ", 7) == 0) {
+	    } else if ((pipe->access & ACCESS_CONFIG)
+	    && strncmp(buf, "config ", 7) == 0) {
 		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
 		parse_options_line(buf+7);
 #endif
-	    } else if (strcmp(buf,"block") == 0) {
+	    } else if ((pipe->access & ACCESS_BLOCK)
+	    && strcmp(buf,"block") == 0) {
 		mon_syslog(LOG_INFO, "%s: block request", pipe->name);
 		parse_options_line(buf);
-	    } else if (strcmp(buf,"unblock") == 0) {
+	    } else if ((pipe->access & ACCESS_UNBLOCK)
+	    && strcmp(buf,"unblock") == 0) {
 		mon_syslog(LOG_INFO, "%s: unblock request", pipe->name);
 		parse_options_line(buf);
-	    } else if (strcmp(buf,"force") == 0) {
+	    } else if ((pipe->access & ACCESS_FORCE)
+	    && strcmp(buf,"force") == 0) {
 		mon_syslog(LOG_INFO, "%s: force request", pipe->name);
 		forced = 1;
-	    } else if (strcmp(buf,"unforce") == 0) {
+	    } else if ((pipe->access & ACCESS_UNFORCE)
+	    && strcmp(buf,"unforce") == 0) {
 		mon_syslog(LOG_INFO, "%s: unforce request", pipe->name);
 		forced = 0;
-	    } else if (strcmp(buf,"down") == 0) {
+	    } else if ((pipe->access & ACCESS_DOWN)
+	    && strcmp(buf,"down") == 0) {
 		mon_syslog(LOG_INFO, "%s: link down request", pipe->name);
     		request_down = 1;
     		request_up = 0;
-	    } else if (strcmp(buf,"up") == 0) {
+	    } else if ((pipe->access & ACCESS_UP)
+	    && strcmp(buf,"up") == 0) {
     		mon_syslog(LOG_INFO, "%s: link up request", pipe->name);
     		request_down = 0;
     		request_up = 1;
-	    } else if (strcmp(buf,"delayed-quit") == 0) {
+	    } else if ((pipe->access & ACCESS_DELQUIT)
+	    && strcmp(buf,"delayed-quit") == 0) {
     		mon_syslog(LOG_INFO, "%s: delayed termination request", pipe->name);
     		delayed_quit = 1;
-	    } else if (strcmp(buf,"quit") == 0) {
+	    } else if ((pipe->access & ACCESS_QUIT)
+	    && strcmp(buf,"quit") == 0) {
     		mon_syslog(LOG_INFO, "%s: termination request", pipe->name);
     		terminate = 1;
-	    } else if (strcmp(buf,"reset") == 0) {
+	    } else if ((pipe->access & ACCESS_RESET)
+	    && strcmp(buf,"reset") == 0) {
     		mon_syslog(LOG_INFO, "%s: reset request received - re-reading configuration", pipe->name);
 		do_config();
-	    } else if (strcmp(buf,"queue") == 0) {
+	    } else if ((pipe->access & ACCESS_QUEUE)
+	    && strcmp(buf,"queue") == 0) {
     		struct firewall_req req;
     		mon_syslog(LOG_INFO,"%s: user requested dump of firewall queue", pipe->name);
     		mon_syslog(LOG_INFO,"--------------------------------------");
     		req.unit = fwunit;
     		ctl_firewall(IP_FW_PCONN,&req);
     		mon_syslog(LOG_INFO,"--------------------------------------");
-	    } else if (sscanf(buf,"debug %d", &pid) == 1) {
+	    } else if ((pipe->access & ACCESS_DEBUG)
+	    && sscanf(buf,"debug %d", &pid) == 1) {
     		mon_syslog(LOG_INFO,"%s: changing debug flags to 0x%x",
 		    pipe->name, pid);
 		debug = pid;
-	    } else if ((sscanf(buf,"dynamic %n%*s%n %n",&j,&k,&l) >= 0) && l) {
+	    } else if ((pipe->access & ACCESS_DYNAMIC)
+	    && (sscanf(buf,"dynamic %n%*s%n %n",&j,&k,&l) >= 0) && l) {
 		buf[k] = 0;
 		if (inet_addr(buf+j) == (unsigned long)0xffffffff
 		||  inet_addr(buf+l) == (unsigned long)0xffffffff) {
@@ -600,14 +614,15 @@ void ctrl_read(PIPE *pipe)
 		    remote_ip = strdup(buf+l);
 		    force_dynamic = 1;
 		}
-	    } else if (strncmp(buf,"monitor", 7) == 0) {
+	    } else if ((pipe->access & ACCESS_MONITOR)
+	    && strncmp(buf,"monitor", 7) == 0) {
     		struct stat sbuf;
 		int fd;
 		MONITORS *new;
 
 		k = 0;
 		if (sscanf(buf,"monitor %i %n",&j,&k) == 1) {
-		    mon_syslog(LOG_INFO,"%s: monitor connection at info level 0x%x to %s requested",
+		    mon_syslog(LOG_INFO,"%s: monitor connection at info level 0x%08x to %s requested",
 			    pipe->name, j, buf+k);
 		} else if (buf[7] != 0 && buf[7] == ' ') {
 		    mon_syslog(LOG_INFO,"%s: full monitor connection to %s requested",
@@ -654,14 +669,16 @@ void ctrl_read(PIPE *pipe)
 		    mon_syslog(LOG_INFO, "%s: empty monitor request ignored",
 			pipe->name);
 		}
-	    } else if (strncmp(buf,"message ",8) == 0) {
+	    } else if ((pipe->access & ACCESS_MESSAGE)
+	    && strncmp(buf,"message ",8) == 0) {
 		/* pass a message from the connector on to the monitor */
 		if (monitors) {
 		    mon_write(MONITOR_MESSAGE,"MESSAGE\n",8);
 		    mon_write(MONITOR_MESSAGE,buf+8,strlen(buf+8));
 		    mon_write(MONITOR_MESSAGE,"\n",1);
 		}
-            } else if (sscanf(buf,"connect %d %n", &pid, &dev) == 1) {
+            } else if ((pipe->access & ACCESS_CONNECT)
+	    && sscanf(buf,"connect %d %n", &pid, &dev) == 1) {
 #if 0
 /* XXX */mon_syslog(LOG_INFO,"%s: up request on %s state=%d, dial=%d, dev=%s", pipe->name, buf+dev, state, dial_pid, current_dev ? current_dev : "none");
 #endif
@@ -697,7 +714,7 @@ void ctrl_read(PIPE *pipe)
                     }
                 }
             } else {
-		mon_syslog(LOG_ERR,"%s: Unknown request '%s' made.",
+		mon_syslog(LOG_ERR,"%s: Ignored request '%s'",
 		    pipe->name, buf);
 	    }
 	   buf = tail+1;

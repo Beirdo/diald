@@ -32,6 +32,18 @@
  */
 #undef CONFIG_REMOTE_CONFIG
 
+/*
+ * The default access to be allowed on monitor connections. Note
+ * that connections on the control fifo can always do anything
+ * because there is no way to determine who asked. This only
+ * applies to TCP monitor connections.
+ * (N.B. If ACCESS_CONTROL is not set then *anything* received
+ * on the pipe is treated as a messge)
+ */
+#define CONFIG_DEFAULT_ACCESS \
+	(ACCESS_CONTROL | ACCESS_MONITOR | ACCESS_MESSAGE \
+	| ACCESS_UP | ACCESS_DOWN)
+
 
 /*****************************************************************************
  * EVERYTHING BELOW HERE IS RUN TIME CONFIGURABLE

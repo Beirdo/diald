@@ -9,7 +9,7 @@
 typedef struct pipe {
     struct pipe *next;
     char *name;		/* the name given to this channel */
-    int is_ctrl;	/* is this a control pipe or just script output? */
+    int access;		/* access flags */
     int fd;		/* file descriptor */
     int count;		/* number of characters in the buffer now */
     char buf[1024];
