@@ -199,53 +199,8 @@ void proxy_up(void)
 	    proxy_iftype, proxy_ifunit);
 
     /* Mark the interface as up */
-    /* set the routing to the interface */
-    proxy_config(orig_local_ip,orig_remote_ip);
-    if (blocked && !blocked_route) {
-	del_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
-    } else {
-	set_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
-	add_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-    }
-}
-
-/*
- * Configure the proxy SLIP lines address.
- * This may change in a dynamic setting.
- */
-void proxy_config(char *lip, char *rip)
-{
-    char buf[128];
-    int res;
-
-    /* mark the interface as up */
-    sprintf(buf,"%s %s%d %s pointopoint %s netmask %s mtu %d up",
-	path_ifconfig,proxy_iftype,proxy_ifunit,lip,rip,
-	netmask ? netmask : "255.255.255.255",mtu);
-    res = system(buf);
-    report_system_result(res,buf);
-}
-
-/*
- * Call the delroute script and take the pty out of slip mode.
- */
-void proxy_down()
-{
-    char buf[128];
-    int res;
-
-    if (debug&DEBUG_VERBOSE)
-	mon_syslog(LOG_INFO,"taking proxy device down");
-    del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-
-    /* mark the interface as down */
-    sprintf(buf,"%s %s%d down", path_ifconfig,proxy_iftype,proxy_ifunit);
-    res = system(buf);
-    report_system_result(res,buf);
-
-    /* clear the line discipline */
-    if ((proxy_ifunit = ioctl(proxy_sfd, TIOCSETD, &orig_disc)) < 0)
-	mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
+    if (!blocked || blocked_route)
+	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
 }
 
 int proxy_open()
@@ -259,6 +214,14 @@ void proxy_close()
 {
     close(proxy_mfd);
     close(proxy_sfd);
+}
+
+void proxy_release()
+{
+    /* clear the line discipline */
+    if ((proxy_ifunit = ioctl(proxy_sfd, TIOCSETD, &orig_disc)) < 0)
+	mon_syslog(LOG_ERR,"Can't set line discipline: %m");
+    proxy_close();
 }
 
 void run_state_script(char *name, char *script, int background)

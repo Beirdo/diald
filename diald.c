@@ -851,7 +851,8 @@ void die(int i)
 
 	close_modem();
 	interface_down();
-    	proxy_down();
+    	iface_down(proxy_iftype, proxy_ifunit);
+	proxy_release();
 
 	if (deinitializer) {
 		int res;

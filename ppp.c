@@ -178,7 +178,6 @@ int ppp_set_addrs()
 		mon_syslog(LOG_WARNING,"Attempting to auto adjust mtu.");
 		mon_syslog(LOG_WARNING,"Restart diald with mtu set to %d to avoid errors.",ifr.ifr_mtu);
 		mtu = ifr.ifr_mtu;
-	        proxy_config(orig_local_ip,orig_remote_ip);
 	    }
 	}
 
@@ -196,13 +195,11 @@ int ppp_set_addrs()
 		local_ip,remote_ip);
 	}
 
-	/* This is redundant in normal operation, but if we
-	 * have to restart the link, then this is necessary...
+	/* The pppd should have configured the interface but there
+	 * may be user or default routes to add :-(.
 	 */
-	set_ptp("ppp", link_iface, local_ip, remote_ip, metric+0);
-
-	add_routes("ppp",link_iface,local_ip,remote_ip,metric+0);
-	del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
+	iface_config("ppp", link_iface, local_ip, remote_ip);
+	iface_down(proxy_iftype, proxy_ifunit);
 
 	return 1;
     }
@@ -211,10 +208,6 @@ int ppp_set_addrs()
 
 int ppp_dead()
 {
-    /* pppd is way too enthusiastic about deleting routes it had
-     * nothing to do with creating. Therefore, we have to reestablish
-     * the proxy routes here, including the point to point route!
-     */
     if (link_pid == 0)
 	ppp_reroute();
     return (link_pid == 0);
@@ -270,24 +263,13 @@ void ppp_stop()
 
 void ppp_reroute()
 {
-    /* Restore the original proxy routing */
-    /* If there was a change in the proxy addresses
-     * (i.e., we are running with -reroute), then
-     * this will change introduce a window in which
-     * we loose our routes. There does not seem to be a way
-     * to avoid this. Sigh.
-     */
-    proxy_config(orig_local_ip,orig_remote_ip);
-    if (blocked && !blocked_route)
-	del_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
-    else {
-	set_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
-	add_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-    }
+    /* Restore the original proxy. */
+    if (!blocked || blocked_route)
+	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     local_addr = inet_addr(orig_local_ip);
-    /* If we did routing on the ppp link, remove it */
+
     if (link_iface != -1)
-    	del_routes("ppp",link_iface,local_ip,remote_ip,metric+0);
+    	iface_down("ppp", link_iface);
     link_iface = -1;
 }
 

@@ -186,7 +186,7 @@ void slip_start(void)
     report_system_result(res,buf);
 
     /* Set the routing for the new slip interface */
-    set_ptp("sl", link_iface, local_ip, remote_ip, metric+0);
+    iface_config("sl", link_iface, local_ip, remote_ip);
 
     /* run bootp if it is asked for */
     if (dynamic_addrs && dynamic_mode == DMODE_BOOTP && !force_dynamic) start_bootp();
@@ -247,22 +247,12 @@ int slip_set_addrs()
 	if (slip_rx_count() == rx_count) return 0;
     }
 
-    /* redo the interface marking and the routing since BOOTP will change it */
-    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	path_ifconfig,link_iface,local_ip,remote_ip,
-	netmask ? netmask : "255.255.255.255",mtu);
-    res = system(buf);
-    report_system_result(res,buf);
-
-    /* Set the routing for the new slip interface */
-    set_ptp("sl", link_iface, local_ip, remote_ip, metric+0);
-
     if (dynamic_addrs || force_dynamic) {
 	local_addr = inet_addr(local_ip);
     }
 
-    add_routes("sl",link_iface,local_ip,remote_ip,metric+0);
-    del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
+    iface_config("sl", link_iface, local_ip, remote_ip);
+    iface_down(proxy_iftype, proxy_ifunit);
 
     return 1;
 }
@@ -286,18 +276,13 @@ void slip_stop()
 
 void slip_reroute()
 {
-    /* Restore the original proxy routing */
-    proxy_config(orig_local_ip,orig_remote_ip);
-    if (blocked && !blocked_route)
-	del_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
-    else {
-	set_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
-	add_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
-    }
+    /* Restore the original proxy. */
+    if (!blocked || blocked_route)
+	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     local_addr = inet_addr(orig_local_ip);
-    /* If we did routing on the slip link, remove it */
-    if (link_iface != -1) /* just in case we get called twice */
-    	del_routes("sl",link_iface,local_ip,remote_ip,metric+0);
+
+    if (link_iface != -1)
+    	iface_down("sl", link_iface);
     link_iface = -1;
 }
 
