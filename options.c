@@ -114,6 +114,8 @@ struct {
     {"tcpport","<n>",1,&tcpport,set_int},
     {"blocked","",0,&blocked,set_flag},
     {"-blocked","",0,&blocked,clear_flag},
+    {"blocked-route","",0,&blocked_route,set_flag},
+    {"-blocked-route","",0,&blocked_route,clear_flag},
     {"initializer","<script>",1,&initializer,set_str},
     {"deinitializer","<script>",1,&deinitializer,set_str},
 /* scheduling */

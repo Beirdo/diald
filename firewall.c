@@ -152,6 +152,42 @@ static unsigned int slot_end_timeout(FW_Timeslot *slot, time_t *clock)
     	return maxtime;
 }
 
+/* Generate a connection description */
+static char *
+desc_connection(FW_Connection *c)
+{
+    struct in_addr addr;
+    char saddr[20], daddr[20];
+    int sport, dport;
+    char *pent;
+    char proto[20];
+    char *buf;
+
+    addr.s_addr = c->id.id[1] + (c->id.id[2]<<8)
+		+ (c->id.id[3]<<16) + (c->id.id[4]<<24);
+    strcpy(saddr,inet_ntoa(addr));
+    sport = c->id.id[10]+(c->id.id[9]<<8);
+
+    addr.s_addr = c->id.id[5] + (c->id.id[6]<<8)
+		+ (c->id.id[7]<<16) + (c->id.id[8]<<24);
+    strcpy(daddr,inet_ntoa(addr));
+    dport = c->id.id[12]+(c->id.id[11]<<8);
+
+    pent = getprotonumber(c->id.id[0]);
+    if (pent)
+	strcpy(proto,pent);
+    else
+	sprintf(proto,"%d",c->id.id[0]);
+
+    buf = malloc(64);
+    if (buf) {
+	sprintf(buf, "%-4s  %15s/%-5d  %15s/%-5d",
+		proto, saddr, sport, daddr, dport);
+    }
+
+    return buf;
+}
+
 /* Find a connection in the queue */
 static FW_Connection *find_connection(FW_unit *unit, FW_ID *id)
 {
@@ -189,6 +225,7 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	       die(1);
 	    }
 	    c->id = *id;
+	    c->description = NULL;
 	    c->packets[0] = c->packets[1] = 0;
 	    c->bytes[0] = c->bytes[1] = 0;
 	    c->bytes_total[0] = c->bytes_total[1] = 0;
@@ -199,6 +236,15 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    c->unit = unit;
 	    c->timer.data = (void *)c;
 	    c->timer.function = (void *)(void *)del_connection;
+	    if (unit->connections->next == unit->connections && monitors
+	    && state != STATE_UP && !blocked) {
+		c->description = desc_connection(c);
+		if (c->description) {
+		    char buf[1024];
+		    sprintf(buf, "MESSAGE\ndiald: %s\n", c->description);
+		    mon_write(MONITOR_MESSAGE, buf, strlen(buf));
+		}
+	    }
 	    c->next = unit->connections->next;
 	    c->prev = unit->connections;
 	    unit->connections->next->prev = c;
@@ -240,6 +286,7 @@ void del_connection(FW_Connection *c)
 
     c->next->prev = c->prev;
     c->prev->next = c->next;
+    if (c->description) free(c->description);
     free(c);
 }
 
@@ -757,15 +804,12 @@ skip:
     return 1;
 }
 
-static char * pcountdown(int level, long secs)
+static char * pcountdown(char *buf, long secs)
 {
-    static char buf[10];
     /* Make sure that we don't try to print values that overflow our buffer */
     if (secs < 0) secs = 0;
     if (secs > 359999) secs = 359999;
     sprintf(buf,"%02ld:%02ld:%02ld\n",secs/3600,(secs/60)%60,secs%60);
-    if (monitors && level != MONITOR_QUEUE)
-	mon_write(level,buf,9);
     return buf;
 }
 
@@ -897,55 +941,43 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    unsigned long atime = time(0);
             unsigned long tstamp = timestamp();
 	    FW_Connection *c;
-	    char saddr[20], daddr[20];
-  	    int sport, dport;
-	    char proto[20];
-    	    char *pent;
-    	    struct in_addr addr;
+	    char tbuf1[10], tbuf2[10], tbuf3[10];
             char buf[1024];
 
-	    sprintf(buf,"STATUS\n%d\n%d\n%d\n%d\n%d\n%d\n",
+	    sprintf(buf,"STATUS\n%d\n%d\n%d\n%d\n%d\n%d\n%s\n%s\n%s\n",
 		unit->up, unit->force, unit->impulse_mode,
 		impulse_init_time, impulse_time,
-		impulse_fuzz);
-	    if (monitors) mon_write(MONITOR_STATUS,buf,strlen(buf));
-	    /* If this is non-zero we just have an expired timer so
-	     * we of course display nothing.
-	     */
-            if (unit->impulse.expected-tstamp > 0)
-                pcountdown(MONITOR_STATUS,unit->impulse.expected-tstamp);
-            else
-                pcountdown(MONITOR_STATUS,0);
-	    pcountdown(MONITOR_STATUS,unit->force_etime-atime);
-	    pcountdown(MONITOR_STATUS,next_alarm());
-	    if (monitors) mon_write(MONITOR_QUEUE,"QUEUE\n",6);
+		impulse_fuzz,
+		((unit->impulse.expected-tstamp > 0)
+		    ? pcountdown(tbuf1, unit->impulse.expected-tstamp)
+		    : pcountdown(tbuf1, 0)),
+		pcountdown(tbuf2, unit->force_etime-atime),
+		pcountdown(tbuf3, next_alarm())
+	    );
+	    mon_write(MONITOR_STATUS, buf, strlen(buf));
+
+	    sprintf(buf,"STATUS2\n%c\n%c\n",
+		(blocked ? '1' : '0'),
+		(forced ? '1' : '0')
+	    );
+	    mon_write(MONITOR_STATUS, buf, 12);
+
+	    mon_write(MONITOR_QUEUE,"QUEUE\n",6);
 	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
 		if (c->timer.next == 0) continue;
-                addr.s_addr = c->id.id[1] + (c->id.id[2]<<8)
-                        + (c->id.id[3]<<16) + (c->id.id[4]<<24);
-                strcpy(saddr,inet_ntoa(addr));
-                addr.s_addr = c->id.id[5] + (c->id.id[6]<<8)
-                        + (c->id.id[7]<<16) + (c->id.id[8]<<24);
-                strcpy(daddr,inet_ntoa(addr));
-		pent = getprotonumber(c->id.id[0]);
-		if (pent) strcpy(proto,pent);
-		else sprintf(proto,"%d",c->id.id[0]);
-		sport = c->id.id[10]+(c->id.id[9]<<8);
-		dport = c->id.id[12]+(c->id.id[11]<<8);
-                sprintf(buf,
-                        "%-4s  %15s/%-5d  %15s/%-5d  %8.8s"
-			" %ld %ld %ld %ld %ld %ld\n",
-                        proto, saddr, sport,
-                        daddr, dport,
-			pcountdown(MONITOR_QUEUE,c->timer.expected-tstamp),
+		if (!c->description) c->description = desc_connection(c);
+		strcpy(buf, c->description);
+                sprintf(buf+50,
+                        "  %8.8s %ld %ld %ld %ld %ld %ld\n",
+			pcountdown(tbuf1, c->timer.expected-tstamp),
 			c->packets[0], c->bytes[0], c->bytes_total[0],
 			c->packets[1], c->bytes[1], c->bytes_total[1]);
 		c->bytes_total[0] += c->bytes[0];
 		c->bytes_total[1] += c->bytes[1];
 		c->packets[0] = c->packets[1] = c->bytes[0] = c->bytes[1] = 0;
-                if (monitors) mon_write(MONITOR_QUEUE,buf,strlen(buf));
+                mon_write(MONITOR_QUEUE,buf,strlen(buf));
 	    }
-	    if (monitors) mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
+	    mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
 	    return 0;
 	}
 	return 0;

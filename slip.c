@@ -259,18 +259,20 @@ int slip_set_addrs()
 
     if (dynamic_addrs || force_dynamic) {
 	local_addr = inet_addr(local_ip);
-	/* have to reset the proxy if we won't be rerouting... */
-	if (!do_reroute) {
-	    proxy_config(local_ip,remote_ip);
-#if 1
-    	    set_ptp("sl",proxy_iface,remote_ip,1);
-#endif
-	    add_routes("sl",proxy_iface,local_ip,remote_ip,1);
-	}
     }
 
-    if (do_reroute)
+    /* have to reset the proxy if we won't be rerouting... */
+    if (!do_reroute
+    && ((dynamic_addrs || force_dynamic) || (blocked && !blocked_route))) {
+	proxy_config(local_ip,remote_ip);
+	del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	add_routes("sl",proxy_iface,local_ip,remote_ip,1);
+    }
+
+    if (do_reroute) {
         add_routes("sl",link_iface,local_ip,remote_ip,0);
+	del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
 
     return 1;
 }
@@ -296,10 +298,10 @@ void slip_reroute()
 {
     /* Restore the original proxy routing */
     proxy_config(orig_local_ip,orig_remote_ip);
-#if 1
-    set_ptp("sl",proxy_iface,orig_remote_ip,1);
-#endif
-    add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    if (blocked && !blocked_route)
+	del_ptp("sl",proxy_iface,orig_remote_ip);
+    else
+	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
     local_addr = inet_addr(orig_local_ip);
     /* If we did routing on the slip link, remove it */
     if (do_reroute && link_iface != -1) /* just in case we get called twice */

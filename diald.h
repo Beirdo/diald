@@ -297,6 +297,7 @@ int running_pid;		/* current system command pid */
 int dial_status;		/* status from last dial command */
 int state_timeout;		/* state machine timeout counter */
 int blocked;			/* user has blocked the link */
+int blocked_route;		/* blocked link has routed through it */
 int state;			/* DFA state */
 int current_retry_count;	/* current retry count */
 int proxy_iface;		/* Interface number for proxy pty */
@@ -436,6 +437,7 @@ void forward_buffer(void);
 void run_ip_up(void);
 void run_ip_down(void);
 void set_ptp(char *, int, char *, int);
+void del_ptp(char *, int, char *);
 void add_routes(char *, int, char *, char *, int);
 void del_routes(char *, int, char *, char *, int);
 void pipe_init(int, PIPE *, int);

@@ -350,9 +350,9 @@ void open_fifo()
  * Set up the signal handlers.
  */
 static sigset_t sig_mask;
-void stray_signal(int sig)
+void stray_signal(int sig, struct sigcontext_struct sc)
 {
-	syslog(LOG_ERR, "Stray signal %d ignored", sig);
+	syslog(LOG_ERR, "Stray signal %d ignored (eip=0x%08lx)", sig, sc.eip);
 }
 
 void signal_setup()
@@ -518,32 +518,41 @@ void ctrl_read(PIPE *pipe)
 		/* Empty line. Probably \r\n? */
 	    } else if (strcmp(buf,"block") == 0) {
 		syslog(LOG_INFO, "FIFO: Block request received.");
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nBlock request received\n", 31);
 		blocked = 1;
 	    } else if (strcmp(buf,"unblock") == 0) {
 		syslog(LOG_INFO, "FIFO: Unblock request received.");
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nUnblock request received\n", 33);
 		blocked = 0;
 	    } else if (strcmp(buf,"force") == 0) {
 		syslog(LOG_INFO, "FIFO: Force request received.");
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nForce request received\n", 31);
 		forced = 1;
 	    } else if (strcmp(buf,"unforce") == 0) {
 		syslog(LOG_INFO, "FIFO: Unforce request received.");
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nUnforce request received\n", 33);
 		forced = 0;
 	    } else if (strcmp(buf,"down") == 0) {
 		syslog(LOG_INFO, "FIFO: Link down request received.");
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nDown request received\n", 30);
     		request_down = 1;
     		request_up = 0;
 	    } else if (strcmp(buf,"up") == 0) {
     		syslog(LOG_INFO, "FIFO: Link up request received.");
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nUp request received\n", 28);
     		request_down = 0;
     		request_up = 1;
 	    } else if (strcmp(buf,"delayed-quit") == 0) {
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nDelayed termination request received\n", 45);
     		syslog(LOG_INFO, "FIFO. Delayed termination request received.");
     		delayed_quit = 1;
 	    } else if (strcmp(buf,"quit") == 0) {
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nTermination request received\n", 37);
     		syslog(LOG_INFO, "FIFO. Termination request received.");
     		terminate = 1;
 	    } else if (strcmp(buf,"reset") == 0) {
     		syslog(LOG_INFO, "FIFO. Reset request received. Re-reading configuration.");
+		mon_write(MONITOR_MESSAGE, "MESSAGE\nReset request received\n", 31);
 		do_config();
 	    } else if (strcmp(buf,"queue") == 0) {
     		struct firewall_req req;

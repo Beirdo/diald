@@ -157,6 +157,7 @@ typedef struct tcp_state {
 typedef struct fw_connection {
     struct timer_lst timer;		/* timer for this connection */
     FW_ID id;				/* identifier for this connection */
+    char *description;			/* description of this connection */
     unsigned long packets[2];		/* packet counts out/in */
     unsigned long bytes[2];		/* byte count out/in */
     unsigned long bytes_total[2];	/* total byte count out/in */

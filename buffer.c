@@ -121,12 +121,6 @@ void forward_buffer()
              * on the snoopfd (which points to the same device),
              * then we will never get them back on snoopfd.
              */
-/* XXX ... */
-if (((struct iphdr *)pkt)->saddr == 0) {
-	((struct iphdr *)pkt)->saddr = local_addr;
-	syslog(LOG_DEBUG, "Oops: forwarding packet with zero source addr");
-}
-/* ... XXX */
 #if 1
 	    if (sendto(snoopfd,pkt,clen,0,(struct sockaddr *)&to,sizeof(to)) < 0) {
 #else

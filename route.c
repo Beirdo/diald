@@ -26,6 +26,19 @@ void set_ptp(char *itype, int iface, char *rip, int metric)
     report_system_result(res,buf);
 }
 
+/* delete a point to point route for a device */
+void del_ptp(char *itype, int iface, char *rip)
+{
+    char buf[128];
+    int res;
+    if (debug&DEBUG_VERBOSE)
+	syslog(LOG_INFO, "Deleting pointopoint route for %s%d",itype,iface);
+    sprintf(buf,"%s del %s dev %s%d",
+	path_route,rip,itype,iface); 
+    res = system(buf);
+    report_system_result(res,buf);
+}
+
 /*
  * Add in a direct and default route to the slip link.
  * The default route is only added if the "default" option was

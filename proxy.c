@@ -193,10 +193,10 @@ void proxy_up(void)
     /* Mark the interface as up */
     proxy_config(orig_local_ip,orig_remote_ip);
     /* set the routing to the interface */
-#if 1
-    set_ptp("sl",proxy_iface,orig_remote_ip,1);
-#endif
-    add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    if (blocked && !blocked_route)
+	del_ptp("sl",proxy_iface,orig_remote_ip);
+    else
+	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
 }
 
 /*

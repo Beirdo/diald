@@ -374,7 +374,14 @@ int open_modem()
 	syslog(LOG_ERR, "failed to clear O_NDELAY flag: %m"), die(1);
 
     if (!req_pid) {
+	int line_disc;
+
 	/* hang up and then start again */
+	set_up_tty(modem_fd, 1, inspeed);
+	if (ioctl(modem_fd, TIOCGETD, &line_disc) < 0 || line_disc != N_TTY) {
+	    line_disc = N_TTY;
+	    ioctl(modem_fd, TIOCSETD, &line_disc);
+	}
 	set_up_tty(modem_fd, 1, 0);
 	sleep(1);
 	set_up_tty(modem_fd, 1, inspeed);

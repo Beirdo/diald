@@ -112,14 +112,13 @@ int dev_set_addrs()
 	    local_addr = laddr;
 	    syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 		local_ip,remote_ip);
-	    if (!do_reroute) {
-	        proxy_config(local_ip,remote_ip);
-#if 1
-    		set_ptp("sl",proxy_iface,remote_ip,1);
-#endif
-		del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
-		add_routes("sl",proxy_iface,local_ip,remote_ip,1); 
-	    }
+	}
+
+	if (!do_reroute
+	&& (dynamic_addrs || (blocked && !blocked_route))) {
+	    proxy_config(local_ip,remote_ip);
+	    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	    add_routes("sl",proxy_iface,local_ip,remote_ip,1); 
 	} 
 
 #if 1
@@ -184,10 +183,10 @@ void dev_reroute()
 
     /* Restore the original proxy routing */
     proxy_config(orig_local_ip,orig_remote_ip);
-#if 1
-    set_ptp("sl",proxy_iface,orig_remote_ip,1);
-#endif
-    add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    if (blocked && !blocked_route)
+	del_ptp("sl",proxy_iface,orig_remote_ip);
+    else
+	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
     local_addr = inet_addr(orig_local_ip);
 }
 

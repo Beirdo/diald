@@ -20,16 +20,16 @@ CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS
 LIBS = -lwrap -lnsl
 
 # Linux, libc.so.6, no TCP access control
-CFLAGS = -O2 -Wall -pipe
-LIBS = -lnsl
+#CFLAGS = -O2 -Wall -pipe
+#LIBS = -lnsl
 
 # Linux, libc.so.5, TCP access control via /etc/hosts.allow (tcp_wrappers)
-CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS
-LIBS = -lwrap
+#CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS
+#LIBS = -lwrap
 
 # Linux, libc.so.5, no TCP access control
-CFLAGS = -O2 -Wall -pipe
-LIBS =
+#CFLAGS = -O2 -Wall -pipe
+#LIBS =
 
 
 #Moderately paranoid CFLAGS (this is moderately useful):
