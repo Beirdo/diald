@@ -494,28 +494,28 @@ void clear_flag(int *var, char **argv)
 void set_blocked(int *var, char **argv)
 {
     if (!blocked_route && state == STATE_DOWN && *var == 0)
-	iface_down(proxy_iftype, proxy_ifunit);
+	iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     *var = 1;
 }
 
 void clear_blocked(int *var, char **argv)
 {
     if (!blocked_route && state == STATE_DOWN && *var == 1)
-	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     *var = 0;
 }
 
 void set_blocked_route(int *var, char **argv)
 {
     if (blocked && state == STATE_DOWN && *var == 0)
-	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     *var = 1;
 }
 
 void clear_blocked_route(int *var, char **argv)
 {
     if (blocked && state == STATE_DOWN && *var == 1)
-	iface_down(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     *var = 0;
 }
 

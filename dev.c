@@ -124,8 +124,8 @@ int dev_set_addrs()
 		local_ip,remote_ip);
 	}
 
-	iface_config(device_node, link_iface, local_ip, remote_ip);
-	iface_down(proxy_iftype, proxy_ifunit);
+	iface_start(device_node, link_iface, local_ip, remote_ip);
+	iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
 
         return 1;
 }
@@ -172,12 +172,12 @@ void dev_reroute()
 {
     /* Restore the original proxy. */
     if (!blocked || blocked_route)
-	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     local_addr = inet_addr(orig_local_ip);
 
     /* Kill the alternate routing */
     if (link_iface != -1)
-	iface_down(device_node, link_iface);
+	iface_stop(device_node, link_iface, local_ip, remote_ip);
     link_iface = -1;
 }
 

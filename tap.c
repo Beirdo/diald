@@ -65,7 +65,7 @@ void proxy_up(void)
 {
     /* Mark the interface as up */
     if (!blocked || blocked_route)
-	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
 }
 
 
@@ -110,6 +110,7 @@ void proxy_close()
 
 void proxy_release()
 {
+    iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     proxy_close();
     unlock(proxy_lock);
 }

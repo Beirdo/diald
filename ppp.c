@@ -198,8 +198,8 @@ int ppp_set_addrs()
 	/* The pppd should have configured the interface but there
 	 * may be user or default routes to add :-(.
 	 */
-	iface_config("ppp", link_iface, local_ip, remote_ip);
-	iface_down(proxy_iftype, proxy_ifunit);
+	iface_start("ppp", link_iface, local_ip, remote_ip);
+	iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
 
 	return 1;
     }
@@ -265,11 +265,11 @@ void ppp_reroute()
 {
     /* Restore the original proxy. */
     if (!blocked || blocked_route)
-	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     local_addr = inet_addr(orig_local_ip);
 
     if (link_iface != -1)
-    	iface_down("ppp", link_iface);
+    	iface_stop("ppp", link_iface, local_ip, remote_ip);
     link_iface = -1;
 }
 

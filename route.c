@@ -28,6 +28,12 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
     else
     	sprintf(win,"window %d",window);
 
+#if 1
+    /* FIXME: this is only needed for 2.0 kernels. 2.2 and beyond
+     * create routes automatically when the interface is configured.
+     * On 2.2 and later kernels this just creates some annoying
+     * duplicate routes.
+     */
     if (path_ip) {
 	sprintf(buf,"%s route add %s dev %s%d scope link src %s metric %d %s",
 	    path_ip, rip, iftype, ifunit, lip, metric, win); 
@@ -37,6 +43,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
     }
     res = system(buf);
     report_system_result(res, buf);
+#endif
 
     /* Add in a default route for the link if required. */
     if (default_route) {
@@ -64,11 +71,45 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 }
 
 
-void
-iface_config(char *iftype, int ifunit, char *lip, char *rip)
+static void
+del_routes(char *iftype, int ifunit, char *lip, char *rip)
 {
-    char buf[128];
     int res;
+    char buf[1024];
+
+    if (debug&DEBUG_VERBOSE)
+	mon_syslog(LOG_DEBUG, "Removing routes for %s%d", iftype, ifunit);
+
+    if (proxyarp) clear_proxyarp(inet_addr(rip));
+
+    if (delroute) {
+	/* call delroute <iface> <netmask> <local> <remote> */
+        sprintf(buf, "%s %s%d %s %s %s %d",
+	    delroute, iftype, ifunit,
+	    (netmask) ? netmask : "default",
+	    lip, rip, metric);
+        res = system(buf);
+        report_system_result(res, buf);
+    }
+
+    if (default_route) {
+	if (path_ip) {
+	    sprintf(buf, "%s route del default dev %s%d scope link src %s metric %d",
+		path_ip, iftype, ifunit, lip, metric); 
+	} else {
+	    sprintf(buf, "%s del default metric %d netmask 0.0.0.0 dev %s%d",
+		path_route, metric, iftype, ifunit);
+	}
+        system(buf);
+    }
+}
+
+
+void
+iface_start(char *iftype, int ifunit, char *lip, char *rip)
+{
+    int res;
+    char buf[128];
 
     /* mark the interface as up */
     sprintf(buf,"%s %s%d %s pointopoint %s netmask %s metric %d mtu %d up",
@@ -88,13 +129,22 @@ iface_config(char *iftype, int ifunit, char *lip, char *rip)
 
 
 void
-iface_down(char *iftype, int ifunit)
+iface_stop(char *iftype, int ifunit, char *lip, char *rip)
 {
     char buf[128];
     int res;
 
-    /* Downing an interface drops all routes through it. */
-    sprintf(buf, "%s %s%d down",
+    /* We do not simply down the interface because it may be required
+     * to up (ISDN, for instance, will not answer an incoming call if
+     * there is not up interface). Instead we delete the address
+     * which has much the same effect of stopping traffic through it.
+     * Deleting the addresses has the effect of deleting routes as well
+     * but we still call del_routes first because the user delroutes
+     * scripts may have been abused to do something "special".
+     */
+    del_routes(iftype, ifunit, lip, rip);
+
+    sprintf(buf, "%s %s%d 0.0.0.0",
 	path_ifconfig, iftype, ifunit);
     res = system(buf);
     report_system_result(res,buf);

@@ -5,12 +5,11 @@
  * All rights reserved. Please see the file LICENSE which should be
  * distributed with this software for terms of use.
  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <unistd.h>
-#include <strings.h>
+#include <string.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -60,6 +59,9 @@
 #  include <linux/if_packet.h>
 #else
 #  include <net/ethernet.h>
+#  if __GLIBC_MINOR__ >= 1
+#    include <netpacket/packet.h>
+#  endif
 #  include <net/if_packet.h>
 #endif
 
@@ -398,8 +400,8 @@ void parse_up(void *var, char **argv);
 void parse_down(void *var, char **argv);
 void parse_prule(void *var, char **argv);
 void parse_var(void *var, char **argv);
-void iface_config(char *, int, char *, char *);
-void iface_down(char *, int);
+void iface_start(char *, int, char *, char *);
+void iface_stop(char *, int, char *, char *);
 void close_modem(void);
 int open_modem (void);
 void reopen_modem (void);

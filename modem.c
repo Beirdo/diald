@@ -320,7 +320,7 @@ int open_modem()
 	 *   Possibly we should also inherit existing locks?
 	 */
 
-	modem_fd = open(current_dev[0] != '/' ? current_dev : "/dev/null",
+	modem_fd = open(current_dev[0] == '/' ? current_dev : "/dev/null",
 			O_RDWR | O_NDELAY);
 	if (modem_fd < 0) {
 	    mon_syslog(LOG_ERR, "Can't open requested device '%s'", req_dev);

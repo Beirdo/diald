@@ -186,7 +186,7 @@ void slip_start(void)
     report_system_result(res,buf);
 
     /* Set the routing for the new slip interface */
-    iface_config("sl", link_iface, local_ip, remote_ip);
+    iface_start("sl", link_iface, local_ip, remote_ip);
 
     /* run bootp if it is asked for */
     if (dynamic_addrs && dynamic_mode == DMODE_BOOTP && !force_dynamic) start_bootp();
@@ -251,8 +251,8 @@ int slip_set_addrs()
 	local_addr = inet_addr(local_ip);
     }
 
-    iface_config("sl", link_iface, local_ip, remote_ip);
-    iface_down(proxy_iftype, proxy_ifunit);
+    iface_start("sl", link_iface, local_ip, remote_ip);
+    iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
 
     return 1;
 }
@@ -278,11 +278,11 @@ void slip_reroute()
 {
     /* Restore the original proxy. */
     if (!blocked || blocked_route)
-	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
     local_addr = inet_addr(orig_local_ip);
 
     if (link_iface != -1)
-    	iface_down("sl", link_iface);
+    	iface_stop("sl", link_iface, local_ip, remote_ip);
     link_iface = -1;
 }
 

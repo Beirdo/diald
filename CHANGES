@@ -1,14 +1,14 @@
 Major changes between version 0.98.2 and 0.98.3.
 ------------------------------------------------
-  - More major routing stuff. We now rely mainly on upping and
-    downing interfaces. We still add the p-t-p routes for compatibility
-    with 2.0 kernels (with 2.2 you get double routes but it isn't
-    particularly important). We still add the default route if
-    specified in the config. We still call the user's addroute
-    script. We never call the delroute script because the routes
-    all disappear when the interface they point through goes down.
-    If you were doing abusing a delroute script to do something
-    clever you will be in trouble. Try doing it in ip-down instead.
+  - Changes for compatibility with glibc 2.1.
+  - Fixed a typo in modem.c that prevented non-/dev devices
+    from working.
+  - More major routing stuff. We now rely mainly on adding and
+    removing addresses on interfaces. We still add the p-t-p
+    routes for compatibility with 2.0 kernels (with 2.2 you
+    get double routes but it isn't particularly important).
+      We still add the default route if specified in the config.
+    We still call the user's addroute and delroute scripts.
       The intention is to make diald work with interfaces rather
     than routes so it can run alongside a real routing daemon.
     This isn't tested :-).
@@ -16,7 +16,6 @@ Major changes between version 0.98.2 and 0.98.3.
     out of diald so that we can eventually work with IPv4, IPv6,
     IPX etc. in arbitrary combinations. This isn't done yet so
     don't get excited.
-
   - If we are in dynamic mode the buffered packets are sent back to
     the kernel via the proxy so that they will go back through the
     firewall/masquerading before being sent out again. Masquerading

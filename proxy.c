@@ -200,7 +200,7 @@ void proxy_up(void)
 
     /* Mark the interface as up */
     if (!blocked || blocked_route)
-	iface_config(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
 }
 
 int proxy_open()
@@ -218,9 +218,12 @@ void proxy_close()
 
 void proxy_release()
 {
+    iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+
     /* clear the line discipline */
     if ((proxy_ifunit = ioctl(proxy_sfd, TIOCSETD, &orig_disc)) < 0)
 	mon_syslog(LOG_ERR,"Can't set line discipline: %m");
+
     proxy_close();
 }
 

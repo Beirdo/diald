@@ -7,7 +7,7 @@
  */
 
 #include "diald.h"
-#if defined(__GLIBC__) && __GLIBC_MINOR__ < 1
+#if defined(__GLIBC__)
 typedef u_int8_t __u8;
 typedef u_int16_t __u16;
 typedef u_int32_t __u32;
