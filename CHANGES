@@ -1,5 +1,7 @@
 Major changes between version 1.0 and 1.0.1
 ------------------------------------------------
+  - Get the correct clocks per second value for the return from
+    times() using sysconf(), CLK_TCK or HZ.
   - Use ip to set and remove addresses if we have it and specify the
     netmask.
 
