@@ -136,6 +136,11 @@ iface_start(char *mode, char *iftype, int ifunit,
     snprintf(desc+6, sizeof(desc)-6-1, "%s%d", iftype, ifunit);
     iface = desc+6;
 
+    if (monitors) {
+	sprintf(buf, "INTERFACE\n%s\n%s\n%s\n", desc+6, lip, rip);
+	mon_write(MONITOR_INTERFACE, buf, strlen(buf));
+    }
+
     /* mark the interface as up */
     if (ifsetup) {
 	sprintf(buf, "%s start %s %s",
@@ -158,11 +163,6 @@ iface_start(char *mode, char *iftype, int ifunit,
     }
 
     add_routes(desc, iface, lip, rip);
-
-    if (monitors) {
-	sprintf(buf, "INTERFACE\n%s\n%s\n%s\n", desc+6, lip, rip);
-	mon_write(MONITOR_INTERFACE, buf, strlen(buf));
-    }
 }
 
 
