@@ -1,5 +1,6 @@
 Major changes between version 0.99.5 and 1.0
 ------------------------------------------------
+  - Use openpty to get a pseudo terminal if it is available.
   - Added Makefile rule to build RPMs.
   - Changed to use GNU autoconf.
   - Added config save/restore to dctrl. Patch from someone but

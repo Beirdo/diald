@@ -471,18 +471,17 @@ void default_sigacts()
     SIGNAL(SIGTTOU, SIG_DFL);
 }
 
+#ifndef HAVE_PTY_H
 /*
  * Get a pty and open both the slave and master sides.
  */
 
-void get_pty(int *mfd, int *sfd)
+int openpty(int *mfd, int *sfd, void *name, void *termios, void *win)
 {
     char *ptys = "0123456789abcdef";
-    int i,c;
+    int i, c;
     static char buf[128];
 
-    /* FIXME: this is a crudy way to find a pty.
-     */
     for (c = 'p'; c <= 's'; c++)
         for (i = 0; i < 16; i++) {
 	    sprintf(buf,"/dev/pty%c%c",c,ptys[i]);
@@ -490,14 +489,15 @@ void get_pty(int *mfd, int *sfd)
 	    	sprintf(buf,"/dev/tty%c%c",c,ptys[i]);
 		if ((*sfd = open(buf,O_RDWR|O_NOCTTY|O_NDELAY)) < 0) {
 		    syslog(LOG_ERR,"Can't open slave side of pty: %m");
-		    die(1);
+		    return -1;
 		}
-		return;
+		return 0;
 	    }
         }
     syslog(LOG_ERR,"No pty found in range pty[p-s][0-9a-f]\n");
-    die(1);
+    return -1;
 }
+#endif
 
 /* Read a request from the command pipe.
  * Valid requests are:

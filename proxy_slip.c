@@ -9,6 +9,12 @@
  * distributed with this software for terms of use.
  */
 
+#if HAVE_PTY_H
+#  include <pty.h>
+#else
+extern int openpty(int *, int *, void *name, void *termios, void *win);
+#endif
+
 #include "diald.h"
 
 
@@ -219,8 +225,7 @@ proxy_slip_init(proxy_t *proxy, char *proxydev)
 {
     int d, unit, disc, sencap = 0;
 
-    get_pty(&d, &proxy_sfd);
-    if (d < 0)
+    if (openpty(&d, &proxy_sfd, NULL, NULL, NULL) < 0)
 	return -1;
     fcntl(d, F_SETFD, FD_CLOEXEC);
     proxy_mfp = fdopen(d, "r+");

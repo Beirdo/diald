@@ -362,7 +362,6 @@ void default_sigacts(void);
 void block_signals(void);
 void unblock_signals(void);
 void filter_setup(void);
-void get_pty(int *, int *);
 void proxy_start(void);
 void proxy_stop(void);
 void proxy_close(void);
