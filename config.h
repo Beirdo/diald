@@ -54,6 +54,12 @@
 #endif
 
 
+/* If defined then a fatal signal will print the eip that it
+ * ocurred at. This may or may not be useful.
+ */
+#define CONFIG_FATAL_EIP
+
+
 /*****************************************************************************
  * EVERYTHING BELOW HERE IS RUN TIME CONFIGURABLE
  * You can change these things if you want to save yourself some

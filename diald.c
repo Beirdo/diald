@@ -28,7 +28,7 @@
 #include "diald.h"
 #include "version.h"
 
-#ifndef __GLIBC__
+#if !defined(__GLIBC__) && defined(CONFIG_FATAL_EIP)
 #  include <asm/sigcontext.h>
 #endif
 
@@ -390,12 +390,19 @@ void stray_signal(int sig)
 	mon_syslog(LOG_ERR, "Stray signal %d ignored", sig);
 }
 
+#ifdef CONFIG_FATAL_EIP
 void fatal_signal(int sig, struct sigcontext_struct sc)
 {
 	mon_syslog(LOG_ALERT, "Fatal signal %d, eip=0x%08lx",
 		sig, sc.eip);
 	die(1);
 }
+#else
+void fatal_signal(int sig)
+{
+	die(1);
+}
+#endif
 
 void signal_setup()
 {

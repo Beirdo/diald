@@ -1,5 +1,17 @@
-Major changes between version 0.16 and 0.98.
---------------------------------------------
+Major changes between version 0.16 and 0.98.1.
+----------------------------------------------
+  - The "print eip on a fatal signal" code is controlled by a
+    flag in config.h.
+  - Hybrid mode support. If the device used starts with '/' the
+    configured mode (usually either ppp or a slip variant) is
+    used. Otherwise device mode is used. This should allow a
+    set of devices to mix, say, ippp<n> or isdn<n> with modem
+    fallback using ppp or slip. It is not currently possible
+    to mix ppp and slip - it is under consideration.
+
+
+Major changes between version 0.16 and 0.98.0.
+----------------------------------------------
   - Added a demand/nodemand option that controls whether outgoing
     connections are done on demand or not. Manual connections
     (using "up") work regardless or whether demand is enabled
