@@ -82,6 +82,11 @@ proxy_init(proxy_t *proxy, char *proxydev)
 		return proxy_dev_init(proxy, proxydev);
 	}
 
+#ifdef TUNTAP
+	if ((fd = proxy_tun_init(proxy, NULL)) >= 0)
+		return fd;
+#endif
+
 #ifdef AF_NETLINK
 	if ((fd = proxy_tap_init(proxy, NULL)) >= 0)
 		return fd;
