@@ -139,8 +139,29 @@ ignore udp tcp.source=udp.router
 # Anything else gest 2 minutes.
 accept udp 120 any
 
+
+# Rules for IGMP packets
+
+# Bring the link up for mtrace requests.
+accept igmp 10 igmp.vertype=IGMP_MTRACE
+
+# Bring the link up for new membership reports.
+accept igmp 10 igmp.vertype=IGMP_HOST_NEW_MEMBERSHIP_REPORT
+
+# All other IGMP packets are ignored but listed in the connection
+# queue for 5 seconds.
+ignore igmp 0:5 any
+
+
+# Rules for ICMP/ICMP6 packets
+
+# Bring the link up for ICMP echo requests.
+# Some may want to disable this...
+accept icmp 5 icmp.type=ICMP_ECHO
+accept icmp 5 icmp6.type=ICMP6_ECHO_REQUEST
+
+
 # Ignore some background protocols.
-ignore igmp any
 ignore ospfigp any
 
 # Catch any packets that we didn't catch above and give the connection
