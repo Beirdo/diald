@@ -338,7 +338,7 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    c->unit = unit;
 	    c->timer.data = (void *)c;
 	    c->timer.function = (void *)(void *)del_connection;
-	    if (unit->connections->next == unit->connections && monitors
+	    if (unit->connections->next == unit->connections
 	    && state != STATE_UP && !blocked && demand) {
 		c->description = desc_connection(c);
 		if (c->description)

@@ -13,8 +13,9 @@ Major changes between version 0.16 and 0.98.
     network traffic. This makes more sense because chargable
     duration is from the moment the physical layer (modem etc.)
     is connected and not from when the network layer is connected.
-  - Add beginnings of per-connection access flags to control
-    who can do what.
+  - Added per-connection access flags to control who can do what.
+    This applie only to TCP connections - not to FIFO connections
+    since the single control pipe is effectively shared by everyone.
   - Clean up of ctrl pipe handling for script output.
   - When the connect script times out we should go to STOP_DIAL.
   - Capture stderr output from scripts and feed it to syslog/monitors.
@@ -58,7 +59,7 @@ Major changes between version 0.16 and 0.98.
   - Glibc changes.
   - Add traffic stats on connections.
   - Sanitize dev handling.
-  - Add options to start in blocked or unblock(default) mode.
+  - Add options to start in blocked or unblocked (default) mode.
 
 * Dctrl changes:
   - Add a menu to allow the log level of the information window to
