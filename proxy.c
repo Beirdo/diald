@@ -196,8 +196,8 @@ void proxy_up(void)
     if (blocked && !blocked_route)
 	del_ptp("sl",proxy_iface,orig_remote_ip);
     else {
-	set_ptp("sl",proxy_iface,orig_remote_ip,1);
-	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	set_ptp("sl",proxy_iface,orig_remote_ip,metric+1);
+	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
     }
 }
 
@@ -228,7 +228,7 @@ void proxy_down()
 
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_INFO,"taking proxy device down");
-    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
 
     /* mark the interface as down */
     sprintf(buf,"%s sl%d down", path_ifconfig,proxy_iface);

@@ -1,5 +1,6 @@
 Major changes between version 0.16 and 0.98.2.
 ----------------------------------------------
+  - Added a metric option (inspired by Erik Muller).
   - Fixed a memory leak when the connection queue was flushed
     as the link came up.
   - Added the FLB fix (found on ftp.inr.ac.ru/ip-routing).

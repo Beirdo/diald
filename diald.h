@@ -187,6 +187,7 @@
 #define DEFAULT_FIRST_PACKET_TIMEOUT 120
 #define DEFAULT_DIAL_DELAY 30
 #define DEFAULT_MTU 1500
+#define DEFAULT_METRIC 0
 #define DEFAULT_SPEED 38400
 
 #ifdef SCHED_OTHER
@@ -211,6 +212,7 @@ int inspeed;
 int window;
 int mtu;
 int mru;
+int metric;
 char *link_name;
 char *link_desc;
 char *authsimple;

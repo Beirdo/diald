@@ -674,6 +674,13 @@ This only makes sense in PPP mode. This sets the size that pppd
 will ask the remote size to choose for its MTU. This may be useful
 to help obtain matching MTU settings on both ends of the PPP link.
 .TP
+.B metric \fI<n>
+Sets the metric for routes associated with this link to \fI<n>\fR.
+The default is 0. This is useful if you want diald to run as a
+backup for another network connection. Note that this value is
+for the actual link. Routes through the proxy will have a metric
+one greater.
+.TP
 .B  window \fI<s>
 This option specifies a TCP window size to place in routing table entries.
 Choosing a window size limits the number of bytes that a TCP connection

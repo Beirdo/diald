@@ -196,3 +196,6 @@ a full "reset" which is overkill and not always something you want.
 Log the pid of the ip-up script, put it in its own process group.
 If it is still around when we are about to take the link down
 kill it off first.
+
+dctrl appears to disconnect when diald goes from START_LINK to UP
+or DISCONNECT to CLOSE?
