@@ -1,3 +1,11 @@
+/*
+ * log.c - Message logging to monitors and syslog.
+ *
+ * Copyright (c) 1999 Mike Jagdis.
+ * All rights reserved. Please see the file LICENSE which should be
+ * distributed with this software for terms of use.
+ */
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>

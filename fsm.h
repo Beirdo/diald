@@ -2,6 +2,7 @@
  * fsm.h - Finite state machine control.
  *
  * Copyright (c) 1994, 1995, 1996 Eric Schenk.
+ * Copyright (c) 1999 Mike Jagdis.
  * All rights reserved. Please see the file LICENSE which should be
  * distributed with this software for terms of use.
  */

@@ -1,3 +1,11 @@
+/*
+ * proxy.h - Proxy interface stuff.
+ *
+ * Copyright (c) 1999 Mike Jagdis.
+ * All rights reserved. Please see the file LICENSE which should be
+ * distributed with this software for terms of use.
+ */
+
 typedef struct proxy proxy_t;
 
 struct proxy {

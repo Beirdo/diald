@@ -2,12 +2,9 @@
  * buffer.c - Packet buffering code.
  *
  * Copyright (c) 1994, 1995, 1996 Eric Schenk.
+ * Copyright (c) 1999 Mike Jagdis.
  * All rights reserved. Please see the file LICENSE which should be
  * distributed with this software for terms of use.
- *
- * FIXME: This stuff should probably record the protocol that the
- * packet came in over so that we can use that info when forwarding
- * the packet. (It may not always be coming in over IP!)
  */
 
 #include "diald.h"

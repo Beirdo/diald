@@ -1,3 +1,11 @@
+/*
+ * access.c - Monitor access stuff.
+ *
+ * Copyright (c) 1999 Mike Jagdis.
+ * All rights reserved. Please see the file LICENSE which should be
+ * distributed with this software for terms of use.
+ */
+
 #include <syslog.h>
 #include <string.h>
 #include <stdio.h>
