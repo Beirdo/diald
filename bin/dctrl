@@ -335,10 +335,12 @@ proc openMonitor {} {
     set monstate 0.0
     if { $diald_HOST != "" } {
 	# FIXME: should do a catch here?
+	set title "$diald_HOST:$diald_PORT"
         set fifofd [socket $diald_HOST $diald_PORT]
         set monfd $fifofd
         set monfifo "TCP [fconfigure $fifofd -sockname]"
     } elseif { $diald_FIFO != "" } {
+	set title "$diald_FIFO"
         set fifofd [open $diald_FIFO w]
         #
         set fifo_counter [expr "$fifo_counter+1"]
@@ -358,8 +360,8 @@ proc openMonitor {} {
     setMonitor
 
     if { $diald_TITLE == "" } {
-	wm title . "Diald: No link"
-	wm iconname . "Diald"
+	wm title . "Diald: $title"
+	wm iconname . "$title"
     }
     fileevent $monfd readable {readMonitor}
     .toolbar.up configure -state active
@@ -546,7 +548,7 @@ proc readMonitor {} {
 	{ STATE}	{ set monstate 1.0; return 0 }
 	{ STATUS}	{ set monstate 2.0; return 0 }
 	{ STATUS2}	{ set monstate 3.0; return 0 }
-	{ QUEUE}		{ set monstate 4.0
+	{ QUEUE}	{ set monstate 4.0
 			set queue_list [list]
 			return 0
 			}
