@@ -213,7 +213,7 @@ proxy_slip_release(proxy_t *proxy)
 int
 proxy_slip_init(proxy_t *proxy, char *proxydev)
 {
-    int d, disc, sencap = 0;
+    int d, unit, disc, sencap = 0;
 
     get_pty(&d, &proxy_sfd);
     if (d < 0)
@@ -228,7 +228,7 @@ proxy_slip_init(proxy_t *proxy, char *proxydev)
 
     /* change line disciple to SLIP and set the SLIP encapsulation */
     disc = N_SLIP;
-    if ((proxy->ifunit = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
+    if ((unit = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
 	if (errno == ENFILE) {
 	   mon_syslog(LOG_ERR,"No free slip device available for proxy."), die(1);
 	} else if (errno == EEXIST) {
@@ -253,10 +253,11 @@ proxy_slip_init(proxy_t *proxy, char *proxydev)
         mon_syslog(LOG_ERR,"Couldn't set up the proxy link correctly!"), die(1);
 
     if (debug&DEBUG_VERBOSE)
-        mon_syslog(LOG_INFO,"Proxy device established on interface %s%d",
-	    proxy->iftype, proxy->ifunit);
+        mon_syslog(LOG_INFO,"Proxy device established on interface sl%d",
+	    unit);
 
     strcpy(proxy->iftype, "sl");
+    proxy->ifunit = unit;
     proxy->send = proxy_slip_send;
     proxy->recv = proxy_slip_recv;
     proxy->init = proxy_slip_init;

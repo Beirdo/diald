@@ -112,24 +112,30 @@ proxy_tap_release(proxy_t *proxy)
 int
 proxy_tap_init(proxy_t *proxy, char *proxydev)
 {
-    for (proxy->ifunit=0; proxy->ifunit<16; proxy->ifunit++) {
+    int unit;
+
+    for (unit=0; unit<16; unit++) {
 	int d;
 	char buf[16];
 	struct sockaddr_nl nl;
 	struct ifreq ifr;
 
-	sprintf(buf, "tap%d", proxy->ifunit);
+	sprintf(buf, "tap%d", unit);
 	if (!(proxy_lock = lock(buf)))
 	    continue;
 
-	d = socket(AF_NETLINK, SOCK_RAW, NETLINK_TAPBASE+proxy->ifunit);
+	/* Does the interface actually *exist*?
+	 * N.B. You cannot do SIOCGIFINDEX on a netlink socket.
+	 */
+	strncpy(ifr.ifr_name, buf, IFNAMSIZ);
+	d = socket(AF_INET, SOCK_DGRAM, 0);
+	if (d < 0 || ioctl(d, SIOCGIFINDEX, &ifr) < 0)
+	    goto close_and_unlock;
+	close(d);
+
+	d = socket(AF_NETLINK, SOCK_RAW, NETLINK_TAPBASE+unit);
 	if (d < 0)
 	    goto unlock;
-
-	/* We have a socket but does the interface actually *exist*? */
-	strncpy(ifr.ifr_name, buf, IFNAMSIZ);
-	if (ioctl(d, SIOCGIFINDEX, &ifr) < 0)
-	    goto close_and_unlock;
 
 	memset(&nl, 0, sizeof(nl));
 	nl.nl_family = AF_NETLINK;
@@ -139,9 +145,10 @@ proxy_tap_init(proxy_t *proxy, char *proxydev)
 
 	if (debug&DEBUG_VERBOSE)
 	    mon_syslog(LOG_INFO,
-		"Proxy device established on interface %s%d",
-		proxy->iftype, proxy->ifunit);
+		"Proxy device established on interface tap%d",
+		unit);
 	strcpy(proxy->iftype, "tap");
+	proxy->ifunit = unit;
 	proxy->send = proxy_tap_send;
 	proxy->recv = proxy_tap_recv;
 	proxy->init = proxy_tap_init;
