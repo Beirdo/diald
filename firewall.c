@@ -874,7 +874,7 @@ check_packet(FW_unit *unit, FW_ID *id,
 #if 1 /* TCP KLUDGE */
     TCP_STATE lflags;
 #endif
-    clock_t clock = time(0);
+    time_t clock = time(0);
     FW_Connection *conn;
     struct iphdr * ip_pkt = (struct iphdr *)pkt;
 
@@ -1438,7 +1438,9 @@ int ctl_firewall(int op, struct firewall_req *req)
     case IP_FW_MCONN:
 	if (!req || !monitors) return -1; /* ERRNO */
 	{
-	    unsigned long atime = time(0);
+	    extern int call_timer_running;
+	    extern time_t call_start_time;
+	    time_t atime = time(0);
             unsigned long tstamp = timestamp();
 	    FW_Connection *c;
 #if 0
@@ -1450,7 +1452,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 
 	    mon_cork(1);
 
-	    sprintf(buf,"STATUS\n%d %d %d %d %d %d %s %s %s %c %c %c\n",
+	    sprintf(buf,"STATUS\n%d %d %d %d %d %d %s %s %s %c %c %c %d\n",
 		unit->up, unit->force, unit->impulse_mode,
 		impulse_init_time, impulse_time,
 		impulse_fuzz,
@@ -1461,7 +1463,8 @@ int ctl_firewall(int op, struct firewall_req *req)
 		pcountdown(tbuf3, next_alarm()),
 		(demand ? '1' : '0'),
 		(blocked ? '1' : '0'),
-		(forced ? '1' : '0')
+		(forced ? '1' : '0'),
+		call_timer_running ? atime - call_start_time : 0
 	    );
 	    mon_write(MONITOR_VER2|MONITOR_STATUS, buf, strlen(buf));
 

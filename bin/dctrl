@@ -80,6 +80,17 @@ proc _toolTipShow {w} {
 }
 
 
+proc user_duration { n } {
+    if { $n > 0 } {
+	format "%d days, %d hours, %d minutes, %d seconds" \
+	    [expr $n / (60*60*24) ] \
+	    [expr ($n / (60*60)) % 24 ] \
+	    [expr ($n / 60) % 60 ] \
+	    [expr $n % 60 ]
+    }
+}
+
+
 proc user_number { n } {
     if { $n > 1073741824 } {
 	format " %4.0fG" [expr $n/1073741824]
@@ -595,7 +606,8 @@ proc readMonitor {} {
 	    status(up) status(force) status(impmode) \
 	    status(imp_itime) status(imp_time) status(imp_fuzz) \
 	    status(imp_timeout) status(force_timeout) \
-	    status(timeout) demand blocked forced
+	    status(timeout) demand blocked forced uptime
+	set status(uptime) [user_duration $uptime]
 	set monstate 0.0
     } elseif {$monstate < 4.0} {
 # This was STATUS2 but it is no longer used.
@@ -883,6 +895,8 @@ label .basic.p5 -text " to "
 label .basic.p6 -textvar status(rip)
 label .basic.p7 -text " in state "
 label .basic.p8 -textvar status(fsm)
+label .basic.p9 -text " "
+label .basic.p10 -textvar status(uptime)
 pack .basic.p1 -side left
 pack .basic.p2 -side left
 pack .basic.p3 -side left
@@ -891,6 +905,8 @@ pack .basic.p5 -side left
 pack .basic.p6 -side left
 pack .basic.p7 -side left
 pack .basic.p8 -side left
+pack .basic.p9 -side left
+pack .basic.p10 -side left
 
 
 # Link status display
