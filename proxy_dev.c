@@ -90,7 +90,7 @@ proxy_dev_recv(proxy_t *proxy, unsigned char *p, size_t len)
 	af_packet ? from.sl.sll_protocol :
 #endif
 	htons(ETH_P_IP);
-    return len;
+    return len + sizeof(unsigned short);
 }
 
 

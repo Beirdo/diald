@@ -273,7 +273,7 @@ void ppp_reroute()
     /* Restore the original proxy. */
     if (proxy.start && (!blocked || blocked_route))
 	proxy.start(&proxy);
-    local_addr = inet_addr(orig_local_ip);
+    local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
     if (link_iface != -1)
     	iface_stop("ppp", link_iface, local_ip, remote_ip);

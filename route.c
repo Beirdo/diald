@@ -91,7 +91,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
     	report_system_result(res, buf);
     }
 
-    if (proxyarp) set_proxyarp(inet_addr(rip));
+    if (proxyarp && rip) set_proxyarp(inet_addr(rip));
 }
 
 
@@ -104,7 +104,7 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_DEBUG, "Removing routes for %s%d", iftype, ifunit);
 
-    if (proxyarp) clear_proxyarp(inet_addr(rip));
+    if (proxyarp && rip) clear_proxyarp(inet_addr(rip));
 
     if (delroute) {
 	/* call delroute <iface> <netmask> <local> <remote> */

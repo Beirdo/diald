@@ -179,7 +179,7 @@ void dev_reroute()
     /* Restore the original proxy. */
     if (proxy.start && (!blocked || blocked_route))
 	proxy.start(&proxy);
-    local_addr = inet_addr(orig_local_ip);
+    local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
     /* Kill the alternate routing */
     if (link_iface != -1)

@@ -247,7 +247,7 @@ int slip_set_addrs()
 	if (slip_rx_count() == rx_count) return 0;
     }
 
-    if (dynamic_addrs || force_dynamic) {
+    if ((dynamic_addrs || force_dynamic) && local_ip) {
 	local_addr = inet_addr(local_ip);
     }
 
@@ -280,7 +280,7 @@ void slip_reroute()
     /* Restore the original proxy. */
     if (proxy.start && (!blocked || blocked_route))
 	proxy.start(&proxy);
-    local_addr = inet_addr(orig_local_ip);
+    local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
     if (link_iface != -1)
     	iface_stop("sl", link_iface, local_ip, remote_ip);
