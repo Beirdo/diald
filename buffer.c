@@ -129,16 +129,19 @@ void forward_buffer()
         if (stamp+buffer_timeout >= ctime) {
 	    for (i = 0; i < clen; i++)
 		pkt[i] = B(head+6+i);
-	    /* Subtle point here: normally we forward packets on the
-	     *	"fwdfd" socket pointer. If we do this here, then
-	     * the packet we foward will get seen by the filter again.
-             * Since we've already seen these packets once, we don't
-             * care to see them again. If instead we forward them
-             * on the snoopfd (which points to the same device),
-             * then we will never get them back on snoopfd.
-             */
-	    if (sendto(snoopfd, pkt, clen, 0, to, to_len) < 0) {
-		mon_syslog(LOG_ERR,"Error forwarding data packet to physical device from buffer: %m");
+
+	    /* If we are using dynamic addresses we send the packet back
+	     * in to the kernel on the proxy so that it will go through
+	     * the firewall/masquerading rules again. It is up to the
+	     * user to enable and disable masquerading in ip-up/ip-down.
+	     * Masquerading a packet which was incorrectly masqueraded
+	     * to start with will never work :-).
+	     */
+	    if (dynamic_addrs) {
+		send_packet(pkt, clen);
+	    } else {
+		if (sendto(snoopfd, pkt, clen, 0, to, to_len) < 0)
+		    mon_syslog(LOG_ERR,"Error forwarding data packet to physical device from buffer: %m");
 	    }
 	}
 	head = (head+6+clen)%buffer_size;
