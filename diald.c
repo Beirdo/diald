@@ -370,6 +370,9 @@ void open_fifo()
     if (tcpport) {
 	if ((tcp_fd = socket(AF_INET, SOCK_STREAM, 0)) >= 0) {
 	    struct sockaddr_in sa;
+	    int opt = 1;
+	    setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR,
+		(void *)&opt, sizeof(opt));
 	    fcntl(tcp_fd, F_SETFD, FD_CLOEXEC);
 	    sa.sin_family = AF_INET;
 	    sa.sin_addr.s_addr = INADDR_ANY;
