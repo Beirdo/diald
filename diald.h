@@ -308,7 +308,6 @@ int proxy_mfd;			/* master pty fd */
 FILE *proxy_mfp;		/* also have an fp. Hackery for recv_packet. */
 int proxy_sfd;			/* slave pty fd */
 int modem_fd;			/* modem device fp (for slip links) */
-char packet[4096];		/* slip packet buffer */
 int modem_hup;			/* have we seen a modem HUP? */
 int request_down;		/* has the user requested link down? */
 int request_up;			/* has the user requested link up? */

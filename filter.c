@@ -159,8 +159,15 @@ void filter_read()
     } from;
     size_t from_len = sizeof(from);
     int len;
+    char packet[256];
 
-    if ((len = recvfrom(snoopfd,packet,4096,0,(struct sockaddr *)&from,&from_len)) > 0) {
+    /* N.B. The packet buffer only needs to be big enough for the longest
+     * header of any protocol we handle. Surplus data in a packet will
+     * be silently discarded by the kernel. Letting it be copied to
+     * user space is a waste of time and cache resources...
+     */
+
+    if ((len = recvfrom(snoopfd,packet,sizeof(packet),0,(struct sockaddr *)&from,&from_len)) > 0) {
 	/* FIXME: really if the bind succeeds, then I don't need
 	 * this check. How can I shortcut this effectly?
 	 * perhaps two different filter_read routines?
