@@ -1,5 +1,16 @@
 Major changes between version 0.16 and 0.98.2.
 ----------------------------------------------
+  - Check we have ifconfig and either ip or route.
+  - It is not an error not to have a connect script. We may not
+    be expecting to initiate outgoing connections. We may be using
+    a device which does not need a connect sequence or which manages
+    it automatically.
+  - Even if we are not in mode dev we can have devices which are
+    not character devices. They will be treated as mode dev devices
+    if we use them automatically. This allows for modem backup of
+    other interfaces, for instance.
+  - If we have no devices in the config it is not a fatal error. We may
+    just be sitting waiting to handle incoming connections.
   - External programs such as route, ifconfig etc. are now searched
     for automatically in /sbin and then /usr/sbin. If you wish you
     can specify paths either at compile time in config.h or run time

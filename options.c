@@ -746,27 +746,12 @@ void parse_options_file(char *file)
 
 void check_setup()
 {
-    struct stat st;
-    int i;
     int flag = 0;
 
-    if (device_count == 0) {
-	flag = 1,
-	mon_syslog(LOG_ERR,
-	    "No device specified. You must have at least one device!");
-    }
-
-    if (mode != MODE_DEV)
-	for (i = 0; i < device_count; i++)
-	    if (stat(devices[i],&st) < 0 || !S_ISCHR(st.st_mode))
-		flag = 1,
-		mon_syslog(LOG_ERR,
-		    "Specified device '%s' not a character device.",devices[0]);
-
-    if (!connector)
-	flag = 1,
-	mon_syslog(LOG_ERR,
-	    "You must define a connector script (option 'connect').");
+    if (!path_ifconfig)
+	flag = 1, mon_syslog(LOG_ERR,"No ifconfig program found.");
+    if (!path_ip && !path_route)
+	flag = 1, mon_syslog(LOG_ERR,"No ip or route programs found.");
     if (!remote_ip)
 	flag = 1, mon_syslog(LOG_ERR,"You must define the remote ip address.");
     else if (inet_addr(remote_ip) == -1)
@@ -778,10 +763,13 @@ void check_setup()
     else
     	local_addr = inet_addr(local_ip);
 
-    if (acctlog && (acctfp = fopen(acctlog,"a")) == NULL)
-	mon_syslog(LOG_ERR,"Can't open accounting log file %s: %m",acctlog);
-    else
-        if (acctfp) fclose(acctfp);
+    if (acctlog) {
+	if ((acctfp = fopen(acctlog,"a")) == NULL)
+	    mon_syslog(LOG_ERR, "Can't open accounting log file %s: %m",
+		acctlog);
+	else
+	    fclose(acctfp);
+    }
     
     if (flag) {
 	mon_syslog(LOG_ERR,"Terminating due to damaged reconfigure.");
