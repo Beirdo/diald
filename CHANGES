@@ -1,5 +1,7 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - Improve mode dev handling so we notice if the interface went
+    down for reasons beyond oor ken.
   - Added basic igmp and ospfigp protocol rules and set the
     standard and dynamic filters to ignore them by default.
   - Added my setup scripts under the "setup" directory.
@@ -11,7 +13,7 @@ Major changes between version 0.99.1 and 0.99.2.
   - Use close on exec flag rather than trying (and failing) to
     figure out what to close every time we fork and exec.
   - Allow the value for a debug fifo command to be given as
-    hax (0x...) or octal (0...).
+    hex (0x...) or octal (0...).
   - Removed spurious calls to {ppp,slip,dev}_reroute(). These
     were unnecessary (I think) and perhaps the reason why the
     idle filter socket sometimes seemed to stop receiving data.

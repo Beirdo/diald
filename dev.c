@@ -76,8 +76,8 @@ int dev_set_addrs()
 		current_dev);
 	    return 0;
 	}
-	if (!(ifr.ifr_flags & IFF_UP))
-	    return 0;	/* interface is not up yet */
+	if ((ifr.ifr_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
+	    return 0;	/* interface is not up and running yet */
 
 	if (route_wait) {
             /* set the initial rx counter once the link is up */
@@ -158,6 +158,17 @@ int dev_set_addrs()
 
 int dev_dead()
 {
+    /* If we think the interface is not dead we check its flags
+     * to see if it is still up and running.
+     */
+    if (!dead) {
+	struct ifreq ifr;
+	strncpy(ifr.ifr_name, current_dev, IFNAMSIZ);
+	ifr.ifr_name[IFNAMSIZ-1] = '\0';
+	if (ioctl(sockfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1
+	|| (ifr.ifr_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
+	    dead = 1;
+    }
     return (dead);
 }
 
@@ -183,13 +194,16 @@ int dev_rx_count()
 
 void dev_stop()
 {
-    /* FIXME: There should be something here that actually can shut
-     * down whatever is driving the ether device, or at least try.
-     * [The trick used by the ISDN people seems to be to hang up
-     * in the delroute scripts. The ip-down scripts make sense
-     * for this as well. This might well be good enough.]
+    /* If there is a requesting pid we assume it controls the
+     * interface in some way and kill it now. But we don't
+     * know this is the case...
      */
-    dead = 1;
+    if (!req_pid)
+	dead = 1;
+    else if (kill(req_pid, SIGINT) == -1 && errno == ESRCH) {
+	req_pid = 0;
+	dead = 1;
+    }
 }
 
 void dev_reroute()
@@ -212,12 +226,26 @@ void dev_reroute()
     }
 }
 
-/* Dummy proc. This should never get called */
 void dev_kill()
 {
+    /* If there is a requesting pid we assume it controls the
+     * interface in some way and kill it now. But we don't
+     * know this is the case...
+     */
+    if (!req_pid)
+	dead = 1;
+    else if (kill(req_pid, SIGKILL) == -1 && errno == ESRCH) {
+	req_pid = 0;
+	dead = 1;
+    }
 }
 
-/* Dummy proc. This should never get called */
 void dev_zombie()
 {
+    /* Maybe the requesting pid didn't control the interface
+     * in any way. Maybe the interface is supposed to stay
+     * up for some reason (ISDN for instance). At this stage
+     * we have little choice but to pretend it is dead.
+     */
+    dead = 1;
 }
