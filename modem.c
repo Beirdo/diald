@@ -359,6 +359,8 @@ int open_modem()
 
 	if (rotate_devices)
 	    rotate_offset = (rotate_offset+1)%device_count;
+
+	current_dev = strdup(current_dev);
     }
 
     if (current_dev[0] != '/')
@@ -488,6 +490,8 @@ void close_modem()
     if (current_dev && debug&DEBUG_VERBOSE)
         mon_syslog(LOG_INFO,"Closing %s", current_dev);
 
+    if (current_dev)
+	free(current_dev);
     current_dev = 0;
     if (modem_fd < 0)
  	return;

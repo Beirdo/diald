@@ -88,7 +88,7 @@ void do_config(void)
     parse_args(argc_save-1,argv_save+1);
     /* Do validity checks on the setup */
     check_setup();
-    /* FIXME: minor memory leak here */
+
     orig_local_ip = strdup(local_ip);
     orig_remote_ip = strdup(remote_ip);
 
@@ -619,7 +619,9 @@ void ctrl_read(PIPE *pipe)
 		    mon_syslog(LOG_ERR,"%s: bad parameters '%s' and '%s' to dynamic command ignored",
 			pipe->name, buf+j, buf+l);
 		} else {
+		    if (local_ip) free(local_ip);
 		    local_ip = strdup(buf+j);
+		    if (remote_ip) free(remote_ip);
 		    remote_ip = strdup(buf+l);
 		    force_dynamic = 1;
 		}

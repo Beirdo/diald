@@ -39,7 +39,7 @@ char *ip_up = 0;
 char *ip_down = 0;
 char *ip_goingdown = 0;
 char *acctlog = 0;
-char *pidlog = "diald.pid";
+char *pidlog = 0;
 char *fifoname = 0;
 int tcpport = 0;
 int demand = 1;
@@ -234,9 +234,13 @@ struct {
 
 void init_vars()
 {
-    /* FIXME: there are many strdup'd strings here that we just
-     * drop whenever a monitor issues a "reset" command...
-     */
+    int i;
+
+    if (device_count) {
+	for (i=0; i<device_count; i++)
+	    free(devices[i]);
+	free(devices);
+    }
     devices = 0;
     device_count = 0;
     inspeed = DEFAULT_SPEED;
@@ -244,26 +248,46 @@ void init_vars()
     mtu = DEFAULT_MTU;
     mru = DEFAULT_MTU;
     metric = DEFAULT_METRIC;
+    if (link_name) free(link_name);
     link_name = 0;
+    if (link_desc) free(link_desc);
     link_desc = 0;
+    if (authsimple) free(authsimple);
     authsimple = 0;
+    if (initializer) free(initializer);
     initializer = 0;
+    if (deinitializer) free(deinitializer);
     deinitializer = 0;
+    if (connector) free(connector);
     connector = 0;
+    if (disconnector) free(disconnector);
     disconnector = 0;
+    if (local_ip) free(local_ip);
     local_ip = 0;
     local_addr = 0;
+    if (orig_local_ip) free(orig_local_ip);
     orig_local_ip = 0;
+    if (netmask) free(netmask);
     netmask = 0;
+    if (remote_ip) free(remote_ip);
     remote_ip = 0;
+    if (orig_remote_ip) free(orig_remote_ip);
     orig_remote_ip = 0;
+    if (addroute) free(addroute);
     addroute = 0;
+    if (delroute) free(delroute);
     delroute = 0;
+    if (ip_up) free(ip_up);
     ip_up = 0;
+    if (ip_down) free(ip_down);
     ip_down = 0;
+    if (ip_goingdown) free(ip_goingdown);
     ip_goingdown = 0;
+    if (acctlog) free(acctlog);
     acctlog = 0;
-    pidlog = "diald.pid";
+    if (pidlog) free(pidlog);
+    pidlog = strdup("diald.pid");
+    if (fifoname) free(fifoname);
     fifoname = 0;
     acctfp = 0;
     mode = MODE_SLIP;
@@ -301,13 +325,20 @@ void init_vars()
     redial_backoff_start = -1;
     redial_backoff_limit = 600;
     dial_fail_limit = 0;
+    if (lock_prefix) free(lock_prefix);
     lock_prefix = LOCK_PREFIX;
     pidstring = PIDSTRING;
+    if (run_prefix) free(run_prefix);
     run_prefix = RUN_PREFIX;
+    if (path_ip) free(path_ip);
     path_ip = PATH_IP;
+    if (path_route) free(path_route);
     path_route = PATH_ROUTE;
+    if (path_ifconfig) free(path_ifconfig);
     path_ifconfig = PATH_IFCONFIG;
+    if (path_bootpc) free(path_bootpc);
     path_bootpc = PATH_BOOTPC;
+    if (path_pppd) free(path_pppd);
     path_pppd = PATH_PPPD;
     buffer_packets = BUFFER_PACKETS;
     buffer_size = BUFFER_SIZE;
@@ -319,6 +350,12 @@ void init_vars()
 #ifdef SIOCSOUTFILL
     outfill = 0;
 #endif
+
+    if (pppd_argv) {
+	for (i = 0; i < pppd_argc; i++)
+	    free(pppd_argv[i]);
+	free(pppd_argv);
+    }
 }
 
 void set_int(int *var, char **argv)
@@ -328,6 +365,7 @@ void set_int(int *var, char **argv)
 
 void set_str(char **var, char **argv)
 {
+    if (*var) free (*var);
     *var = strdup(*argv);
 }
 
@@ -470,13 +508,7 @@ void usage(void)
 void copy_pppd_args(int argc, char *argv[])
 {
     int i;
-#ifdef NO_MEM_LEAKS
-    if (pppd_argv) {
-	while (i = 0; i < argc; i++)
-	    free(pppd_argv[i]);
-	free(pppd_argv);
-    }
-#endif
+
     pppd_argv = malloc(sizeof(char **)*argc);
     for (i = 0; i < argc; i++) {
 	pppd_argv[i] = strdup(argv[i]);

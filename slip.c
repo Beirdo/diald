@@ -87,6 +87,7 @@ static int grab_addr(char **var)
 	}
     }
 done:
+    if (*var) free(*var);
     *var = strdup(buffer);
     return 1;
 }
@@ -213,9 +214,11 @@ int slip_set_addrs()
 		if (sscanf(buf,"%[^=]=%s\n",type,addr) == 2) {
 		    if (strcmp(type,"SERVER")==0) {
 			have_remote = 1;
+			if (remote_ip) free(remote_ip);
 			remote_ip = strdup(addr);
 		    } else if (strcmp(type,"IPADDR")==0) {
 			have_local = 1;
+			if (local_ip) free(local_ip);
 			local_ip = strdup(addr);
 		    }
 		}

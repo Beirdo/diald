@@ -113,9 +113,11 @@ int dev_set_addrs()
 	    /* only do the configuration in dynamic mode. */
 	    struct in_addr addr;
 	    addr.s_addr = raddr;
-	    strcpy(remote_ip,inet_ntoa(addr));
+	    if (remote_ip) free(remote_ip);
+	    remote_ip = strdup(inet_ntoa(addr));
 	    addr.s_addr = laddr;
-	    strcpy(local_ip,inet_ntoa(addr));
+	    if (local_ip) free(local_ip);
+	    local_ip = strdup(inet_ntoa(addr));
 	    local_addr = laddr;
 	    mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 		local_ip,remote_ip);
