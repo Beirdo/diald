@@ -191,12 +191,12 @@ void proxy_up(void)
 	    proxy_iface);
 
     /* Mark the interface as up */
-    proxy_config(orig_local_ip,orig_remote_ip);
     /* set the routing to the interface */
-    if (blocked && !blocked_route)
-	del_ptp("sl",proxy_iface,orig_remote_ip);
-    else {
-	set_ptp("sl",proxy_iface,orig_remote_ip,metric+1);
+    proxy_config(orig_local_ip,orig_remote_ip);
+    if (blocked && !blocked_route) {
+	del_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+    } else {
+	set_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
 	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
     }
 }

@@ -427,6 +427,11 @@ Write lock files in binary format.
 Set the directory where diald writes out its PID file.
 By default this is "/var/run".
 .TP
+.B path-ip \fI<path>
+Set the path to the ip command. There is no default for this as this
+command may not be installed on all systems yet. If this is specified
+diald will use ip in preference to the route command.
+.TP
 .B path-route \fI<path>
 Set the path to the route command. By default this is "/sbin/route".
 Diald must have the correct setting for this path in order to function.

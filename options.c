@@ -48,6 +48,7 @@ int blocked_route = 1;
 char *lock_prefix = LOCK_PREFIX;
 int pidstring = PIDSTRING;
 char *run_prefix = RUN_PREFIX;
+char *path_ip = PATH_IP;
 char *path_route = PATH_ROUTE;
 char *path_ifconfig = PATH_IFCONFIG;
 char *path_bootpc = PATH_BOOTPC;
@@ -184,6 +185,7 @@ struct {
     {"pidstring","",0,&pidstring,set_flag},
     {"-pidstring","",0,&pidstring,clear_flag},
     {"run-prefix","<path>",1,&run_prefix,set_str},
+    {"path-ip","<path>",1,&path_ip,set_str},
     {"path-route","<path>",1,&path_route,set_str},
     {"path-ifconfig","<path>",1,&path_ifconfig,set_str},
     {"path-bootpc","<path>",1,&path_bootpc,set_str},
@@ -302,6 +304,7 @@ void init_vars()
     lock_prefix = LOCK_PREFIX;
     pidstring = PIDSTRING;
     run_prefix = RUN_PREFIX;
+    path_ip = PATH_IP;
     path_route = PATH_ROUTE;
     path_ifconfig = PATH_IFCONFIG;
     path_bootpc = PATH_BOOTPC;
@@ -413,7 +416,9 @@ void set_blocked(int *var, char **argv)
 {
     if (!blocked_route && state == STATE_DOWN && *var == 0) {
 	del_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
-	del_ptp("sl", proxy_iface, orig_remote_ip);
+#if 0 /* del_routes does a del_ptp as well */
+	del_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+#endif
     }
     *var = 1;
 }
@@ -421,7 +426,7 @@ void set_blocked(int *var, char **argv)
 void clear_blocked(int *var, char **argv)
 {
     if (!blocked_route && state == STATE_DOWN && *var == 1) {
-	set_ptp("sl", proxy_iface, orig_remote_ip, metric+1);
+	set_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
 	add_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
     }
     *var = 0;
@@ -430,7 +435,7 @@ void clear_blocked(int *var, char **argv)
 void set_blocked_route(int *var, char **argv)
 {
     if (blocked && state == STATE_DOWN && *var == 0) {
-	set_ptp("sl", proxy_iface, orig_remote_ip, metric+1);
+	set_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
 	add_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
     }
     *var = 1;
@@ -440,7 +445,9 @@ void clear_blocked_route(int *var, char **argv)
 {
     if (blocked && state == STATE_DOWN && *var == 1) {
 	del_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
-	del_ptp("sl", proxy_iface, orig_remote_ip);
+#if 0 /* del_routes does a del_ptp as well */
+	del_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+#endif
     }
     *var = 0;
 }

@@ -202,22 +202,21 @@ int ppp_set_addrs()
 	     * clobbers all the routes.
 	     */
 	    proxy_config(local_ip,remote_ip);
-	    set_ptp("sl",proxy_iface,remote_ip,metric+1);
+	    set_ptp("sl", proxy_iface, local_ip, remote_ip, metric+1);
 	    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
 	    add_routes("sl",proxy_iface,local_ip,remote_ip,metric+1); 
 	}
 
-#if 1
 	/* This is redundant in normal operation, but if we
 	 * have to restart the link, then this is necessary...
 	 */
-	set_ptp("ppp",link_iface,remote_ip,metric+0);
-#endif
+	set_ptp("ppp", link_iface, local_ip, remote_ip, metric+0);
 
 	if (do_reroute) {
-	     add_routes("ppp",link_iface,local_ip,remote_ip,metric+0);
-	     del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
+	    add_routes("ppp",link_iface,local_ip,remote_ip,metric+0);
+	    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
 	}
+
 	return 1;
     }
     return 0;
@@ -293,9 +292,9 @@ void ppp_reroute()
      */
     proxy_config(orig_local_ip,orig_remote_ip);
     if (blocked && !blocked_route)
-	del_ptp("sl",proxy_iface,orig_remote_ip);
+	del_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
     else {
-	set_ptp("sl",proxy_iface,orig_remote_ip,metric+1);
+	set_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
 	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
     }
     local_addr = inet_addr(orig_local_ip);

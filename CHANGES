@@ -1,5 +1,7 @@
 Major changes between version 0.16 and 0.98.2.
 ----------------------------------------------
+  - Allow the use of the "ip" program rather than "route".
+  - Handle the auto-route creation in Linux 2.2.
   - Performance improvements to dctrl.
   - Added a metric option (inspired by Erik Muller).
   - Fixed a memory leak when the connection queue was flushed

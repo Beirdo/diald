@@ -199,3 +199,7 @@ kill it off first.
 
 dctrl appears to disconnect when diald goes from START_LINK to UP
 or DISCONNECT to CLOSE?
+
+The program paths (ifconfig, route, ip etc.) should be verified as
+part of the config checks. If we don't have enough to make things
+work we should not try to do anything.

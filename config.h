@@ -28,8 +28,8 @@
  * applies to TCP monitor connections. The full list of access
  * flags can be found in access.h.
  *   N.B. If ACCESS_CONTROL is not set then *anything* received
- * on the pipe is treated as a message and no command are possible.
- * If ACCESS_ACCESS is not set then the "access" command may not
+ * on the pipe is treated as a message and no commands are possible.
+ * If ACCESS_AUTH is not set then the "auth" command may not
  * be used to get other than the default access capabilities.
  */
 #define CONFIG_DEFAULT_ACCESS \
@@ -90,6 +90,13 @@
  */
 #define PATH_ROUTE	"/sbin/route"
 #define PATH_IFCONFIG	"/sbin/ifconfig"
+
+/*
+ * The "ip" program is the preferred way to set routes on Linux 2.2
+ * and beyond. Either specify the path here or use the "path-ip"
+ * config option.
+ */
+#define PATH_IP		NULL
 
 /*
  * Diald needs to know where to find the bootpc binary in order to

@@ -9,34 +9,69 @@
 #include "diald.h"
 
 /* set up a point to point route for a device */
-void set_ptp(char *itype, int iface, char *rip, int metric)
+void
+set_ptp(char *itype, int iface, char *lip, char *rip, int metric)
 {
-    char buf[128];
     char win[32];
-    int res;
+    char buf[1024];
+
     if (window == 0)
 	win[0] = 0;
     else
     	sprintf(win,"window %d",window);
+
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_DEBUG, "Setting pointopoint route for %s%d",itype,iface);
-    sprintf(buf,"%s add %s metric %d %s dev %s%d",
-	path_route,rip,metric,win,itype,iface); 
-    res = system(buf);
-    report_system_result(res,buf);
+
+    /* If metric changes changed routes instead of adding duplicates
+     * (except for the metric) this would not be necessary.
+     * We do the delete first because if the following replace does
+     * a replace rather than an add a following delete would delete
+     * the _only_ route and not one of a pair. (Yeah, I lack confidence)
+     * This may open a routeless window sometimes...
+     * N.B. This is not needed for Linux 2.0 which did not auto add
+     * routes when interfaces were configured. Deleting non-existent
+     * routes is not a problem however.
+     */
+    if (metric || !path_ip) {
+	if (path_ip) {
+	    sprintf(buf,"%s route del %s dev %s%d scope link src %s metric 0",
+		path_ip, rip, itype, iface, lip); 
+	} else {
+	    sprintf(buf,"%s del %s metric 0 dev %s%d",
+		path_route, rip, itype, iface); 
+	}
+
+	system(buf);
+    }
+
+    if (path_ip) {
+	sprintf(buf,"%s route replace %s dev %s%d scope link src %s metric %d %s",
+	    path_ip, rip, itype, iface, lip, metric, win); 
+    } else {
+	sprintf(buf,"%s add %s metric %d %s dev %s%d",
+	    path_route, rip, metric, win, itype, iface); 
+    }
+
+    system(buf);
 }
 
 /* delete a point to point route for a device */
-void del_ptp(char *itype, int iface, char *rip)
+void del_ptp(char *itype, int iface, char *lip, char *rip, int metric)
 {
-    char buf[128];
-    int res;
+    char buf[1024];
+
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_DEBUG, "Deleting pointopoint route for %s%d",itype,iface);
-    sprintf(buf,"%s del %s dev %s%d",
-	path_route,rip,itype,iface); 
-    res = system(buf);
-    report_system_result(res,buf);
+    if (path_ip) {
+	sprintf(buf,"%s route del %s dev %s%d scope link src %s metric %d",
+	    path_ip, rip, itype, iface, lip, metric); 
+    } else {
+	sprintf(buf,"%s del %s dev %s%d",
+	    path_route, rip, itype, iface); 
+    }
+
+    system(buf);
 }
 
 /*
@@ -47,9 +82,9 @@ void del_ptp(char *itype, int iface, char *rip)
 
 void add_routes(char *itype, int iface, char *lip, char *rip, int metric)
 {
-    char buf[128];
-    char win[32];
     int res;
+    char win[32];
+    char buf[1024];
 
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_DEBUG,"Establishing routes for %s%d",itype,iface);
@@ -58,8 +93,11 @@ void add_routes(char *itype, int iface, char *lip, char *rip, int metric)
 	win[0] = 0;
     else
     	sprintf(win,"window %d",window);
-    sprintf(buf,"INTERFACE\n%s%d\n%s\n%s\n", itype, iface, lip, rip);
-    if (monitors) mon_write(MONITOR_INTERFACE,buf,strlen(buf));
+
+    if (monitors) {
+	sprintf(buf, "INTERFACE\n%s%d\n%s\n%s\n", itype, iface, lip, rip);
+	mon_write(MONITOR_INTERFACE, buf, strlen(buf));
+    }
 
     /* Add in a default route for the link */
     /* FIXME: should this refuse to add if a default route exists? */
@@ -68,8 +106,13 @@ void add_routes(char *itype, int iface, char *lip, char *rip, int metric)
      *        (A new error reported by more recent kernels.)
      */
     if (default_route) {
-	sprintf(buf,"%s add default metric %d %s netmask 0.0.0.0 dev %s%d",
-		path_route,metric,win,itype,iface);
+	if (path_ip) {
+	    sprintf(buf, "%s route add default dev %s%d scope link src %s metric %d %s",
+		path_ip, itype, iface, lip, metric, win); 
+	} else {
+	    sprintf(buf,"%s add default metric %d %s netmask 0.0.0.0 dev %s%d",
+		path_route, metric, win, itype, iface);
+	}
         res = system(buf);
     	report_system_result(res,buf);
     }
@@ -91,8 +134,8 @@ void add_routes(char *itype, int iface, char *lip, char *rip, int metric)
  */
 void del_routes(char *itype, int iface, char *lip, char *rip, int metric)
 {
-    char buf[128];
     int res;
+    char buf[1024];
 
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_DEBUG,"Removing routes for %s%d",itype,iface);
@@ -106,7 +149,13 @@ void del_routes(char *itype, int iface, char *lip, char *rip, int metric)
      * whole question of the need for a delroute script.
      */
     if (default_route) {
-	sprintf(buf,"%s del default metric %d netmask 0.0.0.0 dev %s%d",path_route,metric,itype,iface);
+	if (path_ip) {
+	    sprintf(buf, "%s route del default dev %s%d scope link src %s metric %d",
+		path_ip, itype, iface, lip, metric); 
+	} else {
+	    sprintf(buf, "%s del default metric %d netmask 0.0.0.0 dev %s%d",
+		path_route,metric,itype,iface);
+	}
         system(buf);
     }
 
@@ -118,8 +167,5 @@ void del_routes(char *itype, int iface, char *lip, char *rip, int metric)
         report_system_result(res,buf);
     }
 
-    if (debug&DEBUG_VERBOSE)
-	mon_syslog(LOG_DEBUG, "Deleting pointopoint route for %s%d",itype,iface);
-    sprintf(buf,"%s del %s metric %d dev %s%d",path_route,rip,metric,itype,iface); 
-    res = system(buf);
+    del_ptp(itype, iface, lip, rip, metric);
 }

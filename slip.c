@@ -184,10 +184,8 @@ void slip_start(void)
     res = system(buf);
     report_system_result(res,buf);
 
-#if 1
     /* Set the routing for the new slip interface */
-    set_ptp("sl",link_iface,remote_ip,metric+0);
-#endif
+    set_ptp("sl", link_iface, local_ip, remote_ip, metric+0);
 
     /* run bootp if it is asked for */
     if (dynamic_addrs && dynamic_mode == DMODE_BOOTP && !force_dynamic) start_bootp();
@@ -253,22 +251,20 @@ int slip_set_addrs()
     res = system(buf);
     report_system_result(res,buf);
 
-#if 1
-    /* Set the routing for the new slip interface */
-    set_ptp("sl",link_iface,remote_ip,metric+0);
-#endif
-
-    if (dynamic_addrs || force_dynamic) {
-	local_addr = inet_addr(local_ip);
-    }
-
     /* have to reset the proxy if we won't be rerouting... */
     if (!do_reroute
     && ((dynamic_addrs || force_dynamic) || (blocked && !blocked_route))) {
 	proxy_config(local_ip,remote_ip);
-	set_ptp("sl",proxy_iface,remote_ip,metric+1);
+	set_ptp("sl", proxy_iface, local_ip, remote_ip, metric+1);
 	del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
 	add_routes("sl",proxy_iface,local_ip,remote_ip,metric+1);
+    }
+
+    /* Set the routing for the new slip interface */
+    set_ptp("sl", link_iface, local_ip, remote_ip, metric+0);
+
+    if (dynamic_addrs || force_dynamic) {
+	local_addr = inet_addr(local_ip);
     }
 
     if (do_reroute) {
@@ -301,9 +297,9 @@ void slip_reroute()
     /* Restore the original proxy routing */
     proxy_config(orig_local_ip,orig_remote_ip);
     if (blocked && !blocked_route)
-	del_ptp("sl",proxy_iface,orig_remote_ip);
+	del_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
     else {
-	set_ptp("sl",proxy_iface,orig_remote_ip,metric+1);
+	set_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
 	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
     }
     local_addr = inet_addr(orig_local_ip);
