@@ -4,11 +4,20 @@ exec wish "$0" "$@"
 
 # User tunable parameters
 set default_FIFO "/etc/diald/diald.ctl"
+set default_HOST ""
+set default_PORT 0
 
 # Default globals
 set monfifo ""
 set monfd ""
 set fifofd ""
+set fifo_counter 0
+
+# Initial values
+set out_usage bps
+set in_usage bps
+set out_bandwidth [expr 33600 / 8]
+set in_bandwidth [expr 33600 / 8]
 
 # strip chart code
 proc stripchart {win x y label} {
@@ -144,21 +153,33 @@ wm iconname . "Diald"
 wm minsize . 1 1
 
 proc print_usage {} {
-	puts {Usage dctrl [-i|-animated-icon] [-c|-control-window] [-iconic] [-fifo <name>] [-dstatus] [-tload] [-gload] [-pqueue] [-dlog]}
+	puts {Usage dctrl [-title <title>] [-fifo <name>] [-host <host> -port <port>] [-i|-animated-icon] [-c|-control-window] [-iconic] [-dstatus] [-tload] [-gload] [-pqueue] [-dlog]}
 	exit
 }
 
 # Deal with command line options
 set previous ""
 foreach i $argv {
-	if {"$previous"=="-fifo"} {
+	if {"$previous"=="-title"} {
+		wm title . $i
+		set previous ""
+	} elseif {"$previous"=="-fifo"} {
 		set default_FIFO $i
 		set previous ""
+	} elseif {"$previous"=="-host"} {
+		set default_HOST $i
+		set previous ""
+	} elseif {"$previous"=="-port"} {
+		set default_PORT $i
+		set previous ""
 	} elseif {"$i"=="-i"} { set fancy_icon 1 } \
+	elseif {"$i"=="-title"} { set previous $i } \
 	elseif {"$i"=="-animated-icon"} { set fancy_icon 1 } \
 	elseif {"$i"=="-c"} { set fancy_icon 2 } \
 	elseif {"$i"=="-control-window"} { set fancy_icon 2 } \
 	elseif {"$i"=="-fifo"} { set previous $i } \
+	elseif {"$i"=="-host"} { set previous $i } \
+	elseif {"$i"=="-port"} { set previous $i } \
 	elseif {"$i"=="-iconic"} {wm iconify .} \
         elseif {"$i"=="-dstatus"} { set dstatus 1 } \
 	elseif {"$i"=="-tload"} { set tload 1 } \
@@ -210,20 +231,41 @@ if {"$fancy_icon"==1} { wm iconwindow . .dctrlIcon }
 # MONITOR_QUEUE           0x0020
 #
 
+proc killFifo {} {
+    global monfifo monfd default_HOST
+    if {$monfd!=""} {close $monfd}
+    if { $default_HOST == "" } {
+        if {$monfifo!=""} {catch {exec rm -f $monfifo}}
+    }
+    set monfd ""
+    set monfifo ""
+}
+
 proc openFifo {} {
-    global fifofd monfifo monfd default_FIFO
+    global fifofd monfifo monfd default_FIFO default_HOST default_PORT fifo_counter
 
     # Turn off any previous monitoring
-    if {$monfd!=""} {close $monfd}
-    if {$monfifo!=""} {catch {exec rm -f $monfifo}}
+    killFifo
 
     # get new monitoring fifo
-    set fifofd [open $default_FIFO w]
-
-    set monfifo /tmp/dctrl.[pid]
-    catch {exec mkfifo -m 0600 $monfifo}
+    if { $default_HOST != "" } {
+        set fifofd [socket $default_HOST $default_PORT]
+        set monfd $fifofd
+        set monfifo "TCP [fconfigure $fifofd -sockname]"
+    } else {
+        set fifofd [open $default_FIFO w]
+        #
+        set fifo_counter [expr "$fifo_counter+1"]
+        set monfifo /tmp/dctrl.[pid]-$fifo_counter
+        # If an event comes along that causes a signal, then
+        # it is possible the exec above gets exited BEFORE
+        # it finishes waiting. Nasty stuff.
+        # so, we do a little loop until we can confirm the fifo exists
+        # before we ask diald to deal with it.
+        catch {exec mkfifo -m 0600 $monfifo}
+        set monfd [open $monfifo r+]
+    }
     fifoCmd "monitor $monfifo"
-    set monfd [open $monfifo r]
     fileevent $monfd readable {stateChange}
 }
 
@@ -262,8 +304,21 @@ proc updateIcon {} {
 
 
 
+proc user_number { n } {
+    if { $n > 1073741824 } {
+	format " %4dG" [expr $n/1073741824]
+    } elseif { $n > 1048576 } {
+	format " %4dM" [expr $n/1048576]
+    } elseif { $n > 1024 } {
+	format " %4dk" [expr $n/1024]
+    } else {
+	format " %4d " $n
+    }
+}
+
 proc stateChange {} {
     global monfd status trans colors gload tload
+    global in_usage out_usage in_bandwidth out_bandwidth
     set foo [gets $monfd]
     if {$foo=="STATE"} {
 	set status(fsm) [gets $monfd]
@@ -287,7 +342,25 @@ proc stateChange {} {
 	set lst [list]
 	.queue.vis.text delete 0.0 end
 	while {$foo!="END QUEUE"} {
-	    lappend lst $foo
+	    set desc [string range $foo 0 59]
+	    scan [string range $foo 61 end] \
+		"%ld %ld %ld %ld %ld %ld" \
+		outp outb outtot inp inb intot
+	    set foo ""
+	    lappend lst [append $foo $desc \
+		[switch $in_usage {
+			pps { user_number $inp }
+			bps { user_number $inb }
+			lbp { format " %4d%%" [expr $inb*100/$in_bandwidth] }
+			tot { user_number $intot }
+		}] \
+		[switch $out_usage {
+			pps { user_number $outp }
+			bps { user_number $outb }
+			lbp { format " %4d%%" [expr $outb*100/$out_bandwidth] }
+			tot { user_number $outtot }
+		}]
+	    ]
 	    set foo [gets $monfd]
 	}
 	foreach i $lst {
@@ -396,6 +469,30 @@ menu .menu.options.m
 .menu.options.m add check -label "Dialing Log" -underline 8 \
 	-variable dlog -command { repack }
 pack .menu.options -side left
+
+menubutton .menu.in_traffic -text "Traffic In" -menu .menu.in_traffic.m -underline 0
+menu .menu.in_traffic.m
+.menu.in_traffic.m add radiobutton -label {Packets per second} \
+	-variable in_usage -value pps
+.menu.in_traffic.m add radiobutton -label {Bytes per second} \
+	-variable in_usage -value bps
+.menu.in_traffic.m add radiobutton -label {Link Bandwidth %} \
+	-variable in_usage -value lbp
+.menu.in_traffic.m add radiobutton -label {Bytes Total} \
+	-variable in_usage -value tot
+pack .menu.in_traffic -side left
+
+menubutton .menu.out_traffic -text "Traffic Out" -menu .menu.out_traffic.m -underline 0
+menu .menu.out_traffic.m
+.menu.out_traffic.m add radiobutton -label {Packets per second} \
+	-variable out_usage -value pps
+.menu.out_traffic.m add radiobutton -label {Bytes per second} \
+	-variable out_usage -value bps
+.menu.out_traffic.m add radiobutton -label {Link Bandwidth %} \
+	-variable out_usage -value lbp
+.menu.out_traffic.m add radiobutton -label {Bytes total} \
+	-variable out_usage -value tot
+pack .menu.out_traffic -side left
 
 # Basic status display
 frame .basic
@@ -521,7 +618,7 @@ frame .queue -bor 0
 label .queue.label -text "Connection Queue"
 frame .queue.bar -height 2 -bor 1 -rel sunken
 frame .queue.vis -bor 0
-text .queue.vis.text -bor 0 -yscrollcommand ".queue.vis.scroll set" -height 6 -width 60 -highlightthickness 0
+text .queue.vis.text -bor 0 -yscrollcommand ".queue.vis.scroll set" -height 6 -width 72 -highlightthickness 0
 scrollbar .queue.vis.scroll -relief sunken -command ".queue.vis.text yview" -highlightthickness 0
 pack .queue.vis.text -side left -fill both -expand 1 -pady 0
 pack .queue.vis.scroll -side right -fill y -pady 0

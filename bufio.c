@@ -8,14 +8,18 @@
 
 #include "diald.h"
 
-void pipe_init(int fd,PIPE *pipe)
+void pipe_init(int fd,PIPE *pipe, int flush)
 {
     char buf[2];
     pipe->fd = fd;
     pipe->count = 0;
     fcntl(fd,F_SETFL,fcntl(fd,F_GETFL)|O_NONBLOCK);
-    /* clear out any old garbage from the FIFO */
-    while (read(fd,buf,1) > 0);
+    pipe->next = pipes;
+    pipes = pipe;
+    if (flush) {
+        /* clear out any old garbage from the FIFO */
+        while (read(fd,buf,1) > 0);
+    }
 }
 
 /* Read from the file descriptor, and
@@ -34,7 +38,7 @@ int pipe_read(PIPE *pipe)
 	pipe->count += i;
 	return pipe->count;
     } else {
-	if (errno == EAGAIN)
+	if (i == 0 || errno == EAGAIN)
 	    syslog(LOG_ERR,"EOF on control fifo. Closing fifo.");
 	else
 	    syslog(LOG_ERR,"Error on control fifo: %m");

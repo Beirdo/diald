@@ -121,6 +121,7 @@ struct firewall_req {
 #define IP_FW_WAIT	15	/* check if we are done waiting for
 				 * routing packet */
 #define IP_FW_RESET_WAITING 16
+#define IP_FW_MCONN_INIT 17	/* initialize connection monitoring */
 
 /*
  * Internal data structures.
@@ -156,6 +157,9 @@ typedef struct tcp_state {
 typedef struct fw_connection {
     struct timer_lst timer;		/* timer for this connection */
     FW_ID id;				/* identifier for this connection */
+    unsigned long packets[2];		/* packet counts out/in */
+    unsigned long bytes[2];		/* byte count out/in */
+    unsigned long bytes_total[2];	/* total byte count out/in */
     TCP_STATE tcp_state;		/* TCP state information */
     struct fw_unit *unit;		/* Unit this connection is in */
     struct fw_connection *next,*prev;	/* queue chain pointers */
@@ -181,4 +185,4 @@ typedef struct fw_unit {
 } FW_unit;
 
 int ctl_firewall(int, struct firewall_req *);
-int check_firewall(int, unsigned char *, int);
+int check_firewall(int, struct sockaddr_ll *, unsigned char *, int);

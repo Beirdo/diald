@@ -8,6 +8,8 @@
 
 #include "diald.h"
 
+extern char *current_dev;	/* From modem.c */
+
 int itxtotal = 0;
 int irxtotal = 0;
 
@@ -16,13 +18,7 @@ int irxtotal = 0;
  */
 void filter_setup()
 {
-
-    fwdfd = -1;
-
-    if ((snoopfd = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
-        syslog(LOG_ERR, "Could not get socket to do packet monitoring: %m");
-        die(1);
-    }
+    fwdfd = snoopfd = -1;
 }
 
 /*
@@ -30,37 +26,50 @@ void filter_setup()
  */
 void idle_filter_init()
 {
-    struct sockaddr to;
+    struct ifreq ifr;
+    struct sockaddr_ll to;
+
+    if (snoopfd != -1)
+        close(snoopfd);
+    if ((snoopfd = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0) {
+        syslog(LOG_ERR, "Could not get socket to do packet monitoring: %m");
+        die(1);
+    }
 
     if (mode == MODE_SLIP) {
 	sprintf(snoop_dev,"sl%d",link_iface);
      } else if (mode == MODE_PPP) {
        sprintf(snoop_dev,"ppp%d",link_iface);
      } else if (mode == MODE_DEV) {
-       sprintf(snoop_dev,"%s",device);
+       sprintf(snoop_dev,"%s",current_dev);
       }
     if (debug) syslog(LOG_INFO,"Changed snoop device to %s",snoop_dev);
     txtotal = rxtotal = 0;
 
-    /* try to bind the snooping socket to a particular device */
+    strncpy(ifr.ifr_name, snoop_dev, IFNAMSIZ);
+    if (ioctl(snoopfd, SIOCGIFINDEX, &ifr) < 0)
+	syslog(LOG_INFO, "ioctl SIOCGIFINDEX: %m");
+    snoop_index = ifr.ifr_ifindex;
     memset(&to,0,sizeof(to));
-    to.sa_family = AF_INET;
-    strcpy(to.sa_data,snoop_dev);
+    to.sll_family = AF_PACKET;
+    to.sll_protocol = htons(ETH_P_ALL);
+    to.sll_ifindex = snoop_index;
     /* This bind may fail if the kernel isn't recent enough. */
     /* This will just mean more work for the kernel. */
-    bind(snoopfd,&to,sizeof(struct sockaddr));
+    if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
+	syslog(LOG_INFO, "bind snoopfd: %m");
 
     if (fwdfd != -1) {
 	close(fwdfd);
-	fwdfd = -1;
     }
-    if ((fwdfd = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
+    if ((fwdfd = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0) {
         syslog(LOG_ERR, "Could not get socket to do packet forwarding: %m");
         die(1);
     }
+
     /* This bind may fail if the kernel isn't recent enough. */
     /* This will just mean more work for the kernel. */
-    bind(fwdfd,&to,sizeof(struct sockaddr));
+    bind(fwdfd,(struct sockaddr *)&to,sizeof(to));
 }
 
 /*
@@ -68,24 +77,40 @@ void idle_filter_init()
  */
 void idle_filter_proxy()
 {
-    struct sockaddr to;
+    struct ifreq ifr;
+    struct sockaddr_ll to;
 
     if (fwdfd != -1) {
         if (debug) syslog(LOG_INFO,"Closed fwdfd");
 	close(fwdfd);
 	fwdfd = -1;
     }
+
+    if (snoopfd != -1)
+        close(snoopfd);
+    if ((snoopfd = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0) {
+        syslog(LOG_ERR, "Could not get socket to do packet monitoring: %m");
+        die(1);
+    }
+
     sprintf(snoop_dev,"sl%d",proxy_iface);
     if (debug) syslog(LOG_INFO,"Changed snoop device to %s",snoop_dev);
 
     /* try to bind the snooping socket to a particular device */
     /* Most likely this should close the old socket and open a new one first */
+    strncpy(ifr.ifr_name, snoop_dev, IFNAMSIZ);
+    if (ioctl(snoopfd, SIOCGIFINDEX, &ifr) < 0)
+	syslog(LOG_INFO, "ioctl SIOCGIFINDEX: %m");
+    snoop_index = ifr.ifr_ifindex;
     memset(&to,0,sizeof(to));
-    to.sa_family = AF_INET;
-    strcpy(to.sa_data,snoop_dev);
+    to.sll_family = AF_PACKET;
+    to.sll_protocol = htons(ETH_P_ALL);
+    to.sll_ifindex = snoop_index;
+
     /* This bind may fail if the kernel isn't recent enough. */
     /* This will just mean more work for the kernel. */
-    bind(snoopfd,&to,sizeof(struct sockaddr));
+    if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
+	syslog(LOG_INFO, "bind snoopfd: %m");
 }
 
 /*
@@ -95,25 +120,18 @@ void idle_filter_proxy()
  */
 void filter_read()
 {
-    struct sockaddr from;
-    size_t from_len = sizeof(struct sockaddr);
+    struct sockaddr_ll from;
+    size_t from_len = sizeof(struct sockaddr_ll);
     int len;
 
-    if ((len = recvfrom(snoopfd,packet,4096,0,&from,&from_len)) > 0) {
-	/* FIXME: really if the bind succeeds, then I don't need
-	 * this check. How can I shortcut this effectly?
-	 * perhaps two different filter_read routines?
-         */
-	if (strcmp(snoop_dev,from.sa_data) == 0) {
+    if ((len = recvfrom(snoopfd,packet,4096,0,(struct sockaddr *)&from,&from_len)) > 0) {
 	    if (do_reroute) {
 		/* If we are doing unsafe routing, then we cannot count
 		 * the transmitted packets on the forwarding side of the
 		 * transitter (since there is none!), so we attempt to
-		 * count them here. However, we can only tell packets
-		 * that are leaving our interface from this machine,
-		 * forwarded packets all get counted as received bytes.
+		 * count them here.
 		 */
-		if (((struct iphdr *)packet)->saddr == local_addr) {
+		if (from.sll_pkttype == PACKET_OUTGOING) {
 		    txtotal += len;
 		    itxtotal += len;
 		} else {
@@ -127,10 +145,9 @@ void filter_read()
 	
             if ((ntohs(((struct iphdr *)packet)->frag_off) & 0x1fff) == 0) {
 	        /* Mark passage of first packet */
-	        if (check_firewall(fwunit,packet,len) && state == STATE_UP)
+	        if (check_firewall(fwunit,&from,packet,len) && state == STATE_UP)
 	            state_timeout = -1;
 	    }
-	}
     }
 }
 

@@ -28,9 +28,17 @@
 #include "diald.h"
 #include "version.h"
 
+#ifdef TCP_WRAPPERS
+#  include <tcpd.h>
+
+   int allow_severity = LOG_INFO;
+   int deny_severity = LOG_NOTICE;
+#endif
+
 /* intialized variables. */
 int modem_fd = -1;		/* modem device fp (for proxy reads) */
 MONITORS *monitors = 0;		/* Monitor pipes */
+PIPE *pipes = 0;		/* Command pipes */
 int modem_hup = 0;		/* have we seen a modem HUP? */
 int sockfd = -1;		/* controling socket */
 int delayed_quit = 0;		/* has the user requested a delayed quit? */
@@ -51,12 +59,23 @@ int dial_failures = 0;		/* count of dialing failures */
 int ppp_half_dead = 0;		/* is the ppp link half dead? */
 int terminate = 0;
 char *pidfile = 0;
-static PIPE fifo_pipe;
+static PIPE *fifo_pipe;
 int argc_save;
 char **argv_save;
 
 void do_config(void)
 {
+#ifdef SCHED_OTHER
+    struct sched_param sp;
+#endif
+    if (deinitializer) {
+	int res;
+	if (devices && devices[0])
+		setenv("MODEM", devices[0], 1);
+	res = system(deinitializer);
+	report_system_result(res, deinitializer);
+    }
+
     init_vars();
     flush_prules();
     flush_vars();
@@ -71,9 +90,29 @@ void do_config(void)
     /* FIXME: minor memory leak here */
     orig_local_ip = strdup(local_ip);
     orig_remote_ip = strdup(remote_ip);
+
+    if (initializer) {
+        int res;
+	if (devices && devices[0])
+	    setenv("MODEM", devices[0], 1);
+	res = system(initializer);
+	report_system_result(res, initializer);
+    }
+
+#ifdef SCHED_OTHER
+    sp.sched_priority = (scheduler == SCHED_OTHER ? 0 : priority);
+    sched_setscheduler(0, scheduler, &sp);
+    if (scheduler == SCHED_OTHER)
+#endif
+#ifdef PRIO_PROCESS
+	setpriority(PRIO_PROCESS, 0, priority);
+#else
+	nice(priority - nice(0));
+#endif
 }
 
-void main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
     int sel;
     struct timeval timeout;
@@ -92,7 +131,6 @@ void main(int argc, char *argv[])
     fwunit = ctl_firewall(IP_FW_OPEN,0);
 
     parse_init();
-    do_config();
 
     become_daemon();
 
@@ -104,12 +142,14 @@ void main(int argc, char *argv[])
 	die(1);
       }
 
-    open_fifo();
-
     if (debug&DEBUG_VERBOSE)
         syslog(LOG_INFO,"Starting diald version %s",VERSION);
 
     signal_setup();
+    do_config();
+
+    FD_ZERO(&ctrl_fds);
+    open_fifo();
     filter_setup();
 
     /* get a pty and open up a proxy link on it */
@@ -124,9 +164,7 @@ void main(int argc, char *argv[])
     /* main loop */
     while (!terminate) {
 	/* wait up to a second for an event */
-        FD_ZERO(&readfds);
-	if (fifo_fd != -1)
-	    FD_SET(fifo_fd,&readfds);
+        readfds = ctrl_fds;
         FD_SET(proxy_mfd,&readfds);
         FD_SET(snoopfd,&readfds);
 	/* Compute the likely timeout for the next second boundary */
@@ -134,10 +172,54 @@ void main(int argc, char *argv[])
 	if (ts < 0) ts = 0;
     	timeout.tv_sec = ts/CLK_TCK;
     	timeout.tv_usec = 1000*(ts%CLK_TCK)/CLK_TCK;
-	sel = select(100,&readfds,0,0,&timeout);
+	sel = select(256,&readfds,0,0,&timeout);
 	if (sel > 0) {
-	    /* read user commands off the fifo */
-	    if (fifo_fd != -1 && FD_ISSET(fifo_fd,&readfds)) fifo_read();
+	    PIPE *p;
+	    if (tcp_fd != -1) {
+		if (FD_ISSET(tcp_fd,&readfds)) {
+		    struct sockaddr_in sa;
+		    int flags, len, fd;
+		    flags = fcntl(tcp_fd, F_GETFL, 0);
+		    fcntl(tcp_fd, F_SETFL, flags|O_NONBLOCK);
+		    len = sizeof(sa);
+		    fd = accept(tcp_fd, (struct sockaddr *)&sa, &len);
+		    fcntl(tcp_fd, F_SETFL, flags);
+		    if (fd >= 0) {
+			PIPE *p;
+#ifdef TCP_WRAPPERS
+			struct request_info rq;
+			request_init(&rq,
+				RQ_DAEMON, "diald",
+				RQ_FILE, fd,
+				0);
+			fromhost(&rq);
+			if (!hosts_access(&rq)) {
+				close(fd);
+				syslog(LOG_INFO, "TCP connection from %s port %d - DENIED",
+				    inet_ntoa(sa.sin_addr), sa.sin_port);
+			} else
+#endif
+			if ((p = malloc(sizeof(PIPE)))) {
+			    pipe_init(fd, p, 0);
+			    FD_SET(fd, &ctrl_fds);
+			    syslog(LOG_INFO, "TCP connection from %s port %d",
+				inet_ntoa(sa.sin_addr), sa.sin_port);
+			} else {
+			    close(fd);
+			    syslog(LOG_INFO, "malloc: %m");
+			}
+		    } else
+			syslog(LOG_INFO, "accept: %m");
+		}
+	    }
+
+	    p = pipes;
+	    while (p) {
+		PIPE *tmp = p->next;
+		if (FD_ISSET(p->fd, &readfds))
+		    ctrl_read(p);
+		p = tmp;
+	    }
 
 	    /* update the connection filters */
 	    if (FD_ISSET(snoopfd,&readfds)) filter_read();
@@ -219,9 +301,16 @@ void open_fifo()
 	 * This guarantees that there is always at least one writer...
          */
 	if ((fifo_fd = open(fifoname, O_RDWR)) >= 0) {
-	    if (debug&DEBUG_VERBOSE)
-	   	 syslog(LOG_INFO,"Using fifo %s",fifoname);
-	    pipe_init(fifo_fd,&fifo_pipe);
+            fifo_pipe = (PIPE *)malloc(sizeof(PIPE));
+            if (fifo_pipe) {
+	        if (debug&DEBUG_VERBOSE)
+	   	    syslog(LOG_INFO,"Using fifo %s",fifoname);
+	        pipe_init(fifo_fd, fifo_pipe, 1);
+		FD_SET(fifo_fd, &ctrl_fds);
+            } else {
+	        syslog(LOG_ERR,"Could not open fifo pipe %m");
+	        fifo_fd = -1;
+            }
 	} else {
 	    syslog(LOG_ERR,"Could not open fifo file %s",fifoname);
 	    fifo_fd = -1;
@@ -229,6 +318,30 @@ void open_fifo()
     } else {
 	/* make sure to invalidate the fifo_fd if we don't open one. */
 	fifo_fd = -1;
+    }
+
+    if (tcpport) {
+	if ((tcp_fd = socket(AF_INET, SOCK_STREAM, 0)) >= 0) {
+	    struct sockaddr_in sa;
+	    sa.sin_family = AF_INET;
+	    sa.sin_addr.s_addr = INADDR_ANY;
+	    sa.sin_port = htons(tcpport);
+	    if (!bind(tcp_fd, (struct sockaddr *)&sa, sizeof(sa))
+	    && !listen(tcp_fd, 5)) {
+		if (debug&DEBUG_VERBOSE)
+	   	    syslog(LOG_INFO,"Using TCP port %d", tcpport);
+		FD_SET(tcp_fd, &ctrl_fds);
+	    } else {
+		close(tcp_fd);
+		tcp_fd = -1;
+	    }
+	}
+	if (tcp_fd < 0) {
+	    syslog(LOG_ERR,"Could not open TCP socket: %m");
+	    tcp_fd = -1;
+	}
+    } else {
+	tcp_fd = -1;
     }
 }
 
@@ -264,6 +377,7 @@ void signal_setup()
         } \
     }
 
+    memset(&sa, 0, sizeof(sa));
     sa.sa_mask = sig_mask;
     sa.sa_flags = 0;
 
@@ -301,6 +415,7 @@ void block_signals()
 void default_sigacts()
 {
     struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
     sa.sa_mask = sig_mask;
     sa.sa_flags = 0;
 
@@ -347,7 +462,7 @@ void get_pty(int *mfd, int *sfd)
     die(1);
 }
 
-/* Read a request off the fifo.
+/* Read a request from the command pipe.
  * Valid requests are:
  *	block		- block diald from calling out.
  *	unblock		- unblock diald from calling out.
@@ -370,25 +485,38 @@ void get_pty(int *mfd, int *sfd)
  *      reset		- reread the configuration information.
  */
 
-void fifo_read()
+void ctrl_read(PIPE *pipe)
 {
     int i;
     int pid, dev, j,k,l = 0;
     char *buf, *tail;
 
-    i = pipe_read(&fifo_pipe);
-    buf = tail = fifo_pipe.buf;
+    i = pipe_read(pipe);
+    buf = tail = pipe->buf;
     if (i < 0) {
-	fifo_fd = -1;
+	PIPE **tmp;
+	FD_CLR(pipe->fd, &ctrl_fds);
+	close(pipe->fd);
+        tmp = &pipes;
+        while (*tmp) {
+            if (pipe == *tmp) {
+                *tmp = pipe->next;
+                free(pipe);
+		break;
+            }
+            tmp = &(*tmp)->next;
+        }
 	return;
     }
     if (i == 0) return;
 
     while (i--) {
-        if (*tail == '\n') {
+        if (*tail == '\n' || *tail == '\r') {
             *tail = '\0';
 	    /* Ok, we've got a line, now we need to "parse" it. */
-	    if (strcmp(buf,"block") == 0) {
+	    if (!*buf) {
+		/* Empty line. Probably \r\n? */
+	    } else if (strcmp(buf,"block") == 0) {
 		syslog(LOG_INFO, "FIFO: Block request received.");
 		blocked = 1;
 	    } else if (strcmp(buf,"unblock") == 0) {
@@ -465,19 +593,24 @@ void fifo_read()
 			new = new->next;
 		    }
 		    if (!new) {
-			if (stat(fifoname,&sbuf) < 0 || !sbuf.st_mode&S_IFIFO) {
+			if (pipe == fifo_pipe
+			&& (stat(fifoname,&sbuf) < 0 || !sbuf.st_mode&S_IFIFO)) {
 			    syslog(LOG_INFO,"FIFO: %s not a pipe.",
 				buf+k);
-			} else if ((fd = open(buf+k,O_WRONLY|O_NDELAY))<0) {
+			} else if ((pipe != fifo_pipe && (fd=dup(pipe->fd)) < 0)
+			|| (pipe == fifo_pipe && (fd = open(buf+k,O_WRONLY|O_NDELAY))<0)) {
 			    syslog(LOG_INFO,"FIFO: could not open pipe %s: %m",
 				buf+k);
 			} else {
+			    struct firewall_req req;
 			    new = (MONITORS *)malloc(sizeof(MONITORS));
 			    new->name = strdup(buf+k);
 			    new->next = monitors;
 			    new->fd = fd;
 			    new->level = j;
+			    if (!monitors) ctl_firewall(IP_FW_MCONN_INIT,&req);
 			    monitors = new;
+			    req.unit = fwunit;
 			    output_state();
 			}
 		    }
@@ -493,25 +626,23 @@ void fifo_read()
 		    mon_write(MONITOR_MESSAGE,"\n",1);
 		}
             } else if (sscanf(buf,"connect %d %n", &pid, &dev) == 1) {
-                if (pid > 1) {
-		    if ((state != STATE_DOWN && state != STATE_CLOSE
-			&& !give_way)
-		    || state==STATE_UP || req_pid) {
-                        /* somebody else already has this diald, tell 'em */
-                        kill(pid, SIGTERM);
-			syslog(LOG_INFO,"FIFO: link up requested but denied");
+		if ((state != STATE_DOWN && state != STATE_CLOSE
+		    && !give_way)
+		|| state==STATE_UP || req_pid) {
+                    /* somebody else already has this diald, tell 'em */
+                    if (pid) kill(pid, SIGTERM);
+		    syslog(LOG_INFO,"FIFO: link up requested but denied");
+                } else {
+                    req_pid = pid;
+                    req_dev = (char *)malloc(tail-(buf+dev)+1);
+                    if (req_dev == 0) {
+                        req_pid = 0;
+                        syslog(LOG_ERR,"FIFO: no memory to store requested devce!");
                     } else {
-                        req_pid = pid;
-                        req_dev = (char *)malloc(tail-(buf+dev)+1);
-                        if (req_dev == 0) {
-                            req_pid = 0;
-                            syslog(LOG_ERR,"FIFO: no memory to store requested devce!");
-                        } else {
-                            strcpy(req_dev, buf+dev);
-                            request_down = 0;
-                            request_up = 1;
-                            syslog(LOG_INFO,"FIFO: link up requested on device %s", req_dev);
-                        }
+                        strcpy(req_dev, buf+dev);
+                        request_down = 0;
+                        request_up = 1;
+                        syslog(LOG_INFO,"FIFO: link up requested on device %s", req_dev);
                     }
                 }
             } else {
@@ -522,7 +653,7 @@ void fifo_read()
        tail++;
     }
 
-    pipe_flush(&fifo_pipe,buf-fifo_pipe.buf);
+    pipe_flush(pipe, buf-pipe->buf);
 }
 
 /*
@@ -532,7 +663,7 @@ void proxy_read()
 {
     char buffer[4096];
     int len;
-    struct SOCKADDR to;
+    struct sockaddr_ll to;
 
     /* read the SLIP packet */
     len = recv_packet(buffer,4096);
@@ -582,17 +713,20 @@ void proxy_read()
 	 * between the route switching and the forwarding I think.)
 	 */
 
-#ifdef HAS_SOCKADDR_PKT
-	to.spkt_family = AF_INET;
-	strcpy(to.spkt_device,snoop_dev);
-	to.spkt_protocol = htons(ETH_P_IP);
-#else
-	to.sa_family = AF_INET;
-	strcpy(to.sa_data,snoop_dev);
-#endif
+	memset(&to,0,sizeof(to));
+	to.sll_family = AF_PACKET;
+	to.sll_protocol = htons(ETH_P_IP);
+	to.sll_ifindex = snoop_index;
+
 	if (debug&DEBUG_VERBOSE)
 	    syslog(LOG_DEBUG,"Forwarding packet of length %d",len);
-	if (sendto(fwdfd,buffer,len,0,(struct sockaddr *)&to,sizeof(struct SOCKADDR)) < 0) {
+/* XXX ... */
+if (((struct iphdr *)buffer)->saddr == 0) {
+	((struct iphdr *)buffer)->saddr = local_addr;
+	syslog(LOG_DEBUG, "Oops: forwarding packet with zero source addr");
+}
+/* ... XXX */
+	if (sendto(fwdfd,buffer,len,0,(struct sockaddr *)&to,sizeof(to)) < 0) {
 	    syslog(LOG_ERR,
 		"Error forwarding data packet to physical device: %m");
 	}
@@ -631,9 +765,19 @@ void die(int i)
 	if (running_pid) kill(running_pid,SIGKILL);
 	/* Give the system a second to send the signals */
 	if (link_pid || dial_pid || running_pid) sleep(1);
+
 	close_modem();
 	interface_down();
     	proxy_down();
+
+	if (deinitializer) {
+		int res;
+		if (devices && devices[0])
+			setenv("MODEM", devices[0], 1);
+		res = system(deinitializer);
+		report_system_result(res, deinitializer);
+	}
+
 	unlink(pidfile);
     	exit(i);
     }
@@ -765,6 +909,14 @@ int system(const char *buf)
 	close(proxy_mfd);      /* close the master pty endpoint */
 	close(proxy_sfd);      /* close the slave pty endpoint */
 	if (fifo_fd != -1) close(fifo_fd);
+	if (tcp_fd != -1) close(tcp_fd);
+	if (pipes) {
+	    PIPE *c = pipes;
+	    while (c) {
+		close(c->fd);
+		c = c->next;
+	    }
+	}
 	if (monitors) {
 	    MONITORS *c = monitors;
 	    while (c) {
@@ -832,6 +984,14 @@ void background_system(const char *buf)
 	close(proxy_mfd);      /* close the master pty endpoint */
 	close(proxy_sfd);      /* close the slave pty endpoint */
 	if (fifo_fd != -1) close(fifo_fd);
+	if (tcp_fd != -1) close(tcp_fd);
+	if (pipes) {
+	    PIPE *c = pipes;
+	    while (c) {
+		close(c->fd);
+		c = c->next;
+	    }
+	}
 	if (monitors) {
 	    MONITORS *c = monitors;
 	    while (c) {
@@ -870,9 +1030,7 @@ void mon_write(int level, char *message,int len)
 	cn = c->next;
 	if (c->level&level) {
 	    if (write(c->fd,message,len) < 0) {
-		if (errno == EPIPE) {
-		    syslog(LOG_INFO,"Monitor pipe %s closed.",c->name);
-		} else {
+		if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
 		    syslog(LOG_INFO,"Writing error on pipe %s: %m.",c->name);
 		    /* Write error. The reader probably got swapped out
 		     * or something and the pipe flooded. We'll just "loose"
@@ -882,6 +1040,7 @@ void mon_write(int level, char *message,int len)
 		     c = cn;
 		     continue;
 		}
+		syslog(LOG_INFO,"Monitor pipe %s closed.",c->name);
 		close(c->fd);
 		if (p) p->next = c->next;
 		else monitors = c->next;

@@ -34,7 +34,7 @@ static void start_bootp()
 	syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	die(1);
     }
-    pipe_init(fileno(bootpfp),&bootp_pipe);
+    pipe_init(fileno(bootpfp),&bootp_pipe, 0);
     have_local = 0;
     have_remote = 0;
     waiting_for_bootp = 1;
@@ -177,18 +177,16 @@ void slip_start(void)
 	    link_iface);
 
     /* mark the interface as up */
-    if (netmask) {
-        sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    path_ifconfig,link_iface,local_ip,remote_ip,netmask,mtu);
-    } else {
-        sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    path_ifconfig,link_iface,local_ip,remote_ip,mtu);
-    }
+    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
+	path_ifconfig,link_iface,local_ip,remote_ip,
+	netmask ? netmask : "255.255.255.255",mtu);
     res = system(buf);
     report_system_result(res,buf);
 
+#if 1
     /* Set the routing for the new slip interface */
     set_ptp("sl",link_iface,remote_ip,0);
+#endif
 
     /* run bootp if it is asked for */
     if (dynamic_addrs && dynamic_mode == DMODE_BOOTP && !force_dynamic) start_bootp();
@@ -248,25 +246,25 @@ int slip_set_addrs()
     }
 
     /* redo the interface marking and the routing since BOOTP will change it */
-    if (netmask) {
-        sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    path_ifconfig,link_iface,local_ip,remote_ip,netmask,mtu);
-    } else {
-        sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    path_ifconfig,link_iface,local_ip,remote_ip,mtu);
-    }
+    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
+	path_ifconfig,link_iface,local_ip,remote_ip,
+	netmask ? netmask : "255.255.255.255",mtu);
     res = system(buf);
     report_system_result(res,buf);
 
+#if 1
     /* Set the routing for the new slip interface */
     set_ptp("sl",link_iface,remote_ip,0);
+#endif
 
     if (dynamic_addrs || force_dynamic) {
 	local_addr = inet_addr(local_ip);
 	/* have to reset the proxy if we won't be rerouting... */
 	if (!do_reroute) {
 	    proxy_config(local_ip,remote_ip);
+#if 1
     	    set_ptp("sl",proxy_iface,remote_ip,1);
+#endif
 	    add_routes("sl",proxy_iface,local_ip,remote_ip,1);
 	}
     }
@@ -298,7 +296,9 @@ void slip_reroute()
 {
     /* Restore the original proxy routing */
     proxy_config(orig_local_ip,orig_remote_ip);
+#if 1
     set_ptp("sl",proxy_iface,orig_remote_ip,1);
+#endif
     add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
     local_addr = inet_addr(orig_local_ip);
     /* If we did routing on the slip link, remove it */

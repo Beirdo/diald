@@ -18,6 +18,9 @@
 #include <syslog.h>
 #include <signal.h>
 #include <time.h>
+#ifdef _POSIX_PRIORITY_SCHEDULER
+#  include <sched.h>
+#endif
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -52,21 +55,12 @@
 #include <arpa/inet.h>
 /* Hmm. Should there be a netinet pointer to these??? */
 #ifndef __GLIBC__ 
-#include <linux/if_ether.h>
-#include <linux/if_slip.h>
+#  include <linux/if_ether.h>
+#  include <linux/if_slip.h>
+#  include <linux/if_packet.h>
 #else
-#include <net/ethernet.h>
-#endif
-
-#include <linux/version.h>
-/* This only exists in kernels >= 1.3.75 */
-#if LINUX_VERSION_CODE >= 66379
-#define HAS_SOCKADDR_PKT
-#include <linux/if_packet.h>
-#define SOCKADDR sockaddr_pkt
-#else
-#include <linux/socket.h>
-#define SOCKADDR sockaddr
+#  include <net/ethernet.h>
+#  include <net/if_packet.h>
 #endif
 
 #include "config.h"
@@ -181,6 +175,13 @@
 #define DEFAULT_MTU 1500
 #define DEFAULT_SPEED 38400
 
+#ifdef SCHED_OTHER
+#  define DEFAULT_SCHEDULER SCHED_OTHER
+#else
+#  define DEFAULT_SCHEDULER 0
+#endif
+#define DEFAULT_PRIORITY -5
+
 typedef struct monitors {
     struct monitors *next;
     int fd;			/* monitor output fp. */
@@ -192,13 +193,12 @@ typedef struct monitors {
 
 char **devices;
 int device_count;
-char device[10];
-char device_node[9];
-int device_iface;
 int inspeed;
 int window;
 int mtu;
 int mru;
+char *initializer;
+char *deinitializer;
 char *connector;
 char *disconnector;
 char *orig_local_ip;
@@ -214,6 +214,7 @@ char *ip_down;
 char *acctlog;
 char *pidlog;
 char *fifoname;
+int tcpport;
 char *lock_prefix;
 int pidstring;
 char *run_prefix;
@@ -230,6 +231,8 @@ int buffer_timeout;
 FILE *acctfp;
 int call_start_time;
 int mode;
+int scheduler;
+int priority;
 int debug;
 int modem;
 int rotate_devices;
@@ -275,6 +278,9 @@ extern int outfill;
 /* Global variables */
 
 int fifo_fd;			/* FIFO command pipe. */
+int tcp_fd;			/* TCP listener. */
+fd_set ctrl_fds;		/* TCP command/monitor connections. */
+PIPE *pipes;			/* List of control/monitor pipes. */
 MONITORS *monitors;		/* List of monitor pipes. */
 int proxy_mfd;			/* master pty fd */
 FILE *proxy_mfp;		/* also have an fp. Hackery for recv_packet. */
@@ -303,6 +309,7 @@ int req_pid;			/* pid of process that made "request" */
 char *req_dev;			/* name of the device file requested to open */
 int use_req;			/* are we actually using the FIFO link-up request device? */
 char snoop_dev[10];		/* The interface name we are listening on */
+int snoop_index;		/* The index of the interface */
 int txtotal,rxtotal;		/* transfer stats for the link */
 int itxtotal, irxtotal;		/* instantaneous transfer stats */
 int delayed_quit;		/* has the user requested delayed termination?*/
@@ -335,7 +342,7 @@ void dynamic_slip(void);
 void idle_filter_proxy(void);
 void open_fifo(void);
 void filter_read(void);
-void fifo_read(void);
+void ctrl_read(PIPE *);
 void proxy_read(void);
 void modem_read(void);
 void advance_filter_queue(void);
@@ -357,6 +364,7 @@ void change_state(void);
 void output_state(void);
 void add_device(void *, char **);
 void set_str(char **, char **);
+void set_scheduler(char **, char **);
 void set_int(int *, char **);
 void set_flag(int *, char **);
 void clear_flag(int *, char **);
@@ -367,7 +375,7 @@ void add_filter(void *var, char **);
 int insert_packet(unsigned char *, int);
 int lock(char *dev);
 void unlock(void);
-void fork_dialer(char *, int);
+void fork_dialer(char *, char *, int);
 void fork_connect(char *);
 void flush_timeout_queue(void);
 void set_up_tty(int, int, int);
@@ -430,7 +438,7 @@ void run_ip_down(void);
 void set_ptp(char *, int, char *, int);
 void add_routes(char *, int, char *, char *, int);
 void del_routes(char *, int, char *, char *, int);
-void pipe_init(int, PIPE *);
+void pipe_init(int, PIPE *, int);
 int pipe_read(PIPE *);
 void pipe_flush(PIPE *, int);
 int set_proxyarp (unsigned int);

@@ -13,15 +13,14 @@
 
 
 /* Configuration variables */
-char device[10]; /* The Device tu use for MODE_DEV */
-char device_node[9];
-int  device_iface ;
 char **devices = 0;
 int device_count = 0;
 int inspeed = DEFAULT_SPEED;
 int window = 0;
 int mtu = DEFAULT_MTU;
 int mru = DEFAULT_MTU;
+char *initializer = 0;
+char *deinitializer = 0;
 char *connector = 0;
 char *disconnector = 0;
 char *local_ip = 0;
@@ -37,6 +36,7 @@ char *ip_down = 0;
 char *acctlog = 0;
 char *pidlog = "diald.pid";
 char *fifoname = 0;
+int tcpport = 0;
 char *lock_prefix = LOCK_PREFIX;
 int pidstring = PIDSTRING;
 char *run_prefix = RUN_PREFIX;
@@ -50,6 +50,8 @@ int buffer_fifo_dispose = BUFFER_FIFO_DISPOSE;
 int buffer_timeout = BUFFER_TIMEOUT;
 FILE *acctfp = 0;
 int mode = MODE_SLIP;
+int scheduler = DEFAULT_SCHEDULER;
+int priority = DEFAULT_PRIORITY;
 int debug = 0;
 int modem = 0;
 int crtscts = 0;
@@ -109,6 +111,14 @@ struct {
     {"accounting-log","<f>",1,&acctlog,set_str},
     {"pidfile","<f>",1,&pidlog,set_str},
     {"fifo","<f>",1,&fifoname,set_str},
+    {"tcpport","<n>",1,&tcpport,set_int},
+    {"blocked","",0,&blocked,set_flag},
+    {"-blocked","",0,&blocked,clear_flag},
+    {"initializer","<script>",1,&initializer,set_str},
+    {"deinitializer","<script>",1,&deinitializer,set_str},
+/* scheduling */
+    {"scheduler","[fifo|rr|other]",1,0,set_scheduler},
+    {"priority","<n>",1,&priority,set_int},
 /* Networking addressing and control options */
     {"window","<n>",1,&window,set_int},
     {"mtu","<m>",1,&mtu,set_int},
@@ -201,6 +211,8 @@ void init_vars()
     window = 0;
     mtu = DEFAULT_MTU;
     mru = DEFAULT_MTU;
+    initializer = 0;
+    deinitializer = 0;
     connector = 0;
     disconnector = 0;
     local_ip = 0;
@@ -218,6 +230,8 @@ void init_vars()
     fifoname = 0;
     acctfp = 0;
     mode = MODE_SLIP;
+    scheduler = DEFAULT_SCHEDULER;
+    priority = DEFAULT_PRIORITY;
     debug = 0;
     modem = 0;
     crtscts = 0;
@@ -274,6 +288,26 @@ void set_int(int *var, char **argv)
 void set_str(char **var, char **argv)
 {
     *var = strdup(*argv);
+}
+
+void set_scheduler(char **var, char **argv)
+{
+#ifdef SCHED_FIFO
+    if (strcmp(argv[0],"fifo") == 0)
+	scheduler = SCHED_FIFO;
+    else
+#endif
+#ifdef SCHED_RR
+    if (strcmp(argv[0],"rr") == 0)
+	scheduler = SCHED_RR;
+    else
+#endif
+#ifdef SCHED_OTHER
+    if (strcmp(argv[0],"other") == 0)
+	scheduler = SCHED_OTHER;
+    else
+#endif
+	syslog(LOG_ERR,"Unknown scheduling class %s.\nValid classes are: fifo, rr, or other.",argv[0]);
 }
 
 void set_mode(char **var, char **argv)
@@ -535,23 +569,11 @@ void check_setup()
     struct stat st;
     int i;
     int flag = 0;
-    int temp ;
-    char *p ;
 
     if (device_count == 0) {
 	flag = 1,
 	syslog(LOG_ERR,
 	    "No device specified. You must have at least one device!");
-    } else {
-	/* This code used to strip a leading /dev/. This is just insane.
-	 * Why put the /dev/ there in the first place for an ether device?
-	 */
-    	strncpy(device , devices[0], 9);
-	device[9] = 0;
-	for (temp = 0; device[temp] && !isdigit(device[temp]); temp++);
-    	strncpy(device_node , device , temp ) ;
-    	p = device + temp + 1;
-    	device_iface = atoi( p );
     }
 
     if (mode != MODE_DEV)

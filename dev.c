@@ -1,5 +1,5 @@
 /*
- * dev.c - A ethernet Device.
+ * dev.c - An ethernet-like device (e.g. ISDN).
  *
  * Copyright (c) 1994, 1995, 1996 Eric Schenk.
  * All rights reserved. Please see the file LICENSE which should be
@@ -16,61 +16,20 @@
 
 #include "diald.h"
 
+extern char *current_dev;	/* From modem.c */
+
+static char device_node[9];
+
 static int dead = 1;
 
 /* internal flag to shortcut repeated calls to setaddr */
 static int rx_count = -1;
 
-/*
- * fork_connect()
- *
- * Added by JPD and AJY, this function is provided to provide a general
- * connect and disconnect functionality for dev mode. This is needed to
- * reliably control isdn4linux and ippp0 because although it appears to
- * diald as a device, it is actually a link that can be brought up and 
- * down and can have errors connecting (which you'd like to send back to
- * diald so that it knows it doesn't have a connection) and it is nice
- * to be able to control when the link goes down.
- */
-void fork_connect(char *program)
-{
-    block_signals();
-
-    dial_pid = fork();
-
-    if (dial_pid < 0) {
-	unblock_signals();
-	syslog(LOG_ERR, "failed to fork dialer: %m");
-	/* FIXME: Probably this should not be fatal */
-	die(1);
-    }
-
-    if (dial_pid == 0) {
-	/* change the signal actions back to the defaults, then unblock them. */
-	default_sigacts();
-	unblock_signals();
-	
-	execl("/bin/sh", "sh", "-c", program, (char *)0);
-	syslog(LOG_ERR, "could not exec /bin/sh: %m");
-	_exit(127);
-	/* NOTREACHED */
-    }
-
-    /* This unblock must not be earlier, otherwise the child can finish
-     * a reset dial_pid to 0 before the parent gets past the above test.
-     * This kills the parent.
-     */
-    unblock_signals();
-    /* AJY, added the program name so I could tell the difference between my */
-    /* connector and my disconnector */
-    syslog(LOG_INFO,"Running connect %s (pid = %d).",program,dial_pid);
-}
-
 void dev_start()
 {
     link_iface = -1 ;
     rx_count = -1;
-    syslog(LOG_INFO, "Open device %s%d",device_node,device_iface);
+    syslog(LOG_INFO, "Open device %s", current_dev);
     dead = 0;
 }
 
@@ -93,24 +52,26 @@ void dev_start()
 int dev_set_addrs()
 {
     ulong laddr = 0, raddr = 0;
+    struct ifreq   ifr; 
 
     /* Try to get the interface number if we don't know it yet. */
     if (link_iface == -1) {
-	link_iface = device_iface;
-	syslog(LOG_INFO,"Old %s , New device : %s %d",device,device_node,device_iface); 
+	int n;
+	n = strcspn(current_dev, "0123456789" );
+	link_iface = atoi(current_dev + n);
+	if (n > sizeof(device_node)-1)
+		n = sizeof(device_node)-1;
+	strncpy(device_node, current_dev, n);
+	device_node[n] = '\0';
     }
 
-
-    /* Ok then, see if pppd has upped the interface yet. */
-    if (link_iface != -1) {
-	struct ifreq   ifr; 
 
 	SET_SA_FAMILY (ifr.ifr_addr,    AF_INET); 
 	SET_SA_FAMILY (ifr.ifr_dstaddr, AF_INET); 
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
-	sprintf(ifr.ifr_name, device);
+	sprintf(ifr.ifr_name, current_dev);
 	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
-	   syslog(LOG_ERR,"failed to read interface status from device %s",device);
+	   syslog(LOG_ERR,"failed to read interface status from device %s",current_dev);
 	   return 0;
 	}
 	if (!(ifr.ifr_flags & IFF_UP))
@@ -126,7 +87,7 @@ int dev_set_addrs()
 
 	/* Ok, the interface is up, grab the addresses. */
 	if (ioctl(snoopfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
-		syslog(LOG_ERR,"failed to get local address from device %s: %m",device);
+		syslog(LOG_ERR,"failed to get local address from device %s: %m",current_dev);
 	else
        	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
@@ -134,6 +95,12 @@ int dev_set_addrs()
 	   syslog(LOG_ERR,"failed to get remote address: %m");
 	else
 	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
+
+	/* If we do not have a valid remote address yet the interface
+	 * is not really up.
+	 */
+	if (raddr == INADDR_ANY || raddr == INADDR_LOOPBACK)
+	    return 0;
 
 	if (dynamic_addrs) {
 	    /* only do the configuration in dynamic mode. */
@@ -147,22 +114,27 @@ int dev_set_addrs()
 		local_ip,remote_ip);
 	    if (!do_reroute) {
 	        proxy_config(local_ip,remote_ip);
+#if 1
     		set_ptp("sl",proxy_iface,remote_ip,1);
-                add_routes("sl",proxy_iface,local_ip,remote_ip,1);
+#endif
+		del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+		add_routes("sl",proxy_iface,local_ip,remote_ip,1); 
 	    }
 	} 
 
+#if 1
 	/* Set the ptp routing for the new interface */
 	/* this was moved from about 15 lines above by ajy so that for */
 	/* dynamic addresses, we have the remote address when we make */
 	/* the call to setup the route */
 	set_ptp(device_node,link_iface,remote_ip,0);
+#endif
 
-	if (do_reroute)
+	if (do_reroute) {
              add_routes(device_node,link_iface,local_ip,remote_ip,0);
+	     del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	}
         return 1;
-    }
-    return 0;
 }
 
 int dev_dead()
@@ -177,7 +149,7 @@ int dev_rx_count()
     char buf[128];
     int packets = 0;
     FILE *fp;
-    sprintf(buf,"%s %s%d",path_ifconfig,device_node,link_iface);
+    sprintf(buf,"%s %s",path_ifconfig, current_dev);
     if ((fp = popen(buf,"r"))==NULL) {
         syslog(LOG_ERR,"Could not run command '%s': %m",buf);
         return 0;       /* assume half dead in this case... */
@@ -212,7 +184,9 @@ void dev_reroute()
 
     /* Restore the original proxy routing */
     proxy_config(orig_local_ip,orig_remote_ip);
+#if 1
     set_ptp("sl",proxy_iface,orig_remote_ip,1);
+#endif
     add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
     local_addr = inet_addr(orig_local_ip);
 }

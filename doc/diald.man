@@ -169,6 +169,42 @@ Note that these commands can be used within a file to
 include another file.
 
 .TP
+.B scheduler \fI<class>\fR
+Set diald's scheduling class. Valid choices for systems that
+support POSIX scheduling classes are:
+.IP
+\fBfifo\fR	Real time, first come, first served.
+.br
+\fBrr\fR	Real time, round robin
+.br
+\fBother\fR	Normal process scheduling
+.br
+.IP
+For systems that do not support POSIX scheduling classes the
+only valid option is \fBother\fR.
+.IP
+If the \fBscheduler\fR option is used the \fBpriority\fR option
+is usually used as well.
+.IP
+Because diald needs to snoop the traffic on the managed link
+and distribute information to any monitors in a timely fashion
+it is often useful to run diald with a higher priority, perhaps
+even in one of the real time scheduling classes. This is especially
+true when the managed link is running at ISDN speeds or faster.
+
+.TP
+.B priority \fI<n>\fR
+Set the scheduling priority to \fI<n>\fR. The meaning of the value
+depends on the chosen scheduling class. For the scheduling class
+\fBother\fR the value is the \fIabsolute\fR nice value to
+use (as compared to the \fBnice(1)\fR command which specifies an
+\fIincrement\fR to the current nice value). Nice values lie
+in the range -20 (highest priority) to 19 (lowest priority).
+For the real time scheduling classes the value is the
+\fIstatic priority\fR, the range of which should be determined
+from system documentation such as \fBsched_setscheduler(2)\fR.
+
+.TP
 .B mode \fI<m>
 Set the operation mode to \fI<m>\fR.
 Valid choices are:
@@ -248,7 +284,7 @@ the directory /var/run, although on some systems it will be
 found in /etc.
 
 .TP
-.B fifo \fI<f>
+.B fifo \fI<f>\fR
 Turns on the FIFO command channel. Diald will attempt to open a named pipe
 with the pathname <f>. External programs can write commands to the pipe
 and diald will react. See the section on signals and FIFO commands
@@ -261,6 +297,37 @@ to allow too many users access to the control FIFO for diald.
 Also, the best security is probably obtained by creating
 the FIFO's ahead of time and choosing appropriate owners and permissions
 rather than letting diald create them.
+
+.TP
+.B tcpport \fI<port>\fR
+Turns on the TCP command channel. Diald will listen on the given port.
+Remote systems may connect to the port in order to issue commands
+to the running diald and monitor its state.
+.IP
+If diald has been compiled with tcp wrappers support connections
+are accepted or rejected on the TCP port under control of rules
+for diald in /etc/hosts.allow and /etc/hosts.deny. If diald has
+not been compiled with tcp wrappers support cconnections are
+accepted from anybody unless blocked by external firewalling.
+.IP
+It is not wise to use a
+.B tcpport
+option unless you are certain that unauthorized users will not
+be able to access it. In particular you almost certainly do
+not want the port to be publically accessible via the link that
+diald is controlling!
+
+.TP
+.B blocked
+Start diald in blocked mode. While the link is blocked diald
+will accept incoming connections but will not attempt to make
+an outgoing call unless manually requested.
+
+.TP
+.B -blocked
+Start diald in unblocked mode. Outgoing calls will be attempted
+when necessary. This is the default.
+
 .TP
 .B debug \fI<mask>\fR
 Set the debugging mask. The mask is the binary OR of the following
@@ -417,6 +484,21 @@ This command forces diald to rotate the list of devices each time
 a device is opened. Thus, in the above scenario diald would
 fail to make the connection on the damaged device, but would
 then try the second device first on the next attempt.
+
+.TP
+.B initializer \fI<p>\fR
+Use the executable or shell script \fI<p>\fR to perform once
+only initialization of this link when diald first starts up
+or when it reloads its configuration. This may be used, for
+instance, to set up an ISDN interface ready to accept incoming
+connections.
+
+.TP
+.B deinitializer \fI<p>\fR
+Use the executable or shell script \fI<p>\fR to clean up this
+link before diald exits or before reloading the configuration.
+This may be used, for instance, to delete an ISDN interface
+when we have finished managing it.
 
 .TP
 .B connect \fI<p>\fR
@@ -765,7 +847,8 @@ number of long distance phone calls to a machine that is
 not operating correctly. Once diald blocks the connection
 an operator can investigate the cause, correct the problem,
 and then issue the "unblock" command to allow diald to
-continue.
+continue. The link may be manually opened while blocked
+but will not open on demand until it has been unblocked.
 .TP
 .B route-wait\fR
 On some badly configured PPP servers, traffic will not flow until

@@ -193,7 +193,9 @@ void proxy_up(void)
     /* Mark the interface as up */
     proxy_config(orig_local_ip,orig_remote_ip);
     /* set the routing to the interface */
+#if 1
     set_ptp("sl",proxy_iface,orig_remote_ip,1);
+#endif
     add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
 }
 
@@ -207,13 +209,9 @@ void proxy_config(char *lip, char *rip)
     int res;
 
     /* mark the interface as up */
-    if (netmask) {
-        sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	    path_ifconfig,proxy_iface,lip,rip,netmask,mtu);
-    } else {
-        sprintf(buf,"%s sl%d %s pointopoint %s mtu %d up",
-	    path_ifconfig,proxy_iface,lip,rip,mtu);
-    }
+    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
+	path_ifconfig,proxy_iface,lip,rip,
+	netmask ? netmask : "255.255.255.255",mtu);
     res = system(buf);
     report_system_result(res,buf);
 }
@@ -223,9 +221,18 @@ void proxy_config(char *lip, char *rip)
  */
 void proxy_down()
 {
+    char buf[128];
+    int res;
+
     if (debug&DEBUG_VERBOSE)
 	syslog(LOG_INFO,"taking proxy device down");
     del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+
+    /* mark the interface as down */
+    sprintf(buf,"%s sl%d down", path_ifconfig,proxy_iface);
+    res = system(buf);
+    report_system_result(res,buf);
+
     /* clear the line discipline */
     if ((proxy_iface = ioctl(proxy_sfd, TIOCSETD, &orig_disc)) < 0)
 	syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);

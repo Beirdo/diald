@@ -89,7 +89,7 @@ void trans_DOWN(void)
 {
     request_down = 0;
     use_req = 0;
-    if (request_up && (req_pid || !blocked)) {
+    if (request_up /* && (req_pid || !blocked) */) {
 	request_up = 0; GOTO(STATE_CONNECT);
     }
     else if ((forced || !queue_empty()) && !blocked) GOTO(STATE_CONNECT);
@@ -278,7 +278,7 @@ void act_UP(void)
 void trans_UP(void)
 {
     request_up = 0;
-    if (blocked || request_down) {
+    if (/* blocked || */ request_down) {
 	request_down = 0;
 	goto take_link_down;
     }
@@ -356,14 +356,8 @@ void act_DISCONNECT(void)
     if (disconnector) {
         if (mode != MODE_DEV) {
 	    reopen_modem();
-            fork_dialer(disconnector, modem_fd);
 	}
-	else
-	{
-	/* added by jpd so that we can use a disconnect script to bring */
-	/* down the ipppd connection */
-	    fork_connect(disconnector);
-	}
+        fork_dialer("disconnector", disconnector, modem_fd);
     }
 }
 void trans_DISCONNECT(void)

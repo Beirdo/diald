@@ -8,7 +8,7 @@
 
 #include "diald.h"
 
-#ifdef 0
+#if 0
 #ifdef PPP_VERSION_2_2_0
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
@@ -199,18 +199,25 @@ int ppp_set_addrs()
 		 * clobbers all the routes.
 		 */
 	    	proxy_config(local_ip,remote_ip);
+#if 1
     		set_ptp("sl",proxy_iface,remote_ip,1);
-	        add_routes("sl",proxy_iface,local_ip,remote_ip,1);
+#endif
+		del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+		add_routes("sl",proxy_iface,local_ip,remote_ip,1); 
 	    }
 	}
 
+#if 1
 	/* This is redundant in normal operation, but if we
 	 * have to restart the link, then this is necessary...
 	 */
 	set_ptp("ppp",link_iface,remote_ip,0);
+#endif
 
-	if (do_reroute)
+	if (do_reroute) {
 	     add_routes("ppp",link_iface,local_ip,remote_ip,0);
+	     del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+	}
 	return 1;
     }
     return 0;
@@ -285,7 +292,9 @@ void ppp_reroute()
      * to avoid this. Sigh.
      */
     proxy_config(orig_local_ip,orig_remote_ip);
-    set_ptp("sl",proxy_iface,orig_remote_ip,1);
+#if 1
+    set_ptp("sl",proxy_iface,orig_remote_ip,0);
+#endif
     add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
     local_addr = inet_addr(orig_local_ip);
     /* If we did routing on the ppp link, remove it */

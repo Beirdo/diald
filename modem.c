@@ -27,8 +27,9 @@
 
 #include "diald.h"
 
-static char *current_dev = 0;
 static int rotate_offset = 0;
+
+char *current_dev = 0;
 
 /* local variables */
 
@@ -193,9 +194,9 @@ void setdtr(int fd, int on)
 
 
 /*
- * fork_dialer - run a program to connect the serial device.
+ * fork_dialer - run a program to connect/disconnect the device.
  */
-void fork_dialer(char *program, int fd)
+void fork_dialer(char *prog_type, char *program, int fd)
 {
     block_signals();
 
@@ -203,7 +204,7 @@ void fork_dialer(char *program, int fd)
 
     if (dial_pid < 0) {
 	unblock_signals();
-        syslog(LOG_ERR, "failed to fork dialer: %m");
+        syslog(LOG_ERR, "failed to fork %s: %m", prog_type);
 	/* FIXME: Probably this should not be fatal */
         die(1);
     }
@@ -217,6 +218,14 @@ void fork_dialer(char *program, int fd)
 	close(proxy_mfd);      /* close the master pty endpoint */
 	close(proxy_sfd);      /* close the slave pty endpoint */
 	if (fifo_fd != -1) close(fifo_fd);
+	if (tcp_fd != -1) close(tcp_fd);
+	if (pipes) {
+	    PIPE *p = pipes;
+	    while (p) {
+		close(p->fd);
+		p = p->next;
+	    }
+	}
 	if (monitors) {
 	    MONITORS *c = monitors;
 	    while (c) {
@@ -241,7 +250,7 @@ void fork_dialer(char *program, int fd)
     }
 
     unblock_signals();
-    syslog(LOG_INFO,"Running connect (pid = %d).",dial_pid);
+    syslog(LOG_INFO,"Running %s (pid = %d).", prog_type, dial_pid);
 }
 
 /*
@@ -259,15 +268,33 @@ int open_modem()
     modem_fd = -1;
     dial_status = 0;
 
-    /* JPD changed mode_dev so that we can use a connect script to get */
-    /* ipppd to dial. This allows us to use a connector program to get */
-    /* ipppd to dial and make sure that ipppd successfully connects to */
-    /* the ISP. Otherwise, we can't be sure that ipppd successfully */
-    /* connected and diald would show that we we're connected */
-    if (mode == MODE_DEV) 
-    {
-        fork_connect(connector);
-        return 0;
+    if (mode == MODE_DEV) {
+	/* If this is a request for diald to take over management of an
+	 * interface that we didn't bring up ourselves there is little
+	 * to do here except note what we are taking on.
+	 */
+	if (req_pid) {
+		/* Hmmm... We could fork here then I think we could
+		 * get away with having just one diald to manage a
+		 * pool of incoming ISDN lines.
+		 * N.B. We would also need to open a different monitor
+		 * fifo and advise any listeners that they might want
+		 * switch allegiance, clone themselves or something.
+		 */
+		current_dev = req_dev;
+		use_req=1;
+		req_pid=0;
+	} else {
+		current_dev = devices[0];
+	}
+
+	/* If we have a connector we may need to run it to set up the
+	 * real interface.
+	 * FIXME: Should we be doing this for a requested up?
+	 */
+	if (connector)
+		fork_dialer("connector", connector, modem_fd);
+	return 0;
     }
 
     if (req_pid) {
@@ -354,7 +381,7 @@ int open_modem()
 
 	/* Get rid of any initial line noise after the hangup */
 	tcflush(modem_fd, TCIOFLUSH);
-	fork_dialer(connector, modem_fd);
+	fork_dialer("connector", connector, modem_fd);
     } else {
 	/* someone else opened the line, we just set the mode */
 	set_up_tty(modem_fd, 0, inspeed);

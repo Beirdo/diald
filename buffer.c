@@ -93,19 +93,18 @@ void forward_buffer()
     unsigned int clen, i;
     unsigned long stamp;
     unsigned long ctime = timestamp();
-    struct SOCKADDR to;
+#if 1
+    struct sockaddr_ll to;
+#endif
     unsigned char pkt[4096];
 
     buffer_check();
 
+#if 1
     memset(&to,0,sizeof(to));
-#ifdef HAS_SOCKADDR_PKT
-    to.spkt_family = AF_INET;
-    strcpy(to.spkt_device,snoop_dev);
-    to.spkt_protocol = htons(ETH_P_IP);
-#else
-    to.sa_family = AF_INET;
-    strcpy(to.sa_data,snoop_dev);
+    to.sll_family = AF_PACKET;
+    to.sll_protocol = htons(ETH_P_IP);
+    to.sll_ifindex = snoop_index;
 #endif
 
     while (used > 0) {
@@ -122,7 +121,17 @@ void forward_buffer()
              * on the snoopfd (which points to the same device),
              * then we will never get them back on snoopfd.
              */
-	    if (sendto(snoopfd,pkt,clen,0,(struct sockaddr *)&to,sizeof(struct SOCKADDR)) < 0) {
+/* XXX ... */
+if (((struct iphdr *)pkt)->saddr == 0) {
+	((struct iphdr *)pkt)->saddr = local_addr;
+	syslog(LOG_DEBUG, "Oops: forwarding packet with zero source addr");
+}
+/* ... XXX */
+#if 1
+	    if (sendto(snoopfd,pkt,clen,0,(struct sockaddr *)&to,sizeof(to)) < 0) {
+#else
+	    if (sendto(snoopfd,pkt,clen,0,NULL,0) < 0) {
+#endif
 		syslog(LOG_ERR,"Error forwarding data packet to physical device from buffer: %m");
 	    }
 	}

@@ -7,7 +7,7 @@
  */
 
 #include "diald.h"
-#ifdef __GLIBC__
+#if defined(__GLIBC__) && __GLIBC_MINOR__ < 1
 typedef u_int8_t __u8;
 typedef u_int16_t __u16;
 typedef u_int32_t __u32;
@@ -54,14 +54,14 @@ static unsigned int in_slot(FW_Timeslot *slot, time_t *clock)
     struct tm *ltime = localtime(clock);
     int ctime = ltime->tm_hour*60*60+ltime->tm_min*60+ltime->tm_sec; 
 
-#ifdef 0
+#if 0
     syslog(LOG_INFO,"slot check: %d %d %d %d",
 	ltime->tm_sec+ltime->tm_min*60+ltime->tm_hour*60*60, ltime->tm_wday,
 	ltime->tm_mday, ltime->tm_mon);
 #endif
 
     while (slot) {
-#ifdef 0
+#if 0
     syslog(LOG_INFO,"slot def: %d %d %x %x %x",
 	slot->start, slot->end, slot->wday, slot->mday, slot->month);
 #endif 0
@@ -175,8 +175,9 @@ static FW_Connection *find_connection(FW_unit *unit, FW_ID *id)
  * Add/update a connection in the queue.
  */
 
-static void add_connection(
-    FW_unit *unit, FW_Connection *c, FW_ID *id, unsigned int timeout, TCP_STATE lflags)
+static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
+			unsigned int timeout, TCP_STATE lflags,
+			int direction, int len)
 {
     /* look for a connection that matches this one */
     if (c == NULL) {
@@ -188,6 +189,11 @@ static void add_connection(
 	       die(1);
 	    }
 	    c->id = *id;
+	    c->packets[0] = c->packets[1] = 0;
+	    c->bytes[0] = c->bytes[1] = 0;
+	    c->bytes_total[0] = c->bytes_total[1] = 0;
+	    c->packets[direction] = 1;
+	    c->bytes[direction] = len;
 	    init_timer(&c->timer);
             c->tcp_state = lflags;
 	    c->unit = unit;
@@ -208,6 +214,8 @@ static void add_connection(
 	if (timeout > 0) {
 	    /* reanimating a ghost? */
 	    del_timer(&c->timer);
+	    c->packets[direction]++;
+	    c->bytes[direction] += len;
 	    c->timer.expires = timeout;
 	    add_timer(&c->timer);
 	    if (debug&DEBUG_CONNECTION_QUEUE)
@@ -421,19 +429,6 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
     }
 }
 
-/* Check if we need to reorder IP addresses for cannonical ordering */
-static int ip_direction(struct iphdr *pkt)
-{
-    struct udphdr *udp = (struct udphdr *)((char *)pkt + 4*pkt->ihl);
-    if (ntohl(pkt->saddr) > ntohl(pkt->daddr)
-    || (ntohl(pkt->saddr) == ntohl(pkt->daddr) &&
-       (pkt->protocol == IPPROTO_TCP || pkt->protocol == IPPROTO_UDP)
-       && ntohs(udp->source) > ntohs(udp->dest)))
-	return 2;
-    else
-	return 1;
-}
-
 static void ip_swap_addrs(struct iphdr *pkt)
 {
     struct udphdr *udp = (struct udphdr *)((char *)pkt + 4*pkt->ihl);
@@ -559,7 +554,8 @@ void forge_tcp_reset(struct iphdr *iph, int len)
 }
 
 /* Check if a packet passes the filters */
-int check_firewall(int unitnum, unsigned char *pkt, int len)
+int check_firewall(int unitnum,
+		struct sockaddr_ll *sll, unsigned char *pkt, int len)
 {
     FW_unit *unit;
     FW_Filters *fw;
@@ -614,8 +610,11 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
     }
 
     /* Build the connection ID, and set the direction flag */
-    direction = ip_direction(ip_pkt);
-    if (direction == 2) ip_swap_addrs(ip_pkt);
+    direction = 1;
+    if (sll->sll_pkttype != PACKET_OUTGOING) {
+	direction = 2;
+	ip_swap_addrs(ip_pkt);
+    }
 
     memset(&id,0,sizeof(id));
     for (i = 0; i < FW_ID_LEN; i++)
@@ -666,7 +665,7 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 
     rule = 1;
     while (fw) {
-#ifdef 0
+#if 0
 	print_filter(&fw->filt);
 #endif
 	/* is this rule currently applicable? */
@@ -698,7 +697,7 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 	        v = (ntohl(*(int *)(&(FW_IN_DATA(term->offset)?data:pkt)
 				  [FW_OFFSET(term->offset)]))
 		    >> term->shift) & term->mask;
-#ifdef 0
+#if 0
 	    syslog(LOG_INFO,"testing ip %x:%x data %x:%x mask %x shift %x test %x v %x",
 		ntohl(*(int *)(&pkt[FW_OFFSET(term->offset)])),
 		*(int *)(&pkt[FW_OFFSET(term->offset)]),
@@ -717,7 +716,7 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 	    }
 	}
 	/* Ok, we matched a rule. What are we suppose to do? */
-#ifdef 0
+#if 0
 	if (fw->filt.log)
 #endif
         if (debug&DEBUG_FILTER_MATCH)
@@ -730,7 +729,9 @@ int check_firewall(int unitnum, unsigned char *pkt, int len)
 		conn,
 		&id,
 		fw->filt.timeout,
-		lflags);
+		lflags,
+		direction-1,
+		len);
 	}
 	/* check if we are no longer waiting */
 	if (fw->filt.type == FW_TYPE_WAIT) {
@@ -756,14 +757,16 @@ skip:
     return 1;
 }
 
-static void pcountdown(int level, long secs)
+static char * pcountdown(int level, long secs)
 {
-    char buf[10];
+    static char buf[10];
     /* Make sure that we don't try to print values that overflow our buffer */
     if (secs < 0) secs = 0;
     if (secs > 359999) secs = 359999;
     sprintf(buf,"%02ld:%02ld:%02ld\n",secs/3600,(secs/60)%60,secs%60);
-    if (monitors) mon_write(level,buf,9);
+    if (monitors && level != MONITOR_QUEUE)
+	mon_write(level,buf,9);
+    return buf;
 }
 
 int ctl_firewall(int op, struct firewall_req *req)
@@ -877,6 +880,17 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    return 0;
 	}
 	return 0;
+    case IP_FW_MCONN_INIT:
+	if (!req) return -1;
+	{
+	    FW_Connection *c;
+	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
+		c->bytes_total[0] += c->bytes[0];
+		c->bytes_total[1] += c->bytes[1];
+		c->packets[0] = c->packets[1] = c->bytes[0] = c->bytes[1] = 0;
+	    }
+	}
+	return 0;
     case IP_FW_MCONN:
 	if (!req || !monitors) return -1; /* ERRNO */
 	{
@@ -919,11 +933,17 @@ int ctl_firewall(int op, struct firewall_req *req)
 		sport = c->id.id[10]+(c->id.id[9]<<8);
 		dport = c->id.id[12]+(c->id.id[11]<<8);
                 sprintf(buf,
-                        "%-4s  %15s/%-5d  %15s/%-5d  ",
+                        "%-4s  %15s/%-5d  %15s/%-5d  %8.8s"
+			" %ld %ld %ld %ld %ld %ld\n",
                         proto, saddr, sport,
-                        daddr, dport);
+                        daddr, dport,
+			pcountdown(MONITOR_QUEUE,c->timer.expected-tstamp),
+			c->packets[0], c->bytes[0], c->bytes_total[0],
+			c->packets[1], c->bytes[1], c->bytes_total[1]);
+		c->bytes_total[0] += c->bytes[0];
+		c->bytes_total[1] += c->bytes[1];
+		c->packets[0] = c->packets[1] = c->bytes[0] = c->bytes[1] = 0;
                 if (monitors) mon_write(MONITOR_QUEUE,buf,strlen(buf));
-		pcountdown(MONITOR_QUEUE,c->timer.expected-tstamp);
 	    }
 	    if (monitors) mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
 	    return 0;

@@ -14,12 +14,22 @@ LIBDIR=/usr/lib/diald
 # will cause it to miscompile the filter parsing code.
 # Also note that later versions of gcc may generate bad code
 # with the -fomit-frame-pointer option.
-#CFLAGS = -O -g -Wall -fomit-frame-pointer -pipe
-CFLAGS = -O2 -g -Wall -pipe
 
-# If you are using gcc 2.5.8 this will get you QMAGIC executables
-# later versions of gcc do this by default.
-#LDFLAGS = -Xlinker -qmagic
+# Linux, libc.so.6, TCP access control via /etc/hosts.allow (tcp_wrappers)
+CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS
+LIBS = -lwrap -lnsl
+
+# Linux, libc.so.6, no TCP access control
+CFLAGS = -O2 -Wall -pipe
+LIBS = -lnsl
+
+# Linux, libc.so.5, TCP access control via /etc/hosts.allow (tcp_wrappers)
+CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS
+LIBS = -lwrap
+
+# Linux, libc.so.5, no TCP access control
+CFLAGS = -O2 -Wall -pipe
+LIBS =
 
 
 #Moderately paranoid CFLAGS (this is moderately useful):
@@ -54,7 +64,7 @@ CONTRIBFILES=contrib
 DISTFILES=Makefile $(SOURCEFILES) $(HFILES) $(DOCFILES) $(CONTRIBFILES)
 
 diald: $(OBJFILES)
-	$(CC) $(LDFLAGS) -o diald $(OBJFILES)
+	$(CC) $(LDFLAGS) -o diald $(OBJFILES) $(LIBS)
 
 install: diald
 	-mkdir -p ${DESTDIR}${BINDIR}
