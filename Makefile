@@ -108,11 +108,5 @@ dist: $(DISTFILES)
 	rm -f $$d
 
 depend:
-	$(CPP) -M *.c > .depend
-
-#
-# include a dependency file if one exists
-#
-ifeq (.depend,$(wildcard .depend))
-include .depend
-endif
+	@echo 'Go to "make". Go directly to "make".'
+	@echo 'Do not do "make depend". Do not collect loads of errors.'

@@ -1,5 +1,7 @@
 Major changes between version 0.99 and 0.99.1.
 ------------------------------------------------
+  - "make depend" no longer even tries to do anything useful.
+    I do not care about header dependencies here. Nor should you.
   - Map protocol numbers to names when logging debug info for
     firewall rule matches.
   - Wrong iovec count when sending packets on an ethertap proxy.
