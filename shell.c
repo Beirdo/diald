@@ -75,6 +75,7 @@ run_shell(int mode, const char *name, const char *buf, int d)
 	    if (p[1] != 1) dup2((p[1] >= 0 ? p[1] : 0), 1);
             if (p[1] != 2) dup2((p[1] >= 0 ? p[1] : 0), 2);
 	}
+	if (p[1] > 2) close(p[1]);
 
 	/* set the current device (compat) */
 	if (current_dev)
