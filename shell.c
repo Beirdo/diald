@@ -128,7 +128,7 @@ run_shell(int mode, const char *name, const char *buf, int d)
 
 	    while (fgets(buf, sizeof(buf)-1, fd)) {
 		buf[sizeof(buf)-1] = '\0';
-		mon_syslog(LOG_DEBUG, "%s: %s", name, buf);
+		mon_syslog(LOG_INFO, "%s: %s", name, buf);
 	    }
 
 	    fclose(fd);
