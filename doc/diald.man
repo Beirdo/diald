@@ -711,25 +711,6 @@ between 2048 and 4096 is not out of line with an MTU between 296 and 1500.
 You should also keep the window size to a multiple of the MTU, otherwise
 there will always be a portion of the window that cannot be used.
 .TP
-.B reroute
-This command asks diald to change the system routes to point to
-the real link when it brings it up, rather than forwarding packets
-from the proxy to the real link. This is the default behavior of diald.
-.TP
-.B -reroute
-This command asks diald to forward packets from the proxy link to the
-real link, rather than change the system routes to point to the real route.
-This may be necessary to avoid locking up TCP sessions if you are running
-versions of the Linux kernel older than 2.0.0 and you have multiple
-outgoing SLIP or PPP links.
-It may also be necessary if you have other software running that will be
-confused by the constant changing of the outgoing network device.
-(It has been reported that the SOCKS Internet service proxy package has
-problems with this.)
-
-Generally this option should be avoided if at all possible, since
-its use can impose a performance penalty of up to 20% on outgoing traffic.
-.TP
 .B defaultroute
 Tell
 .B diald
