@@ -86,3 +86,7 @@ Internationalize...
 If after dialling we can do a PPPIOCGUNIT on the modem we had a
 broken dial script that started pppd itself. Can we recover
 gracefully from this?
+
+Make lock file generation follow symlinks so the actual device
+name is locked and not the symlink name? What do other things
+such as *getty do?
