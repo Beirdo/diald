@@ -58,7 +58,7 @@ run_shell(int mode, const char *name, const char *buf, int d)
 	if (p[0] >= 0) close(p[0]);
 	d2 = open("/dev/null", O_RDWR);
         if (d >= 0) {
-            dup2((p[1] >= 0 ? p[1] : d2), 2);
+            if (p[1] != 2) dup2((p[1] >= 0 ? p[1] : d2), 2);
 	    close(d2);
 	    if (d != 0) {
 	    	dup2(d, 0);
@@ -72,8 +72,8 @@ run_shell(int mode, const char *name, const char *buf, int d)
 	    	dup2(d2, 0);
 		close(d2);
 	    }
-	    dup2((p[1] >= 0 ? p[1] : 0), 1);
-            dup2((p[1] >= 0 ? p[1] : 0), 2);
+	    if (p[1] != 1) dup2((p[1] >= 0 ? p[1] : 0), 1);
+            if (p[1] != 2) dup2((p[1] >= 0 ? p[1] : 0), 2);
 	}
 
 	/* set the current device (compat) */

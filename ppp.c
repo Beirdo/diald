@@ -97,7 +97,7 @@ void ppp_start()
 	    dup2(modem_fd, 0);
 	else
 	    fcntl(modem_fd, F_SETFD, 0);
-	dup2(modem_fd, 1);
+	dup2(0, 1);
 
 	execv(path_pppd,argv);
 
