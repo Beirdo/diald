@@ -622,7 +622,7 @@ void ctrl_read(PIPE *pipe)
     		ctl_firewall(IP_FW_PCONN,&req);
     		mon_syslog(LOG_DEBUG,"--------------------------------------");
 	    } else if ((pipe->access & ACCESS_DEBUG)
-	    && sscanf(buf,"debug %d", &pid) == 1) {
+	    && sscanf(buf,"debug %i", &pid) == 1) {
     		mon_syslog(LOG_NOTICE,"%s: changing debug flags to 0x%x",
 		    pipe->name, pid);
 		debug = pid;
