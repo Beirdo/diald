@@ -82,3 +82,7 @@ and add a "device ssh" mode that sets up a pty with ssh to a remote
 system running on it so that we can then start pppd through it.
 
 Internationalize...
+
+If after dialling we can do a PPPIOCGUNIT on the modem we had a
+broken dial script that started pppd itself. Can we recover
+gracefully from this?

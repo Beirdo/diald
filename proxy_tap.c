@@ -79,7 +79,7 @@ static void
 proxy_tap_start(proxy_t *proxy)
 {
     iface_start("proxy", proxy->iftype, proxy->ifunit,
-	orig_local_ip, orig_remote_ip, orig_broadcast_ip);
+	orig_local_ip, orig_remote_ip, orig_broadcast_ip, metric+1);
 }
 
 
@@ -87,7 +87,7 @@ static void
 proxy_tap_stop(proxy_t *proxy)
 {
     iface_stop("proxy", proxy->iftype, proxy->ifunit,
-	orig_local_ip, orig_remote_ip, orig_broadcast_ip);
+	orig_local_ip, orig_remote_ip, orig_broadcast_ip, metric+1);
 }
 
 
@@ -107,7 +107,7 @@ proxy_tap_release(proxy_t *proxy)
 {
     proxy_tap_stop(proxy);
     iface_down("proxy", proxy->iftype, proxy->ifunit,
-	orig_local_ip, orig_remote_ip, orig_broadcast_ip);
+	orig_local_ip, orig_remote_ip, orig_broadcast_ip, metric+1);
     proxy_tap_close(proxy);
     unlock(proxy_lock);
 }

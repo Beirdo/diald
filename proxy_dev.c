@@ -98,7 +98,7 @@ proxy_dev_start(proxy_t *proxy)
     }
 
     iface_start("proxy", proxy->iftype, proxy->ifunit,
-	orig_local_ip, orig_remote_ip, orig_broadcast_ip);
+	orig_local_ip, orig_remote_ip, orig_broadcast_ip, metric+1);
 }
 
 
@@ -114,7 +114,7 @@ proxy_dev_stop(proxy_t *proxy)
     }
 
     iface_stop("proxy", proxy->iftype, proxy->ifunit,
-	orig_local_ip, orig_remote_ip, orig_broadcast_ip);
+	orig_local_ip, orig_remote_ip, orig_broadcast_ip, metric+1);
 }
 
 
@@ -138,7 +138,7 @@ proxy_dev_release(proxy_t *proxy)
     proxy_dev_stop(proxy);
     if (!(current_dev && !strcmp(current_proxy, current_dev)))
 	iface_down("proxy", proxy->iftype, proxy->ifunit,
-	    orig_local_ip, orig_remote_ip, orig_broadcast_ip);
+	    orig_local_ip, orig_remote_ip, orig_broadcast_ip, metric+1);
     proxy_dev_close(proxy);
 }
 

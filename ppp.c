@@ -224,7 +224,7 @@ int ppp_set_addrs()
 	 * may be user or default routes to add :-(.
 	 */
 	iface_start("link", "ppp", link_iface,
-	    local_ip, remote_ip, broadcast_ip);
+	    local_ip, remote_ip, broadcast_ip, metric);
 	if (proxy.stop)
 	    proxy.stop(&proxy);
 
@@ -295,9 +295,9 @@ void ppp_reroute()
 
     if (link_iface != -1) {
     	iface_stop("link", "ppp", link_iface,
-	    local_ip, remote_ip, broadcast_ip);
+	    local_ip, remote_ip, broadcast_ip, metric);
     	iface_down("link", "ppp", link_iface,
-	    local_ip, remote_ip, broadcast_ip);
+	    local_ip, remote_ip, broadcast_ip, metric);
 	link_iface = -1;
     }
 }

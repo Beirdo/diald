@@ -1,5 +1,9 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - Routes on the proxy and actual link are given different metrics
+    again. I _think_ that you can only have multiple routes with the
+    same metric if the kernel is compiled with the equal cost multipath
+    option (which is under the advanced router config section).
   - Improve mode dev handling so we notice if the interface went
     down for reasons beyond oor ken.
   - Added basic igmp and ospfigp protocol rules and set the

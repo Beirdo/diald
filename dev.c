@@ -149,7 +149,7 @@ int dev_set_addrs()
 	}
 
 	iface_start("link", device_node, link_iface,
-	    local_ip, remote_ip, broadcast_ip);
+	    local_ip, remote_ip, broadcast_ip, metric);
 	if (proxy.stop)
 	    proxy.stop(&proxy);
 
@@ -216,7 +216,7 @@ void dev_reroute()
     /* Kill the alternate routing */
     if (link_iface != -1) {
 	iface_stop("link", device_node, link_iface,
-	    local_ip, remote_ip, broadcast_ip);
+	    local_ip, remote_ip, broadcast_ip, metric);
 	/* We do not down dev interfaces here. Things like ISDN
 	 * require the interface to be up to receive incoming calls.
 	 * If this is not what you want you can do it in a disconnect

@@ -10,7 +10,7 @@
 #include "diald.h"
 
 static void
-add_routes(char *desc, char *iface, char *lip, char *rip)
+add_routes(char *desc, char *iface, char *lip, char *rip, int metric)
 {
     char win[32];
     char buf[1024];
@@ -92,7 +92,7 @@ add_routes(char *desc, char *iface, char *lip, char *rip)
 
 
 static void
-del_routes(char *desc, char *iface, char *lip, char *rip)
+del_routes(char *desc, char *iface, char *lip, char *rip, int metric)
 {
     char buf[1024];
 
@@ -128,7 +128,7 @@ del_routes(char *desc, char *iface, char *lip, char *rip)
 
 void
 iface_start(char *mode, char *iftype, int ifunit,
-    char *lip, char *rip, char *bip)
+    char *lip, char *rip, char *bip, int metric)
 {
     char *iface, desc[32], buf[1024];
 
@@ -162,13 +162,13 @@ iface_start(char *mode, char *iftype, int ifunit,
 	run_shell(SHELL_WAIT, desc, buf, -1);
     }
 
-    add_routes(desc, iface, lip, rip);
+    add_routes(desc, iface, lip, rip, metric);
 }
 
 
 void
 iface_stop(char *mode, char *iftype, int ifunit,
-    char *lip, char *rip, char *bip)
+    char *lip, char *rip, char *bip, int metric)
 {
     char *iface, desc[32], buf[128];
 
@@ -192,7 +192,7 @@ iface_stop(char *mode, char *iftype, int ifunit,
      * 2.0.x kernels have a different behaviour when the address is
      * set to 0.0.0.0 so we use 127.0.0.1 as a "safe" local address.
      */
-    del_routes(desc, iface, lip, rip);
+    del_routes(desc, iface, lip, rip, metric);
 
     sprintf(buf, "%s %s %s",
 	path_ifconfig, iface,
@@ -208,7 +208,7 @@ iface_stop(char *mode, char *iftype, int ifunit,
 
 void
 iface_down(char *mode, char *iftype, int ifunit,
-    char *lip, char *rip, char *bip)
+    char *lip, char *rip, char *bip, int metric)
 {
     char *iface, desc[32], buf[128];
 
