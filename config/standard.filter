@@ -1,8 +1,8 @@
 # This is a pretty complicated set of filter rules.
 # (These are the rules I use myself.)
 #
-# I've divided the rules up into four sections.
-# TCP packets, UDP packets, ICMP packets and a general catch all rule
+# I've divided the rules up into five sections.
+# TCP packets, UDP packets, IGMP, ICMP packets and a general catch all rule
 # at the end.
 
 
@@ -95,6 +95,7 @@ accept tcp 120 tcp.source=tcp.ftp
 # If we don't catch it above, give the link 10 minutes up time.
 accept tcp 600 any
 
+
 # Rules for UDP packets
 #
 # We time out domain requests right away, we just want them to bring
@@ -138,8 +139,20 @@ ignore udp tcp.source=udp.route
 # Anything else gest 2 minutes.
 accept udp 120 any
 
-# Ignore some background protocols.
+
+# Rules for IGMP packets
+
+# Bring the link up for mtrace requests.
+accept igmp 10 igmp.vertype=IGMP_MTRACE
+
+# Bring the link up for new membership reports.
+accept igmp 10 igmp.vertype=IGMP_HOST_NEW_MEMBERSHIP_REPORT
+
+# All other IGMP packets are ignored.
 ignore igmp any
+
+
+# Ignore some background protocols.
 ignore ospfigp any
 
 # Catch any packets that we didn't catch above and give the connection

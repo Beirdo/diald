@@ -1,5 +1,6 @@
 Major changes between version 2.0 and 2.0.1
 ------------------------------------------------
+  - Added IGMP protocol rules and link rules.
   - Use ip to set and remove addresses if we have it and specify the
     netmask.
 

@@ -42,7 +42,12 @@ subproto	ip6	tcp,udp,icmpv6,igmp,ospfigp
 subproto	ipx	rip,sap,spx,ncp,pprop
 
 # Define the outermost "virtual" packet header.
+# N.B. This is only correct if we are using a packet socket to
+# monitor the link. Otherwise it simply tells us if the source
+# address of the packet was numerically less than the destination.
 var	any.direction	{any}@0[1]
+var	OUT		1
+var	IN		2
 
 # Define the IPv4 packet header fields.
 var	ip.version	{ip}@0[1]>>4&0xf
@@ -98,6 +103,24 @@ var	icmp.echo.id	{icmp}@4[2]
 var	icmp.echo.seq	{icmp}@6[2]
 var	icmp.gateway	{icmp}@4[4]
 var	icmp.mtu	{icmp}@6[2]
+
+# Define the IGMP packet header fields
+var	igmp.vertype	{igmp}@0[1]
+var	igmp.version	{igmp}@0[1]>>4&0x0f
+var	igmp.type	{igmp}@0[1]&0x0f
+var	igmp.subtype	{igmp}@1[1]
+var	igmp.group	{igmp}@4[4]
+
+# IGMP vertype constants
+var	IGMP_HOST_MEMBERSHIP_QUERY	0x11
+var	IGMP_HOST_MEMBERSHIP_REPORT	0x12
+var	IGMP_DVMRP			0x13
+var	IGMP_PIM			0x14
+var	IGMP_TRACE			0x15
+var	IGMP_HOST_NEW_MEMBERSHIP_REPORT	0x16
+var	IGMP_HOST_LEAVE_MESSAGE		0x17
+var	IGMP_MTRACE_RESP		0x1e
+var	IGMP_MTRACE			0x1f
 
 # saw_fin 0-1, tcp_flags 2-3, fin_seq 4-7 8-11
 #state	tcp	@0[4]	tcp.rst		0
