@@ -1,3 +1,9 @@
+Major changes between version 1.0 and 1.0.1
+------------------------------------------------
+  - Use ip to set and remove addresses if we have it and specify the
+    netmask.
+
+
 Major changes between version 0.99.5 and 1.0
 ------------------------------------------------
   - Use openpty to get a pseudo terminal if it is available.

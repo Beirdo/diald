@@ -187,7 +187,12 @@ void act_STOP_DIAL(void)
 }
 void trans_STOP_DIAL(void)
 {
+#if 1
     if (dial_pid == 0) GOTO(STATE_CLOSE);
+#else
+    /* If the connector does more than just dial it may be best to do this? */
+    if (dial_pid == 0) GOTO(STATE_STOP_LINK);
+#endif
 }
 
 

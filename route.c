@@ -11,6 +11,24 @@
 
 #include <diald.h>
 
+
+static int
+mask_to_bits(char *netmask)
+{
+    unsigned int mask, bits;
+    int nbits;
+
+    if (!netmask || !*netmask)
+	return 32;
+
+    bits = ntohl(inet_addr(netmask));
+    for (mask=0x80000000,nbits=0; mask; mask>>=1,nbits++)
+	if (!(bits & mask))
+	    break;
+    return nbits;
+}
+
+
 static void
 add_routes(char *desc, char *iface, char *lip, char *rip, int metric)
 {
@@ -39,27 +57,33 @@ add_routes(char *desc, char *iface, char *lip, char *rip, int metric)
      */
     if (rip) {
 	if (path_ip && *path_ip) {
-	    sprintf(buf,"%s route replace %s dev %s scope link%s%s metric %d %s",
-		path_ip, rip, iface,
+	    sprintf(buf,"%s route replace %s/%d dev %s scope link%s%s metric %d %s",
+		path_ip, rip, mask_to_bits(netmask), iface,
 		lip ? " src " : "",
 		lip ? lip : "",
 		metric, win); 
 	} else {
-	    sprintf(buf,"%s add %s metric %d %s dev %s",
-		path_route, rip, metric, win, iface);
+	    sprintf(buf,"%s add %s%s%s metric %d %s dev %s",
+		path_route, rip,
+		netmask ? " netmask " : "",
+		netmask ? netmask : "",
+		metric, win, iface);
 	}
 	run_shell(SHELL_WAIT, desc, buf, -1);
 
 	if (metric) {
 	    if (path_ip && *path_ip) {
-		sprintf(buf,"%s route del %s dev %s scope link%s%s metric 0 %s",
-		    path_ip, rip, iface,
+		sprintf(buf,"%s route del %s/%d dev %s scope link%s%s metric 0 %s",
+		    path_ip, rip, mask_to_bits(netmask), iface,
 		    lip ? " src " : "",
 		    lip ? lip : "",
 		    win); 
 	    } else {
-		sprintf(buf,"%s del %s metric 0 %s dev %s",
-		    path_route, rip, win, iface); 
+		sprintf(buf,"%s del %s%s%s metric 0 %s dev %s",
+		    path_route, rip,
+		    netmask ? " netmask " : "",
+		    netmask ? netmask : "",
+		    win, iface); 
 	    }
 	    run_shell(SHELL_WAIT, desc, buf, -1);
 	}
@@ -125,6 +149,31 @@ del_routes(char *desc, char *iface, char *lip, char *rip, int metric)
 	}
         run_shell(SHELL_WAIT, desc, buf, -1);
     }
+
+#if 1
+    /* This shouldn't be necessary(?) but I've seen situations where
+     * the route was left through the interface even after the address
+     * had been deleted from it (but it was on another interface at
+     * that point). Maybe I misunderstand, maybe it's just one development
+     * kernel that has a problem...
+     */
+    if (rip) {
+	if (path_ip && *path_ip) {
+	    sprintf(buf,"%s route del %s/%d dev %s scope link%s%s metric %d",
+		path_ip, rip, mask_to_bits(netmask), iface,
+		lip ? " src " : "",
+		lip ? lip : "",
+		metric); 
+	} else {
+	    sprintf(buf,"%s del %s%s%s metric %d dev %s",
+		path_route, rip,
+		netmask ? " netmask " : "",
+		netmask ? netmask : "",
+		metric, iface);
+	}
+	run_shell(SHELL_WAIT, desc, buf, -1);
+    }
+#endif
 }
 
 
@@ -153,14 +202,25 @@ iface_start(char *mode, char *iftype, int ifunit,
 
     /* With no ifsetup script we have to do it all ourselves. */
     if (lip) {
-	sprintf(buf,"%s %s %s%s%s%s%s netmask %s metric %d mtu %d up",
-	    path_ifconfig, iface, lip,
-	    rip ? " pointopoint " : "",
-	    rip ? rip : "",
-	    bip ? " broadcast " : "",
-	    bip ? bip : "",
-	    netmask ? netmask : "255.255.255.255",
-	    metric, mtu);
+	if (path_ip && *path_ip) {
+	    sprintf(buf, "%s addr add %s/%d%s%s%s%s dev %s; %s link set %s up",
+		path_ip, lip, mask_to_bits(netmask),
+		rip ? " peer " : "",
+		rip ? rip : "",
+		bip ? " broadcast " : "",
+		bip ? bip : "",
+		iface,
+		path_ip, iface);
+	} else {
+	    sprintf(buf,"%s %s %s%s%s%s%s netmask %s metric %d mtu %d up",
+		path_ifconfig, iface, lip,
+		rip ? " pointopoint " : "",
+		rip ? rip : "",
+		bip ? " broadcast " : "",
+		bip ? bip : "",
+		netmask ? netmask : "255.255.255.255",
+		metric, mtu);
+	}
 	run_shell(SHELL_WAIT, desc, buf, -1);
     }
 
@@ -196,14 +256,24 @@ iface_stop(char *mode, char *iftype, int ifunit,
      */
     del_routes(desc, iface, lip, rip, metric);
 
-    sprintf(buf, "%s %s %s",
-	path_ifconfig, iface,
+    if (path_ip && *path_ip) {
+	sprintf(buf, "%s addr del %s/%d%s%s%s%s dev %s",
+	    path_ip, lip, mask_to_bits(netmask),
+	    rip ? " peer " : "",
+	    rip ? rip : "",
+	    bip ? " broadcast " : "",
+	    bip ? bip : "",
+	    iface);
+    } else {
+	sprintf(buf, "%s %s %s",
+	    path_ifconfig, iface,
 #ifdef HAVE_AF_PACKET
-	af_packet ? "0.0.0.0" : "127.0.0.1"
+	    af_packet ? "0.0.0.0" : "127.0.0.1"
 #else
-	"127.0.0.1"
+	    "127.0.0.1"
 #endif
-    );
+	);
+    }
     run_shell(SHELL_WAIT, desc, buf, -1);
 }
 
@@ -218,8 +288,10 @@ iface_down(char *mode, char *iftype, int ifunit,
     snprintf(desc+5, sizeof(desc)-5-1, "%s%d", iftype, ifunit);
     iface = desc+5;
 
-    sprintf(buf, "%s %s down",
-	path_ifconfig, iface
-    );
+    if (path_ip && *path_ip)
+	sprintf(buf, "%s link set %s down", path_ip, iface);
+    else
+	sprintf(buf, "%s %s down", path_ifconfig, iface);
+
     run_shell(SHELL_WAIT, desc, buf, -1);
 }
