@@ -67,7 +67,8 @@ int dev_set_addrs()
 	SET_SA_FAMILY (ifr.ifr_addr,    AF_INET); 
 	SET_SA_FAMILY (ifr.ifr_dstaddr, AF_INET); 
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
-	sprintf(ifr.ifr_name, current_dev);
+	strncpy(ifr.ifr_name, current_dev, IFNAMSIZ);
+	ifr.ifr_name[IFNAMSIZ-1] = '\0';
 	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
 	    mon_syslog(LOG_ERR,
 		"failed to read interface status from device %s: %m",
