@@ -20,8 +20,12 @@ if [ "$x" = 'setenv.o' ]; then
 		case "$x" in
 			Y*|y*)
 				ar d /usr/lib/libwrap.a setenv.o
-				echo "Removed successfully"
-				exit 0
+				if [ $? -eq 0 ]; then
+					echo "Removed successfully"
+					exit 0
+				fi
+				echo "Removal failed."
+				exit 1
 				;;
 			N*|n*)
 				echo "Ok. It is still there. Good luck."

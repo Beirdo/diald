@@ -1,5 +1,7 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - fixwrappers now checks exit status of ar to see if it succeeded
+    or not.
   - Removed references to reroute and -reroute from the man page.
   - Enabled the demasq code.
   - Use a local netlink.h so we can compile with, hopefully, any
