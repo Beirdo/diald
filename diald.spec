@@ -40,6 +40,10 @@ rm -rf "$RPM_BUILD_ROOT"
 %doc %{_mandir}/man5/diald-control.5
 %doc %{_mandir}/man5/diald-monitor.5
 %doc %{_mandir}/man8/diald.8
+%attr (0644, root, root) /etc/pam.d/diald
 %attr (0755, root, root) /usr/sbin/diald
 %attr (0755, root, root) /usr/bin/dctrl
 %attr (0644, root, root) /usr/lib/diald/*.gif
+%attr (0644, root, root) /usr/lib/diald/diald.defs
+%attr (0644, root, root) /usr/lib/diald/standard.filter
+%attr (0644, root, root) /usr/lib/diald/connect
