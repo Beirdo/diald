@@ -185,3 +185,5 @@ Add IPv6 support...
 
 Have some way of reading config files through cpp or m4 or ??? so
 that they can be parameterized.
+
+Impulse timing should start from START_LINK not UP.
