@@ -88,16 +88,6 @@ int del_timer(struct timer_lst *timer)
     return 1;
 }
 
-int validate_function(struct timer_lst *c)
-{
-	if (c->function == del_impulse
-	|| c->function == del_connection
-	|| c->function == slip_start_fail)
-		return 1;
-	mon_syslog(LOG_ERR, "Caught a bad function value %p. Tell Eric.\n",
-		c->function);
-	return 0;
-}
 
 void fire_timers()
 {
@@ -113,8 +103,7 @@ void fire_timers()
 	/* process the data, this may free the timer entry,
 	 * so we can't refer to the contents of c again.
 	 */
-	if (validate_function(c))
-		(*c->function)(c->data);
+	(*c->function)(c->data);
 	c = cn;
     }
 }
