@@ -1,59 +1,8 @@
-When passing snooped packets through the firewall rules pass
-sll address struct.
--- Now passing the whole sockaddr_sll through check_firewall and
-   using it to get the direction of the packet. Now addresses are
-   always ordered with those beyond the managed link on the right
-   which is better than the previous numerical ordering.
-
-Use a dummy interface rather than slip. It doesn't have to muck
-around passing packets as byte streams through a pseudo-terminal.
--- Now with ethertap option.
-
 Add mechanisms for manual start/stop of other links when bandwidth
 thresholds are crossed. (e.g. slave ISDN links or equal-cost routes).
 
-If we are blocked it may sometimes be better to remove the proxy
-routes to avoid unnecessary timeouts. There should be an option
-for this.
--- Added a blocked-route option which defaults to on. If it is on
-   you get routes through the proxy when blocked, if it is off
-   you get no routes. Note that currently this only changes routes
-   when the interface goes up and down, not when blocked or
-   blocked-route changes.
-   Now it changes routes when blocked-route changes but not
-   when blocked changes.
-   Now it changes routes when the blocked flag changes but only
-   if the link is down of course.
-
-The diald/dctrl combination makes a useful little traffic monitor
-for an interface. Perhaps we could use it as such without all the
-dial up and proxy baggage?
--- Added support to diald and dctrl to show packets per second,
-   bytes per second, percentage of link bandwidth (currently
-   hardcoded in dctrl to 33k6) and total bytes in and out for
-   each connection. Cute :-).
-
-Allow monitors to pass configuration commands to diald for on the
-fly reconfiguration? Security?
--- Done. Use "config <option>". No security yet...
-   Some security now but it's compile time configured and only
-   per connection type so far.
-     Now we have the "auth" command and a simple auth method.
-   The location of the file used for simple auth should be
-   a config option though.
-
 Add authentication on control connections with user/password login,
 maybe SSL?
-
-Add a toolbar to dctrl.
--- Done.
-
-Use monitor messages for more than just dial messages?
--- Started...
-   The monitor messages now feed off the same stream that the
-   syslog messages do. Output from external scripts (connect,
-   route etc.) is caught and handled as messages. Monitors are
-   able to set the level of messages they see.
 
 In dctrl the connection queue, dialling log etc. should be
 independently resizable.
@@ -62,14 +11,8 @@ Now using STATUS2 message to pass flags (blocked, forced etc.). This
 happens at the same time as STATUS. Really it only needs to happen
 when we get a new monitor connection or when the flags change.
 
-Should we be able to specify a metric for the routes through the
-link/proxy?
-
 The behaviour of the horizontal scrollbar on the dctrl information
 window is "unpleasant".
-
-Need a menu on the dctrl information window to select log level.
--- Done.
 
 If we have ISDN ippp links that are both dial out and dial in there
 is no way to get locking right. If we have more than one link there
@@ -84,30 +27,10 @@ the ISDN layers don't have any form of blocking dial.
    I can see no obvious way of knowing if your dial out succeeded
    or if the ippp interface just accepted an incoming call.
 
-We currently have several ways of forking scripts in diald, most
-of which are very similar. There must be opportunity for rationalization
-here?
-
 Rewrite dctrl in Java...
-
-90% of the packets that trigger a link up are DNS queries. Consider
-parsing the request out and displaying it meaningfully.
--- If we have a caching nameserver on this end of the link which
-   isn't used for general, internal, queries (sensible if you don't
-   want mispelled host names to bounce the link) you could have
-   your down script enable query logging and your up script
-   disable query logging. Not perfect but a generic packet parser
-   in diald is getting a bit silly IMHO.
 
 It doesn't make sense to buffer some types of packets (e.g. ntp?).
 Does diald allow us to (not) do that?
-
-The chat I have doesn't flush stderr at appropriate times (i.e.
-when waiting for a response) nor does it report all fails to
-stderr.
--- Don't just have it write its output to stderr. Use the -v -s -S
-   options to have it write debug messages to stderr but not
-   syslog. This is not as nice but works as you might expect.
 
 If we get an EAGAIN back on writing to a monitor pipe we should
 try and flush the pipe in order to avoid a stalled monitor from
@@ -119,56 +42,10 @@ causing diald to suck resources.
 When dctrl is not displaying the packet queue it should not ask
 diald for it.
 
-Should a link down request abort an in-progress dial?
--- Done. The connector is run in its own process group and we
-   signal the process group to stop a dial. Anything that needs
-   to do anything more complex than simply close the port needs
-   to trap SIGINT.
-
 Need to sort out keyboard accelerators and shortcuts on dctrl's menus.
-
-When building the description string for a connection we should optionally
-unmasquerade (using /proc/net/ip_masquerade) and convert addresses
-to textual names.
--- Demasquerading is done (controlled by the demasq option).
-   Note that this demasq's *only* as far as the description in
-   the connection queue given to monitors is concerned. It would
-   also be nice to have a way of demasq'ing before feeding the
-   address through the firewall rules. That would mean demasqing
-   every packet though...
-     Uh... It seems that the snoop socket always sees packets *before*
-   they are masqueraded on their way out and after they are demasqueraded
-   on their way in, which is what we want. However if the link is
-   down we see packets *after* they have been masqueraded because we
-   are watching the remote end of a slip link. This appears to be
-   another vote for snooping a dummy interface rather than using a
-   slip link for the proxy?
 
 It would be nice for dctrl to have some obvious display of how
 long the link has been up somewhere.
-
-The port numbers really should be separated from the IP addresses
-by colons rather than slashes in the packet queue list. However
-diald-top has some excessively strict parsing and changing this
-would break it. One day I will. I may send a patch to diald-top
-before then if I get round to it. I may not...
-
-If we come up on an incoming request and the requested device
-name does not start with '/' we should assume it is an interface
-name and handle it as for mode = dev regardless of the configured
-mode setting. This should allow for things like laptops which
-may have a PC-Card (aka PCMCIA) interface inserted while in the
-office/home but be required to make *out*-going connections
-via dial up ppp or slip. It may also enable us to have a diald
-attach itself to an arbitrary interface and act as a traffic
-monitor on it. (We also need a way to have a diald release a
-link without downing it first!)
-
-There should be an on-demand option that determines whether
-the link is brought up on demand. The block option should
-block *all* dial attempts - manual included.
--- Done. The option is "demand" with corresponding nodemand
-   (aka -demand for the command line).
 
 Is it possible to run with no timeout for the connect script and
 let the connect script handle everything?
@@ -181,8 +58,6 @@ can't use them as Tcl/Tk does not support Unix domain sockets
 Firewall rules should be tagged with the file and line no. they
 came from (or something equally meaningful for on-the-fly reconfig).
 We can use that to give more meaningful log messages.
-
-Add IPv6 support...
 
 Have some way of reading config files through cpp or m4 or ??? so
 that they can be parameterized.
