@@ -21,7 +21,7 @@ proto	ip6ip	41	0		6		-
 proto	ospfigp	89	0		0		-
 #proto	pim	103
 
-proto	icmpv6	58	8		0		-
+proto	icmp6	58	8		0		-
 
 proto	rip	0x01	0		0		-
 proto	sap	0x04	0		0		-
@@ -38,7 +38,7 @@ subproto	pkt.ipx	ipx
 subproto	ip	tcp,udp,icmp,igmp,ip6ip,ospfigp
 subproto	ip6ip	ip6
 subproto	ipip	ip
-subproto	ip6	tcp,udp,icmpv6,igmp,ospfigp
+subproto	ip6	tcp,udp,icmp6,igmp,ospfigp
 subproto	ipx	rip,sap,spx,ncp,pprop
 
 # Define the outermost "virtual" packet header.
@@ -103,6 +103,38 @@ var	icmp.echo.id	{icmp}@4[2]
 var	icmp.echo.seq	{icmp}@6[2]
 var	icmp.gateway	{icmp}@4[4]
 var	icmp.mtu	{icmp}@6[2]
+
+# ICMP type constants
+var	ICMP_ECHOREPLY		0
+var	ICMP_DEST_UNREACH	3
+var	ICMP_SOURCE_QUENCH	4
+var	ICMP_REDIRECT		5
+var	ICMP_ECHO		8
+var	ICMP_TIME_EXCEEDED	11
+var	ICMP_PARAMETERPROB	12
+var	ICMP_TIMESTAMP		13
+var	ICMP_TIMESTAMPREPLY	14
+var	ICMP_INFO_REQUEST	15
+var	ICMP_INFO_REPLY		16
+var	ICMP_ADDRESS		17
+var	ICMP_ADDRESSREPLY	18
+
+# Define the ICMP6 packet header fields.
+var	icmp6.type	{icmp6}@0[1]
+var	icmp6.code	{icmp6}@1[1]
+var	icmp6.checksum	{icmp6}@2[2]
+var	icmp6.data	{icmp6}@4[4]
+
+# ICMP6 type constants
+var	ICMP6_DST_UNREACH             1
+var	ICMP6_PACKET_TOO_BIG          2
+var	ICMP6_TIME_EXCEEDED           3
+var	ICMP6_PARAM_PROB              4
+var	ICMP6_ECHO_REQUEST          128
+var	ICMP6_ECHO_REPLY            129
+var	ICMP6_MEMBERSHIP_QUERY      130
+var	ICMP6_MEMBERSHIP_REPORT     131
+var	ICMP6_MEMBERSHIP_REDUCTION  132
 
 # Define the IGMP packet header fields
 var	igmp.vertype	{igmp}@0[1]
