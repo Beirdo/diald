@@ -1,5 +1,8 @@
 Major changes between version 0.98.2 and 0.98.3.
 ------------------------------------------------
+  - pppd is spawned with the nodefaultroute argument on its command
+    line to avoid breakage with some systems which appear to put
+    a defaultroute in pppd's global options file.
   - Added options to select either the new ethertap proxy code or
     the old slip proxy code in the Makefile. The Makefile will
     now complain if the config settings have not been set before

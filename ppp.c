@@ -44,7 +44,7 @@ void ppp_start()
 #define ADD_ARG(arg) { argv[i] = arg; argv_len += strlen(argv[i++]) + 1; }
     
     if (link_pid == 0) {
-	char **argv = (char **)malloc(sizeof(char *)*(pppd_argc+11));
+	char **argv = (char **)malloc(sizeof(char *)*(pppd_argc+12));
 	int argv_len = 0;
 	char buf[24], *argv_buf;
 	int i = 0, j;;
@@ -53,6 +53,7 @@ void ppp_start()
         unblock_signals();
 
 	ADD_ARG(path_pppd);
+	ADD_ARG("nodefaultroute");
 	ADD_ARG("-detach");
 	if (modem) ADD_ARG("modem");
 	if (crtscts) ADD_ARG("crtscts");
