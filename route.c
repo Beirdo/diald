@@ -129,7 +129,7 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 void
 iface_start(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 {
-    char buf[128];
+    char buf[1024];
 
     /* mark the interface as up */
     if (ifsetup) {
