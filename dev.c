@@ -21,6 +21,51 @@ static int dead = 1;
 /* internal flag to shortcut repeated calls to setaddr */
 static int rx_count = -1;
 
+/*
+ * fork_connect()
+ *
+ * Added by JPD and AJY, this function is provided to provide a general
+ * connect and disconnect functionality for dev mode. This is needed to
+ * reliably control isdn4linux and ippp0 because although it appears to
+ * diald as a device, it is actually a link that can be brought up and 
+ * down and can have errors connecting (which you'd like to send back to
+ * diald so that it knows it doesn't have a connection) and it is nice
+ * to be able to control when the link goes down.
+ */
+void fork_connect(char *program)
+{
+    block_signals();
+
+    dial_pid = fork();
+
+    if (dial_pid < 0) {
+	unblock_signals();
+	syslog(LOG_ERR, "failed to fork dialer: %m");
+	/* FIXME: Probably this should not be fatal */
+	die(1);
+    }
+
+    if (dial_pid == 0) {
+	/* change the signal actions back to the defaults, then unblock them. */
+	default_sigacts();
+	unblock_signals();
+	
+	execl("/bin/sh", "sh", "-c", program, (char *)0);
+	syslog(LOG_ERR, "could not exec /bin/sh: %m");
+	_exit(127);
+	/* NOTREACHED */
+    }
+
+    /* This unblock must not be earlier, otherwise the child can finish
+     * a reset dial_pid to 0 before the parent gets past the above test.
+     * This kills the parent.
+     */
+    unblock_signals();
+    /* AJY, added the program name so I could tell the difference between my */
+    /* connector and my disconnector */
+    syslog(LOG_INFO,"Running connect %s (pid = %d).",program,dial_pid);
+}
+
 void dev_start()
 {
     link_iface = -1 ;
@@ -90,9 +135,6 @@ int dev_set_addrs()
 	else
 	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
-	/* Set the ptp routing for the new interface */
-    	set_ptp(device_node,link_iface,remote_ip,0);
-
 	if (dynamic_addrs) {
 	    /* only do the configuration in dynamic mode. */
 	    struct in_addr addr;
@@ -108,7 +150,13 @@ int dev_set_addrs()
     		set_ptp("sl",proxy_iface,remote_ip,1);
                 add_routes("sl",proxy_iface,local_ip,remote_ip,1);
 	    }
-	}
+	} 
+
+	/* Set the ptp routing for the new interface */
+	/* this was moved from about 15 lines above by ajy so that for */
+	/* dynamic addresses, we have the remote address when we make */
+	/* the call to setup the route */
+	set_ptp(device_node,link_iface,remote_ip,0);
 
 	if (do_reroute)
              add_routes(device_node,link_iface,local_ip,remote_ip,0);
@@ -129,7 +177,7 @@ int dev_rx_count()
     char buf[128];
     int packets = 0;
     FILE *fp;
-    sprintf(buf,"%s %s%d",PATH_IFCONFIG,device_node,link_iface);
+    sprintf(buf,"%s %s%d",path_ifconfig,device_node,link_iface);
     if ((fp = popen(buf,"r"))==NULL) {
         syslog(LOG_ERR,"Could not run command '%s': %m",buf);
         return 0;       /* assume half dead in this case... */

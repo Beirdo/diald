@@ -116,6 +116,12 @@ struct speed {
 #ifdef B115200
     { 115200, B115200 },
 #endif
+#ifdef B230400
+    { 230400, B230400 },
+#endif
+#ifdef B460800
+    { 460800, B460800 },
+#endif
     { 0, 0 }
 };
 
@@ -192,12 +198,11 @@ void setdtr(int fd, int on)
 void fork_dialer(char *program, int fd)
 {
     block_signals();
+
     dial_pid = fork();
 
-    if (dial_pid != 0)
-      unblock_signals();
-
     if (dial_pid < 0) {
+	unblock_signals();
         syslog(LOG_ERR, "failed to fork dialer: %m");
 	/* FIXME: Probably this should not be fatal */
         die(1);
@@ -234,6 +239,8 @@ void fork_dialer(char *program, int fd)
         _exit(127);
         /* NOTREACHED */
     }
+
+    unblock_signals();
     syslog(LOG_INFO,"Running connect (pid = %d).",dial_pid);
 }
 
@@ -252,7 +259,16 @@ int open_modem()
     modem_fd = -1;
     dial_status = 0;
 
-    if (mode == MODE_DEV) return 0;
+    /* JPD changed mode_dev so that we can use a connect script to get */
+    /* ipppd to dial. This allows us to use a connector program to get */
+    /* ipppd to dial and make sure that ipppd successfully connects to */
+    /* the ISP. Otherwise, we can't be sure that ipppd successfully */
+    /* connected and diald would show that we we're connected */
+    if (mode == MODE_DEV) 
+    {
+        fork_connect(connector);
+        return 0;
+    }
 
     if (req_pid) {
 	/* The user has specified a device. Use it, no search or lock needed. */
@@ -432,7 +448,7 @@ void close_modem()
     sleep(1);
 
     close(modem_fd);
-    if (req_pid) {
+    if (use_req) {
 	if (debug&DEBUG_VERBOSE)
 	    syslog(LOG_INFO, "Killing requesting shell pid %d",req_pid);
 	killpg(req_pid, SIGKILL);

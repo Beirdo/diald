@@ -21,7 +21,7 @@ void set_ptp(char *itype, int iface, char *rip, int metric)
     if (debug&DEBUG_VERBOSE)
 	syslog(LOG_INFO, "Setting pointopoint route for %s%d",itype,iface);
     sprintf(buf,"%s add %s metric %d %s dev %s%d",
-	PATH_ROUTE,rip,metric,win,itype,iface); 
+	path_route,rip,metric,win,itype,iface); 
     res = system(buf);
     report_system_result(res,buf);
 }
@@ -50,9 +50,13 @@ void add_routes(char *itype, int iface, char *lip, char *rip, int metric)
 
     /* Add in a default route for the link */
     /* FIXME: should this refuse to add if a default route exists? */
+    /* FIXME: Should not report an error if the error was just that the
+     *        route we tried to add already exists.
+     *        (A new error reported by more recent kernels.)
+     */
     if (default_route) {
-	sprintf(buf,"%s add default metric %d %s dev %s%d",
-		PATH_ROUTE,metric,win,itype,iface);
+	sprintf(buf,"%s add default metric %d %s netmask 0.0.0.0 dev %s%d",
+		path_route,metric,win,itype,iface);
         res = system(buf);
     	report_system_result(res,buf);
     }
@@ -82,20 +86,20 @@ void del_routes(char *itype, int iface, char *lip, char *rip, int metric)
 
     if (proxyarp) clear_proxyarp(inet_addr(rip));
 
-    /* FIXME: should delete routes we added here?
+    /* FIXME: should delete routes be added here?
      * We may be bringing a connection "down" that always has an up interface.
      * Question: should we just delete all routes through the interface?
      * That might be the best thing. On the other hand it confuses the
      * whole question of the need for a delroute script.
      */
     if (default_route) {
-	sprintf(buf,"%s del default metric %d dev %s%d",PATH_ROUTE,metric,itype,iface);
+	sprintf(buf,"%s del default metric %d netmask 0.0.0.0 dev %s%d",path_route,metric,itype,iface);
         system(buf);
     }
 
     if (debug&DEBUG_VERBOSE)
 	syslog(LOG_INFO, "Deleting pointopoint route for %s%d",itype,iface);
-    sprintf(buf,"%s del %s metric %d dev %s%d",PATH_ROUTE,rip,metric,itype,iface); 
+    sprintf(buf,"%s del %s metric %d dev %s%d",path_route,rip,metric,itype,iface); 
     res = system(buf);
 
     if (delroute) {

@@ -38,7 +38,7 @@ char *acctlog = 0;
 char *pidlog = "diald.pid";
 char *fifoname = 0;
 char *lock_prefix = LOCK_PREFIX;
-int pidstring = 1;
+int pidstring = PIDSTRING;
 char *run_prefix = RUN_PREFIX;
 char *path_route = PATH_ROUTE;
 char *path_ifconfig = PATH_IFCONFIG;
@@ -53,11 +53,12 @@ int mode = MODE_SLIP;
 int debug = 0;
 int modem = 0;
 int crtscts = 0;
-int daemon = 1;
+int daemon_flag = 1;
 int slip_encap = 0;
 int lock_dev = 0;
 int default_route = 0;
 int dynamic_addrs = 0;
+int strict_forwarding = 0;
 int dynamic_mode = DMODE_REMOTE_LOCAL;
 int rotate_devices = 0;
 int two_way = 0;
@@ -103,7 +104,7 @@ struct {
     {"mode","[ppp|slip|cslip|slip6|cslip6|aslip|dev]",1,0,set_mode},
 /* Debugging options */
     {"debug","<debugmask>",1,&debug,set_int},
-    {"-daemon","",0,&daemon,clear_flag},
+    {"-daemon","",0,&daemon_flag,clear_flag},
 /* general options */
     {"accounting-log","<f>",1,&acctlog,set_str},
     {"pidfile","<f>",1,&pidlog,set_str},
@@ -116,6 +117,7 @@ struct {
     {"remote","<ip-address>",1,&remote_ip,set_str},
     {"netmask","<ip-address>",1,&netmask,set_str},
     {"dynamic","",0,&dynamic_addrs,set_flag},
+    {"strict-forwarding","",0,&strict_forwarding,set_flag},
     {"dslip-mode","<mode>",1,0,set_dslip_mode},
     {"defaultroute","",0,&default_route,set_flag},
     {"addroute","<script>",1,&addroute,set_str},
@@ -219,10 +221,11 @@ void init_vars()
     debug = 0;
     modem = 0;
     crtscts = 0;
-    daemon = 1;
+    daemon_flag = 1;
     slip_encap = 0;
     lock_dev = 0;
     default_route = 0;
+    strict_forwarding = 0;
     dynamic_addrs = 0;
     dynamic_mode = DMODE_REMOTE_LOCAL;
     rotate_devices = 0;
@@ -245,7 +248,7 @@ void init_vars()
     redial_backoff_limit = 600;
     dial_fail_limit = 0;
     lock_prefix = LOCK_PREFIX;
-    pidstring = 1;
+    pidstring = PIDSTRING;
     run_prefix = RUN_PREFIX;
     path_route = PATH_ROUTE;
     path_ifconfig = PATH_IFCONFIG;
@@ -405,6 +408,16 @@ void parse_args(int argc, char *argv[])
     	copy_pppd_args(argc,argv);
 }
 
+void trim_whitespace(char *s)
+{
+    int i;
+    for (i = strlen(s)-1; i >= 0; i--) {
+	if (!isspace(s[i]))
+	    break;
+	s[i] = 0;
+    }
+}
+
 /* Parse the given options file */
 void parse_options_file(char *file)
 {
@@ -420,7 +433,8 @@ void parse_options_file(char *file)
 	syslog(LOG_ERR,"Unable to open options file %s: %m",file);
 	return;	/* no options file */
     }
-    while (fscanf(fp,"%1024[^\n]\n",line) != -1) {
+    while (getsn(fp,line,1024) != EOF) {
+	trim_whitespace(line);
 	argc = 0;
 	for (s = line, argc = 0; *s && argc < MAXARGS; s++) {
 	    if (*s == ' ' || *s == '\t')
@@ -493,6 +507,8 @@ void parse_options_file(char *file)
 	    }
 	}
 	*s = 0;
+	if (argc == 0)
+	    goto comment;
 
 	for (i = 0; commands[i].str; i++)
 	    if (strcmp(commands[i].str,argv[0]) == 0)
@@ -522,18 +538,21 @@ void check_setup()
     int temp ;
     char *p ;
 
-    if (device_count == 0)
+    if (device_count == 0) {
 	flag = 1,
 	syslog(LOG_ERR,
 	    "No device specified. You must have at least one device!");
-
-    /* If for MODE_DEV then remove the /dev/ */
-    strcpy(device , strrchr(devices[0],'/')+1 );
-	
-    temp = strcspn(device, "0123456789" ) ;
-    strncpy(device_node , device , temp ) ;
-    p = device + temp + 1;
-    device_iface = atoi( p );
+    } else {
+	/* This code used to strip a leading /dev/. This is just insane.
+	 * Why put the /dev/ there in the first place for an ether device?
+	 */
+    	strncpy(device , devices[0], 9);
+	device[9] = 0;
+	for (temp = 0; device[temp] && !isdigit(device[temp]); temp++);
+    	strncpy(device_node , device , temp ) ;
+    	p = device + temp + 1;
+    	device_iface = atoi( p );
+    }
 
     if (mode != MODE_DEV)
 	for (i = 0; i < device_count; i++)
@@ -560,7 +579,10 @@ void check_setup()
     if (acctlog && (acctfp = fopen(acctlog,"a")) == NULL)
 	syslog(LOG_ERR,"Can't open accounting log file %s: %m",acctlog);
     else
-	fclose(acctfp);
+        if (acctfp) fclose(acctfp);
     
-    if (flag) exit(1);
+    if (flag) {
+	syslog(LOG_ERR,"Terminating due to damaged reconfigure.");
+	exit(1);
+    }
 }

@@ -1,4 +1,4 @@
-The next bug report will receive number: 61.
+The next bug report will receive number: 89.
 
 48. I should get someone with an alpha to test diald out in that
     environment so I can get rid of type size assumptions.
@@ -7,9 +7,141 @@ The next bug report will receive number: 61.
     (Mostly this will be with IP addresses.)
     Simiarly, I should look for uses of short where I really want u_int16_t,
     or char where I want u_int8_t.
+    [I have one report that indicates diald won't even compile with the
+     glibc implementation being used on alphas. I suppose I'll have to
+     grab glibc to fix this myself. I hope I can make it consistent
+     between the two libc's. Yuck.
+    (Check out Philip Blundels patches...)]
 
 59. By the way, ip-up options inside a restrict does not seem to work.
     The last ip-up script is always chosen, no matter the time.
     [As designed, but this would be neat to be able to do...]
 
-61.
+62. Diald can get "stuck" writing out to a monitor line if the other
+    end does something stupid in the middle of a write on our part.
+    [FIXED? Race condition possible with writes due to alarms could
+     cause the data structure listing monitors to get corrupted.
+     Changed alarms to not use an interupt. Race conditions all gone.
+     Still something funny about the opening code for the FIFO.]
+
+64. If the load goes so high that diald can't get everything out of
+    the slip connection, odd stuff starts to happen.
+    [This requires some major rewrites.
+     A start was getting rid of alarms() to do timers.
+     Next step is dealing with monitor writing on overloaded systems.
+    ]
+
+65. Something fishy in the impluse rules stuff.
+    [FIXED? I rewrote some stuff and applied some patches. Let's
+     see what the testers say.]
+
+70. Debug flags doesn't take hex values as input. The manual page
+    can be read as suggesting it does. Might as well change it to allow
+    this.
+
+71. Using scanf to do parsing is just begging for trouble. I should
+    rewrite the parsing so it doesn't use scanf at all.
+    I should also go over the diald code to make sure that it
+    can't suffer from buffer overruns causing it to run
+    arbitrary code or just crash. 
+    [Made some starts on this. Still to much dependence on sscanf for
+     my taste.]
+
+72. [Giuseppe Vacanti <gv@deselby.xs4all.nl>]
+    Should diald perhaps be putting the fifo into /var/run by default?
+    It is a run time entity after all. (Precident from gpm!)
+
+74. [Roger C. Pao]
+    If I run diald with no arguments and no /etc/diald.conf, it will core
+    dump.  add_device() is never called before check_setup().
+    [FIXED.]
+
+    If I run diald with "ttyS1" as an argument, it does not core dump, but
+    it's not finding the device.  I have to use "/dev/ttyS1" as the device
+    either on the command line, or in the /etc/diald.conf file.
+    [This should be noted in the manual pages.]
+
+75. It might be worth mentioning that you should prefer to use /dev/ttyS
+    more strongly in the docs. Perhaps a copy of tytso's message about
+    the subject, and a description of the setserial flags that can bugger
+    you up. (Maybe a clearer description of what the pppd patches do as
+    well.)
+
+76. [Jamie Penner] Seems sometimes masquerading combined with firewalling
+    can keep diald from seeing any packets. There may be a problem here
+    that needs to be looked into but it is not clear.
+    [I suspect this could happen if you want to try keep packets not
+     marked as "from us" going out on the link, since the firewall rules
+     could take them out before the masquerading gets a look at them.
+     I should check with Jamie if this was his configuration.]
+
+77. It should be made clearer in the documentation that setting local and
+    remote does not set pppd's idea of local and remote in any way and that
+    "pppd-options X:Y" is sometimes necessary.
+
+78. Diald should accecpt a "-v" (version) flag on the command line.
+    (Hmm. Verbose mode sort of does this...)
+
+79. See message dna/1997/13/518 for a good suggestion to be added to the FAQ.
+
+80. See message dna/1997/13/699. It describes a problem with diald connecting
+    to incoming calls that certify via chap/pap without any login dialog.
+
+82. Make note about slackware brain damage in FAQ. See message 1997/12/854
+    for more information.
+
+83. See message 1997/12/474 from Jim DiFronzo for some patches to dev.c.
+    [These patches aren't quite right. I've asked for an update with
+     some suggestions.]
+
+85. Add code to locking to check if own process id is stored in the lock file.
+
+86. Look at Arrigo Triulzi's message about named configuration.
+    Probably need him to rework it a bit for inclusion into the general FAQ.
+
+88. Diald does not report the forcing/blocked state on the monitor line.
+    It should do so.
+
+89. Fix dctrl so that the window size doesn't jiggle. Also document
+    the recent changes to command line parameters that came from Kurt.
+    [Wiggle should be fixed. Window is slightly wider now.]
+
+90. Add in something like "sub-restrict" that could cut a hole
+    out of a restrict time period. This makes restrict statements
+    more like: "restrict, add-restrict, sub-restrict".
+
+91. The connect script timeout doesn't work.  All it succeeds in doing is 
+    cancelling the shell.  In specific cases it might be possible to use 
+    exec chat, rather than just chat, and it is possible that bash (I use 
+    ash on a minimal system) spots the tail recursion in the simple 
+    cases.  However, I think the general case requires that a new process 
+    group be created (with precautions against input being stalled 
+    because the terminal is associated with the wrong group, and a 
+    process group kill should be used.
+
+92. The get_pty routine drops through if it doesn't find one.  I actually 
+    had the machine configured with only a few new stle PTYs, and none in 
+    the pty[pqrs] range.  The result is various strange error messages.
+
+    It might be an idea to include the expected range in the FILES 
+    section of the man page.
+
+    [Partially fixed. No reports a sensible error if no pty is found.
+     It should still be rewritten to look at all possible names.]
+
+93. Check the diald archives. Time for a new archivist?
+    (Mailed jeremy asking if he wants to pass the torch.)
+
+94. Dctrl man page is wrong with regard to -control-window behavior.
+    Iconifying does not prevent an icon from appearing in this case.
+
+95. Document how to use a connect script to dial more than one number.
+
+96. Point to diald-top and the new diald monitoring deamon in the docs.
+    Might as well point to any other contrib stuff promeniently
+    as possible, maybe to config tools as well.
+
+97. See message dna/1997/17/686 for a start on patches to rewrite
+    addresses when diald is going up. It's not a total solution, but
+    it's a nice start. Best would be to make masquerading do the right
+    thing (TM).

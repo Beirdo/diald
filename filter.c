@@ -43,6 +43,7 @@ void idle_filter_init()
     txtotal = rxtotal = 0;
 
     /* try to bind the snooping socket to a particular device */
+    memset(&to,0,sizeof(to));
     to.sa_family = AF_INET;
     strcpy(to.sa_data,snoop_dev);
     /* This bind may fail if the kernel isn't recent enough. */
@@ -79,6 +80,7 @@ void idle_filter_proxy()
 
     /* try to bind the snooping socket to a particular device */
     /* Most likely this should close the old socket and open a new one first */
+    memset(&to,0,sizeof(to));
     to.sa_family = AF_INET;
     strcpy(to.sa_data,snoop_dev);
     /* This bind may fail if the kernel isn't recent enough. */
@@ -94,7 +96,7 @@ void idle_filter_proxy()
 void filter_read()
 {
     struct sockaddr from;
-    int from_len = sizeof(struct sockaddr);
+    size_t from_len = sizeof(struct sockaddr);
     int len;
 
     if ((len = recvfrom(snoopfd,packet,4096,0,&from,&from_len)) > 0) {

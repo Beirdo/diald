@@ -36,17 +36,27 @@
 */
 #include <netinet/in.h>
 /* #include <asm/byteorder.h> */
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#include <linux/icmp.h>
 /* Shut up gcc about a redefinition that is harmless */
 #undef LITTLE_ENDIAN
+#ifndef __GLIBC__
 #include <linux/ip.h>
 #include <linux/in.h>
+#include <linux/udp.h>
+#include <linux/tcp.h>
+#include <linux/icmp.h>
+#else
+#include <netinet/ip.h>
+#include <netinet/udp.h>
+#include <netinet/tcp.h>
+#endif
 #include <arpa/inet.h>
 /* Hmm. Should there be a netinet pointer to these??? */
+#ifndef __GLIBC__ 
 #include <linux/if_ether.h>
 #include <linux/if_slip.h>
+#else
+#include <net/ethernet.h>
+#endif
 
 #include <linux/version.h>
 /* This only exists in kernels >= 1.3.75 */
@@ -224,7 +234,8 @@ int debug;
 int modem;
 int rotate_devices;
 int crtscts;
-int daemon;
+int daemon_flag;
+int strict_forwarding;
 int dynamic_addrs;
 int dynamic_mode;
 int slip_encap;
@@ -328,8 +339,9 @@ void fifo_read(void);
 void proxy_read(void);
 void modem_read(void);
 void advance_filter_queue(void);
-void alrm_timer(int);
-int recv_packet(unsigned char *, int);
+void fire_timers(void);
+int recv_packet(unsigned char *, size_t);
+void send_packet(unsigned char *, size_t);
 void sig_hup(int);
 void sig_intr(int);
 void sig_term(int);
@@ -356,6 +368,7 @@ int insert_packet(unsigned char *, int);
 int lock(char *dev);
 void unlock(void);
 void fork_dialer(char *, int);
+void fork_connect(char *);
 void flush_timeout_queue(void);
 void set_up_tty(int, int, int);
 void flush_prules(void);
@@ -427,3 +440,10 @@ void mon_write(int,char *,int);
 void background_system(const char *);
 void block_timer();
 void unblock_timer();
+int getservice(const char *name, const char *proto);
+int getprotocol(const char *name);
+char *getprotonumber(int proto);
+int getsn(FILE *fp,char *buf,int len);
+void del_impulse(FW_unit *unit);
+void del_connection(FW_Connection *c);
+void slip_start_fail(void * data);
