@@ -1,5 +1,11 @@
 Major changes between version 0.98.3 and 0.98.4.
 ------------------------------------------------
+  - When using ifconfig we specify the remote IP address as the
+    broadcast as well as the pointopoint. This is to enable diald
+    to handle both pointopoint and broadcast interfaces on 2.2.x
+    kernels. Note that if you specify a netmask other than all ones
+    (the default) the remote IP you specify should probably be
+    the broadcast.
   - Added an ifsetup script that can be used to set up interfaces
     in *really* interesting ways. If defined it is used instead
     of ifconfig and *all* routing calls - route, defaultroute,
