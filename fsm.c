@@ -145,6 +145,9 @@ void trans_CONNECT(void)
 	    }
 	    GOTO(STATE_CLOSE);
 	}
+    } else if (request_down) {
+        mon_syslog(LOG_NOTICE,"Cancelling connect script.");
+	GOTO(STATE_STOP_DIAL);
     } else if (state_timeout == 0) {
 	mon_syslog(LOG_NOTICE,"Connect script timed out. Killing script.");
 	GOTO(STATE_STOP_DIAL);

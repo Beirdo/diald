@@ -1,5 +1,11 @@
 Major changes between version 0.16 and 0.98.
 --------------------------------------------
+  - A down request now aborts an in progress dial/connect script.
+  - Call duration is now measured from the moment we try and start
+    the link rather than when the link actually becomes up for
+    network traffic. This makes more sense because chargable
+    duration is from the moment the physical layer (modem etc.)
+    is connected and not from when the network layer is connected.
   - Add beginnings of per-connection access flags to control
     who can do what.
   - Clean up of ctrl pipe handling for script output.
@@ -38,7 +44,6 @@ Major changes between version 0.16 and 0.98.
   - Added a STATUS2 to give the blocked and force flags.
   - Reset the line disc to NTTY when opening a serial port.
   - TCP monitor connections with tcp_wrapper support.
-  - Use AF_PACKET sockets.
   - Added initializer and deinitializer script options.
   - Added options to set scheduling class/priority.
   - Signal bug fix: ensure the sigaction structs are fully initialized.
