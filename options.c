@@ -807,4 +807,21 @@ void check_setup()
 	broadcast_ip = strdup("0.0.0.0");
 
     current_retry_count = retry_count;
+
+    /* If we are running in "dynamic" or "sticky" address mode
+     * make sure ip_dynaddr is non-zero.
+     */
+    if (dynamic_addrs) {
+	int d;
+
+	if ((d = open("/proc/sys/net/ipv4/ip_dynaddr", O_RDWR)) >= 0) {
+	    char c;
+
+	    if (read(d, &c, 1) == 1 && c == '0') {
+		c = '1';
+		write(d, &c, 1);
+	    }
+	    close(d);
+	}
+    }
 }
