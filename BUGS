@@ -50,6 +50,11 @@ The next bug report will receive number: 89.
 72. [Giuseppe Vacanti <gv@deselby.xs4all.nl>]
     Should diald perhaps be putting the fifo into /var/run by default?
     It is a run time entity after all. (Precident from gpm!)
+    [ Mike: No. /var/run is for per-boot things. The diald fifo
+      is persistent across boots and may be carrying permissions
+      settings that the user wants to keep (Mine have a particular
+      group for instance.
+    ]
 
 74. [Roger C. Pao]
     If I run diald with no arguments and no /etc/diald.conf, it will core
@@ -95,12 +100,14 @@ The next bug report will receive number: 89.
      some suggestions.]
 
 85. Add code to locking to check if own process id is stored in the lock file.
+    [ Mike: Done - treat as a stale lock file and go round again. ]
 
 86. Look at Arrigo Triulzi's message about named configuration.
     Probably need him to rework it a bit for inclusion into the general FAQ.
 
 88. Diald does not report the forcing/blocked state on the monitor line.
     It should do so.
+    [ Mike: It does now if the monitor requests the new protocol. ]
 
 89. Fix dctrl so that the window size doesn't jiggle. Also document
     the recent changes to command line parameters that came from Kurt.
@@ -118,6 +125,7 @@ The next bug report will receive number: 89.
     group be created (with precautions against input being stalled 
     because the terminal is associated with the wrong group, and a 
     process group kill should be used.
+    [ Mike: Done. ]
 
 92. The get_pty routine drops through if it doesn't find one.  I actually 
     had the machine configured with only a few new stle PTYs, and none in 

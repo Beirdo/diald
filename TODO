@@ -1,6 +1,5 @@
 When passing snooped packets through the firewall rules pass
-sll_protocol as well. We need to figure out a syntax for specifying
-protocols in rules etc.
+sll address struct.
 -- Now passing the whole sockaddr_sll through check_firewall and
    using it to get the direction of the packet. Now addresses are
    always ordered with those beyond the managed link on the right
@@ -79,7 +78,7 @@ the ISDN layers don't have any form of blocking dial.
    trying to use the same ippp interface to dial out at once.
    If you have static IP addresses you can make the connect
    scripts fairly robust too. If you have dynamic IP addresses
-   I can see no obvious way of knowing if your diald out succeeded
+   I can see no obvious way of knowing if your dial out succeeded
    or if the ippp interface just accepted an incoming call.
 
 We currently have several ways of forking scripts in diald, most
@@ -110,6 +109,9 @@ stderr.
 If we get an EAGAIN back on writing to a monitor pipe we should
 try and flush the pipe in order to avoid a stalled monitor from
 causing diald to suck resources.
+-- Or should we? Maybe the pipe buffer just isn't big enough. In which
+   case we want to preserve what we managed to write so the monitor
+   gets something even if not everything.
 
 When dctrl is not displaying the packet queue it should not ask
 diald for it.
@@ -150,13 +152,18 @@ office/home but be required to make *out*-going connections
 via dial up ppp or slip. It may also enable us to have a diald
 attach itself to an arbitrary interface and act as a traffic
 monitor on it. (We also need a way to have a diald release a
-link without downing it first)
+link without downing it first!)
 
 There should be an on-demand option that determines whether
 the link is brought up on demand. The block option should
 block *all* dial attempts - manual included.
--- Done. The option is demand with corresponding nodemand
+-- Done. The option is "demand" with corresponding nodemand
    (aka -demand for the command line).
 
 Is it possible to run with no timeout for the connect script and
 let the connect script handle everything?
+
+Add Unix domain sockets for monitor connections. I believe they
+have better data buffering than simple pipes. Unfortunately dctrl
+can't use them as Tcl/Tk does not support Unix domain sockets
+(as of tcl 8.0p2 at least)
