@@ -159,9 +159,9 @@ run_shell(int mode, const char *name, const char *buf, int d)
 void
 run_state_script(char *name, char *script, int background)
 {
-    char buf[128];
+    char buf[1024];
 
-    snprintf(buf, sizeof(buf)-1, "%s %s %s %s %s",
+    snprintf(buf, sizeof(buf)-1, "%s '%s' '%s' '%s' '%s'",
 	script,
 	snoop_dev,
 	netmask ? netmask : "255.255.255.255",

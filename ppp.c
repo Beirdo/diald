@@ -124,7 +124,7 @@ void ppp_start()
 int ppp_set_addrs()
 {
     static int sock = -1;
-    ulong laddr = 0, raddr = 0;
+    ulong laddr = 0, raddr = 0, baddr = 0;
 
     /* We need a socket. Any socket... */
     if (sock < 0)
@@ -173,6 +173,11 @@ int ppp_set_addrs()
 	else
 	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
+	if (ioctl(sock, SIOCGIFBRDADDR, (caddr_t) &ifr) == -1) 
+	   mon_syslog(LOG_ERR,"failed to get ppp broadcast address: %m");
+	else
+	   baddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
+
  	/* Check the MTU, see if it matches what we asked for. If it
 	 * doesn't warn the user and adjust the MTU setting.
 	 * (NOTE: Adjusting the MTU setting may cause kernel nastyness...)
@@ -191,6 +196,9 @@ int ppp_set_addrs()
 	if (dynamic_addrs) {
 	    /* only do the configuration in dynamic mode. */
 	    struct in_addr addr;
+	    addr.s_addr = baddr;
+	    if (broadcast_ip) free(broadcast_ip);
+	    broadcast_ip = strdup(inet_ntoa(addr));
 	    addr.s_addr = raddr;
 	    if (remote_ip) free(remote_ip);
 	    remote_ip = strdup(inet_ntoa(addr));
@@ -199,19 +207,26 @@ int ppp_set_addrs()
 	    local_ip = strdup(inet_ntoa(addr));
 	    local_addr = laddr;
 	    if (dynamic_addrs > 1) {
+		if (orig_broadcast_ip) free(orig_broadcast_ip);
+		orig_broadcast_ip = strdup(broadcast_ip);
 		if (orig_remote_ip) free(orig_remote_ip);
 		orig_remote_ip = strdup(remote_ip);
 		if (orig_local_ip) free(orig_local_ip);
 		orig_local_ip = strdup(local_ip);
 	    }
-	    mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
-		local_ip,remote_ip);
+	    mon_syslog(LOG_INFO, "New addresses: local %s%s%s%s%s",
+		local_ip,
+		remote_ip ? ", remote " : "",
+		remote_ip ? remote_ip : "",
+		broadcast_ip ? ", broadcast " : "",
+		broadcast_ip ? broadcast_ip : "");
 	}
 
 	/* The pppd should have configured the interface but there
 	 * may be user or default routes to add :-(.
 	 */
-	iface_start("link", "ppp", link_iface, local_ip, remote_ip);
+	iface_start("link", "ppp", link_iface,
+	    local_ip, remote_ip, broadcast_ip);
 	if (proxy.stop)
 	    proxy.stop(&proxy);
 
@@ -283,7 +298,8 @@ void ppp_reroute()
     local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
     if (link_iface != -1)
-    	iface_stop("link", "ppp", link_iface, local_ip, remote_ip);
+    	iface_stop("link", "ppp", link_iface,
+	    local_ip, remote_ip, broadcast_ip);
     link_iface = -1;
 }
 

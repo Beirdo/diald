@@ -29,12 +29,13 @@ char *deinitializer = 0;
 char *connector = 0;
 char *disconnector = 0;
 char *proxyif = 0;
+char *orig_local_ip = 0;
+char *orig_remote_ip = 0;
+char *orig_broadcast_ip = 0;
 char *local_ip = 0;
 unsigned long local_addr = 0;
-char *orig_local_ip = 0;
-char *netmask = 0;
 char *remote_ip = 0;
-char *orig_remote_ip = 0;
+char *netmask = 0;
 char *ifsetup = 0;
 char *addroute = 0;
 char *delroute = 0;
@@ -151,6 +152,7 @@ struct {
     {"metric","<metric>",1,&metric,set_int},
     {"local","<ip-address>",1,&local_ip,set_str},
     {"remote","<ip-address>",1,&remote_ip,set_str},
+    {"broadcast","<ip-address>",1,&broadcast_ip,set_str},
     {"netmask","<ip-address>",1,&netmask,set_str},
     {"dynamic","",0,&dynamic_addrs,set_flag},
     {"sticky","",0,&dynamic_addrs,set_flag2},
@@ -274,6 +276,10 @@ void init_vars()
     orig_local_ip = 0;
     if (netmask) free(netmask);
     netmask = 0;
+    if (broadcast_ip) free(broadcast_ip);
+    broadcast_ip = 0;
+    if (orig_broadcast_ip) free(orig_broadcast_ip);
+    orig_broadcast_ip = 0;
     if (remote_ip) free(remote_ip);
     remote_ip = 0;
     if (orig_remote_ip) free(orig_remote_ip);
@@ -772,6 +778,8 @@ void check_setup()
 	    flag = 1, mon_syslog(LOG_ERR, "No ifconfig program found.");
 	if ((!path_ip || !*path_ip) && (!path_route || !*path_route))
 	    flag = 1, mon_syslog(LOG_ERR,"No ip or route programs found.");
+	else if (broadcast_ip && inet_addr(broadcast_ip) == -1)
+	    flag = 1, mon_syslog(LOG_ERR,"Bad broadcast ip address specification.");
 	else if (remote_ip && inet_addr(remote_ip) == -1)
 	    flag = 1, mon_syslog(LOG_ERR,"Bad remote ip address specification.");
 	else if (local_ip) {
@@ -794,6 +802,9 @@ void check_setup()
 	mon_syslog(LOG_ERR,"Terminating due to damaged reconfigure.");
 	exit(1);
     }
+
+    if (!broadcast_ip && remote_ip)
+	broadcast_ip = strdup("0.0.0.0");
 
     current_retry_count = retry_count;
 }

@@ -184,7 +184,8 @@ void slip_start(void)
 	    link_iface);
 
     /* mark the interface as up */
-    iface_start("link", "sl", link_iface, local_ip, remote_ip);
+    iface_start("link", "sl", link_iface,
+	local_ip, remote_ip, broadcast_ip);
 
     /* run bootp if it is asked for */
     if (dynamic_addrs && dynamic_mode == DMODE_BOOTP && !force_dynamic) start_bootp();
@@ -253,7 +254,8 @@ int slip_set_addrs()
 	local_addr = inet_addr(local_ip);
     }
 
-    iface_start("link", "sl", link_iface, local_ip, remote_ip);
+    iface_start("link", "sl", link_iface,
+	local_ip, remote_ip, broadcast_ip);
     if (proxy.stop)
 	proxy.stop(&proxy);
 
@@ -285,7 +287,8 @@ void slip_reroute()
     local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
     if (link_iface != -1)
-    	iface_stop("link", "sl", link_iface, local_ip, remote_ip);
+    	iface_stop("link", "sl", link_iface,
+	    local_ip, remote_ip, broadcast_ip);
     link_iface = -1;
 }
 

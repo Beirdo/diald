@@ -653,6 +653,9 @@ will appear. The default mode is \fBremote-local\fR.
 .B netmask \fI<a>
 Set the netmask to be used for the interface.
 .TP
+.B broadcast \fI<a>
+Set the broadcast IP address to be used for the interface.
+.TP
 .B mtu \fI<m>
 Set the MTU (Maximum Transmission Unit) to \fI<m>\fR.
 The default is 1500. This is the maximum size packet that

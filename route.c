@@ -127,7 +127,8 @@ del_routes(char *desc, char *iface, char *lip, char *rip)
 
 
 void
-iface_start(char *mode, char *iftype, int ifunit, char *lip, char *rip)
+iface_start(char *mode, char *iftype, int ifunit,
+    char *lip, char *rip, char *bip)
 {
     char *iface, desc[32], buf[1024];
 
@@ -149,8 +150,8 @@ iface_start(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 	    path_ifconfig, iface, lip,
 	    rip ? " pointopoint " : "",
 	    rip ? rip : "",
-	    rip ? " broadcast " : "",
-	    rip ? rip : "",
+	    bip ? " broadcast " : "",
+	    bip ? bip : "",
 	    netmask ? netmask : "255.255.255.255",
 	    metric, mtu);
 	run_shell(SHELL_WAIT, desc, buf, -1);
@@ -166,7 +167,8 @@ iface_start(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 
 
 void
-iface_stop(char *mode, char *iftype, int ifunit, char *lip, char *rip)
+iface_stop(char *mode, char *iftype, int ifunit,
+    char *lip, char *rip, char *bip)
 {
     char *iface, desc[32], buf[128];
 

@@ -91,6 +91,7 @@ void do_config(void)
 
     orig_local_ip = (local_ip ? strdup(local_ip) : NULL);
     orig_remote_ip = (remote_ip ? strdup(remote_ip) : NULL);
+    orig_broadcast_ip = (broadcast_ip ? strdup(broadcast_ip) : NULL);
 
     if (initializer) {
 	if (devices && devices[0])
