@@ -10,6 +10,7 @@ CFG_SEQ='/var/run'
 
 # $DIALD_DEVTYPE is a sanitized version of $DIALD_DEVICE.
 case "$DIALD_DEVICE" in
+	eth*)	DIALD_DEVTYPE='ethernet' ;;
 	ippp*)	DIALD_DEVTYPE='isdn' ;;
 	isdn*)	DIALD_DEVTYPE='isdn' ;;
 	*)	DIALD_DEVTYPE='modem' ;;
