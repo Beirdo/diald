@@ -808,6 +808,10 @@ void check_setup()
 	    flag = 1, mon_syslog(LOG_ERR,"No ip or route programs found.");
 	else if (broadcast_ip && inet_addr(broadcast_ip) == -1)
 	    flag = 1, mon_syslog(LOG_ERR,"Bad broadcast ip address specification.");
+	else if (netmask && inet_addr(netmask) == -1)
+	    flag = 1, mon_syslog(LOG_ERR,"Bad netmask specification.");
+	else if (!netmask && broadcast_ip)
+	    flag = 1, mon_syslog(LOG_ERR,"Netmask required with broadcast.");
 	else if (remote_ip && inet_addr(remote_ip) == -1)
 	    flag = 1, mon_syslog(LOG_ERR,"Bad remote ip address specification.");
 	else if (local_ip) {
@@ -833,6 +837,8 @@ void check_setup()
 
     if (!broadcast_ip && remote_ip)
 	broadcast_ip = strdup("0.0.0.0");
+    if (!netmask)
+	netmask = strdup("255.255.255.255");
 
     current_retry_count = retry_count;
 
