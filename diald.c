@@ -72,11 +72,9 @@ void do_config(void)
     struct sched_param sp;
 #endif
     if (deinitializer) {
-	int res;
 	if (devices && devices[0])
 		setenv("MODEM", devices[0], 1);
-	res = run_shell(SHELL_WAIT, "deinit", deinitializer, -1);
-	report_system_result(res, deinitializer);
+	run_shell(SHELL_WAIT, "deinit", deinitializer, -1);
     }
 
     init_vars();
@@ -95,11 +93,9 @@ void do_config(void)
     orig_remote_ip = (remote_ip ? strdup(remote_ip) : NULL);
 
     if (initializer) {
-        int res;
 	if (devices && devices[0])
 	    setenv("MODEM", devices[0], 1);
-	res = run_shell(SHELL_WAIT, "init", initializer, -1);
-	report_system_result(res, initializer);
+	run_shell(SHELL_WAIT, "init", initializer, -1);
     }
 
 #ifdef SCHED_OTHER
@@ -872,11 +868,9 @@ void die(int i)
 	proxy_release();
 
 	if (deinitializer) {
-		int res;
 		if (devices && devices[0])
 			setenv("MODEM", devices[0], 1);
-		res = run_shell(SHELL_WAIT, "deinit", deinitializer, -1);
-		report_system_result(res, deinitializer);
+		run_shell(SHELL_WAIT, "deinit", deinitializer, -1);
 	}
 
 	if (tcp_fd >= 0)
@@ -964,19 +958,6 @@ void sig_term(int sig)
 {
     mon_syslog(LOG_NOTICE, "SIGTERM. Termination request received.");
     terminate = 1;
-}
-
-int report_system_result(int res,char *buf)
-{
-    if (res == -1)
-   	mon_syslog(LOG_ERR,"System call failure on command '%s'",buf);
-    else if (!WIFEXITED(res))
-   	mon_syslog(LOG_ERR,"Abnormal exit (status %d) on command '%s'",res,buf);
-    else if (WEXITSTATUS(res) != 0)
-	mon_syslog(LOG_ERR,"Nonzero exit status (%d) on command '%s'",WEXITSTATUS(res),buf);
-    else
-	return 0;
-    return 1;
 }
 
 

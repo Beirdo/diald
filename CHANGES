@@ -4,6 +4,8 @@ Major changes between version 0.98.3 and 0.98.4.
     a shell into one glorious function. Now the output from
     everything is logged - including ip-up/ip-down - and all
     scripts have the same environment variables set for them.
+    Since we log the output we no longer log the exit status
+    of external scripts.
   - Made local and remote addresses optional. If you are using a
     named interface as proxy (or have no proxy at all) you may
     not care about the addresses.

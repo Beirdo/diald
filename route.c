@@ -12,7 +12,6 @@
 static void
 add_routes(char *iftype, int ifunit, char *lip, char *rip)
 {
-    int res;
     char win[32];
     char buf[1024];
 
@@ -47,8 +46,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 	    sprintf(buf,"%s add %s metric %d %s dev %s%d",
 		path_route, rip, metric, win, iftype, ifunit); 
 	}
-	res = run_shell(SHELL_WAIT, "add route", buf, -1);
-	report_system_result(res, buf);
+	run_shell(SHELL_WAIT, "add route", buf, -1);
 
 	if (metric) {
 	    if (path_ip && *path_ip) {
@@ -61,8 +59,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 		sprintf(buf,"%s del %s metric 0 %s dev %s%d",
 		    path_route, rip, win, iftype, ifunit); 
 	    }
-	    res = run_shell(SHELL_WAIT, "del route", buf, -1);
-	    report_system_result(res, buf);
+	    run_shell(SHELL_WAIT, "del route", buf, -1);
 	}
 #endif
     }
@@ -79,8 +76,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 	    sprintf(buf,"%s add default metric %d %s netmask 0.0.0.0 dev %s%d",
 		path_route, metric, win, iftype, ifunit);
 	}
-        res = run_shell(SHELL_WAIT, "add default route", buf, -1);
-    	report_system_result(res, buf);
+        run_shell(SHELL_WAIT, "add default route", buf, -1);
     }
 
     /* call addroute script */
@@ -88,8 +84,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
         sprintf(buf,"%s %s%d %s \"%s\" \"%s\" %d %d",
 	    addroute, iftype, ifunit, (netmask)?netmask:"default",
 	    lip, rip, metric, window);
-	res = run_shell(SHELL_WAIT, "addroute", buf, -1);
-    	report_system_result(res, buf);
+	run_shell(SHELL_WAIT, "addroute", buf, -1);
     }
 
     if (proxyarp && rip) set_proxyarp(inet_addr(rip));
@@ -99,7 +94,6 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 static void
 del_routes(char *iftype, int ifunit, char *lip, char *rip)
 {
-    int res;
     char buf[1024];
 
     if (debug&DEBUG_VERBOSE)
@@ -113,8 +107,7 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 	    delroute, iftype, ifunit,
 	    (netmask) ? netmask : "default",
 	    lip, rip, metric);
-        res = run_shell(SHELL_WAIT, "delroute", buf, -1);
-        report_system_result(res, buf);
+        run_shell(SHELL_WAIT, "delroute", buf, -1);
     }
 
     if (default_route) {
@@ -136,7 +129,6 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 void
 iface_start(char *iftype, int ifunit, char *lip, char *rip)
 {
-    int res;
     char buf[128];
 
     /* mark the interface as up */
@@ -147,8 +139,7 @@ iface_start(char *iftype, int ifunit, char *lip, char *rip)
 	    rip ? rip : "",
 	    netmask ? netmask : "255.255.255.255",
 	    metric, mtu);
-	res = run_shell(SHELL_WAIT, "iface start", buf, -1);
-	report_system_result(res,buf);
+	run_shell(SHELL_WAIT, "iface start", buf, -1);
     }
 
     add_routes(iftype, ifunit, lip, rip);
@@ -164,7 +155,6 @@ void
 iface_stop(char *iftype, int ifunit, char *lip, char *rip)
 {
     char buf[128];
-    int res;
 
     /* We do not simply down the interface because it may be required
      * to up (ISDN, for instance, will not answer an incoming call if
@@ -178,6 +168,5 @@ iface_stop(char *iftype, int ifunit, char *lip, char *rip)
 
     sprintf(buf, "%s %s%d 0.0.0.0",
 	path_ifconfig, iftype, ifunit);
-    res = run_shell(SHELL_WAIT, "iface stop", buf, -1);
-    report_system_result(res,buf);
+    run_shell(SHELL_WAIT, "iface stop", buf, -1);
 }
