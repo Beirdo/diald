@@ -94,3 +94,9 @@ or not in dctrl.
 
 Specs used for connection identification in diald.defs need to take
 in to account protocol (UDP, TCP etc.) as well as IP and port.
+
+flush_timeout_queue should not delete connections. It should set
+the link times to zero (and the hold times to something?). That
+keeps the connections in the monitor display for a while so people
+can see them. If the link is reestablished the connections will
+be revived, otherwise they expire and are deleted.
