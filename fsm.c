@@ -172,7 +172,9 @@ void act_STOP_DIAL(void)
 #endif
             mon_syslog(LOG_DEBUG,"Sending SIGINT to (dis)connect process %d",
 		dial_pid);
-	if (kill(dial_pid,SIGINT) == -1 && errno == ESRCH) {
+	if (kill(-dial_pid, SIGINT) == -1
+	&& kill(dial_pid, SIGINT) == -1
+	&& errno == ESRCH) {
 	    dial_pid = 0;
 	    dial_status = -1;
 	}
@@ -192,7 +194,9 @@ void act_KILL_DIAL(void)
 #endif
             mon_syslog(LOG_DEBUG,"Sending SIGKILL to (dis)connect process %d",
 		dial_pid);
-	if (kill(dial_pid,SIGKILL) == -1 && errno == ESRCH) {
+	if (kill(-dial_pid, SIGKILL) == -1
+	&& kill(dial_pid, SIGKILL) == -1
+	&& errno == ESRCH) {
 	    dial_pid = 0;
 	    dial_status = -1;
 	}

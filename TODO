@@ -115,6 +115,10 @@ When dctrl is not displaying the packet queue it should not ask
 diald for it.
 
 Should a link down request abort an in-progress dial?
+-- Done. The connector is run in its own process group and we
+   signal the process group to stop a dial. Anything that needs
+   to do anything more complex than simply close the port needs
+   to trap SIGINT.
 
 Need to sort out keyboard accelerators and shortcuts on dctrl's menus.
 
@@ -151,6 +155,8 @@ link without downing it first)
 There should be an on-demand option that determines whether
 the link is brought up on demand. The block option should
 block *all* dial attempts - manual included.
+-- Done. The option is demand with corresponding nodemand
+   (aka -demand for the command line).
 
 Is it possible to run with no timeout for the connect script and
 let the connect script handle everything?

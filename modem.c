@@ -35,7 +35,6 @@ char *current_dev = 0;
 
 static struct termios inittermios;      /* Initial TTY termios */
 static int restore_term = 0;
-int pgrpid;
 
 #if B9600 == 9600
 /*
@@ -216,6 +215,15 @@ void fork_dialer(char *prog_type, char *program, int fd)
     }
 
     if (dial_pid == 0) {
+	/* Run in a new process group and foreground ourselves
+	 * on the tty (SIGTTOU is ignored).
+	 * N.B. If we are in dev mode we have /dev/null and
+	 * not a serial line...
+	 */
+	setpgrp();
+	if (tcsetpgrp(modem_fd, getpid()) < 0 && errno != ENOTTY)
+	    mon_syslog(LOG_ERR, "dial: failed to set pgrp: %m");
+
         /* change the signal actions back to the defaults, then unblock them. */
         default_sigacts();
 	unblock_signals();
@@ -275,8 +283,8 @@ void fork_dialer(char *prog_type, char *program, int fd)
  */
 int open_modem()
 {
-    int npgrpid;
     int i;
+
     /*
      * Open the serial device and set it up.
      */
@@ -384,22 +392,22 @@ int open_modem()
     if (rotate_devices)
     	rotate_offset = (rotate_offset+1)%device_count;
 
-    /* Make sure we are the session leader */
-    if ((npgrpid = setsid()) >= 0)
-	pgrpid = npgrpid;
-
     /* set device to be controlling tty */
-    /* This should only happen in SLIP mode */
-    if (mode == MODE_SLIP) {
-	if (ioctl(modem_fd, TIOCSCTTY, 1) < 0) {
-	    mon_syslog(LOG_ERR, "failed to set modem to controlling tty: %m");
-	    die(1);
-	}
+    /* FIXME: we should not die here. If we go round again we may
+     * be able to use the next device in the list.
+     */
+    /* If this is outgoing this should have become our controlling
+     * tty when we opened it. If it is incoming it belongs to
+     * another session so we have to steal it.
+     */
+    if (ioctl(modem_fd, TIOCSCTTY, 1) < 0) {
+	mon_syslog(LOG_ERR, "failed to set modem to controlling tty: %m");
+	die(1);
+    }
 
-        if (tcsetpgrp(modem_fd, pgrpid) < 0) {
-	    mon_syslog(LOG_ERR, "failed to set process group: %m");
-	    die(1);
-	}
+    if (tcsetpgrp(modem_fd, getpgrp()) < 0) {
+	mon_syslog(LOG_ERR, "open: failed to set tty process group: %m");
+	die(1);
     }
 
     /* Get rid of any initial line noise */
@@ -444,8 +452,6 @@ int open_modem()
  */
 void reopen_modem()
 {
-    int npgrpid;
-
     if (mode == MODE_DEV)
 	return;
 
@@ -457,22 +463,15 @@ void reopen_modem()
     if ((modem_fd = open(current_dev, O_RDWR | O_NDELAY)) < 0) {
 	mon_syslog(LOG_ERR,"Can't reopen device '%s'",current_dev);
     } else {
-	/* Make sure we are the session leader */
-	if ((npgrpid = setsid()) >= 0)
-	    pgrpid = npgrpid;
-
 	/* set device to be controlling tty */
-	/* This should only happen in SLIP mode */
-	if (mode == MODE_SLIP) {
-	    if (ioctl(modem_fd, TIOCSCTTY, 1) < 0) {
-		mon_syslog(LOG_ERR, "failed to set modem to controlling tty: %m");
-		die(1);
-	    }
+	if (ioctl(modem_fd, TIOCSCTTY, 1) < 0) {
+	    mon_syslog(LOG_ERR, "reopen: failed to set modem to controlling tty: %m");
+	    die(1);
+	}
 
-	    if (tcsetpgrp(modem_fd, pgrpid) < 0) {
-		mon_syslog(LOG_ERR, "failed to set process group: %m");
-		die(1);
-	    }
+	if (tcsetpgrp(modem_fd, getpgrp()) < 0) {
+	    mon_syslog(LOG_ERR, "reopen: failed to set process group: %m");
+	    die(1);
 	}
 
 	set_up_tty(modem_fd, 1, inspeed);
@@ -487,8 +486,11 @@ void finish_dial()
     if (mode == MODE_DEV)
 	return;
 
-    if (!req_pid)
+    if (!req_pid) {
+	if (tcsetpgrp(modem_fd, getpgrp()) < 0)
+	    mon_syslog(LOG_ERR, "finish: failed to set pgrp: %m");
         set_up_tty(modem_fd, 0, inspeed);
+    }
 }
 
 /*
@@ -496,7 +498,7 @@ void finish_dial()
  */
 void close_modem()
 {
-    if (debug&DEBUG_VERBOSE)
+    if (current_dev && debug&DEBUG_VERBOSE)
         mon_syslog(LOG_INFO,"Closing %s", current_dev);
 
     current_dev = 0;
@@ -504,6 +506,8 @@ void close_modem()
  	return;
 
     if (mode != MODE_DEV) {
+	tcsetpgrp(modem_fd, getpgrp());
+
 	/* Get rid of what ever might be waiting to go out still */
 	tcflush(modem_fd, TCIOFLUSH);
 

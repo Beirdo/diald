@@ -159,6 +159,11 @@ main(int argc, char *argv[])
     proxy_up();
     idle_filter_proxy();
 
+    /* We are a session manager and currently have no controlling
+     * terminal (this will be the modem tty when open).
+     */
+    setsid();
+
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_INFO,"Diald initial setup completed.");
 
@@ -443,6 +448,7 @@ void signal_setup()
     SIGNAL(SIGIO, stray_signal);
     SIGNAL(SIGPOLL, stray_signal);
     SIGNAL(SIGPWR, stray_signal);
+    SIGNAL(SIGTTOU, SIG_IGN);
 }
 
 static int signal_block_depth = 0;
@@ -474,6 +480,7 @@ void default_sigacts()
     SIGNAL(SIGCHLD, SIG_DFL);
     SIGNAL(SIGALRM, SIG_DFL);
     SIGNAL(SIGPIPE, SIG_DFL);
+    SIGNAL(SIGTTOU, SIG_DFL);
 }
 
 /*
@@ -862,14 +869,18 @@ void die(int i)
 	in_die = 1;
 	/* We're killing without a care here. Uhggg. */
 	if (link_pid) kill(link_pid,SIGINT);
-	if (dial_pid) kill(dial_pid,SIGINT);
+	if (dial_pid)
+	    if (kill(-dial_pid, SIGINT) == -1)
+		kill(dial_pid, SIGINT);
 	if (running_pid) kill(running_pid,SIGINT);
 	/* Wait up to 30 seconds for them to die */
         for (count = 0; (link_pid || dial_pid) && count < 30; count++)
 	    sleep(1);
 	/* If they aren't dead yet, kill them for sure */
 	if (link_pid) kill(link_pid,SIGKILL);
-	if (dial_pid) kill(dial_pid,SIGKILL);
+	if (dial_pid)
+	    if (kill(-dial_pid, SIGKILL) == -1)
+		kill(dial_pid, SIGKILL);
 	if (running_pid) kill(running_pid,SIGKILL);
 	/* Give the system a second to send the signals */
 	if (link_pid || dial_pid || running_pid) sleep(1);
@@ -1176,7 +1187,9 @@ void mon_write(unsigned int level, char *message, int len)
 	&& (!(level & MONITOR_MESSAGE) || pri <= (c->level & 0xff000000))) {
 	    if (write(c->fd,message,len) < 0) {
 		if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+#if 0
 		    syslog(LOG_INFO,"Writing error on pipe %s: %m.",c->name);
+#endif
 		    /* Write error. The reader probably got swapped out
 		     * or something and the pipe flooded. We'll just "loose"
 		     * the data.
