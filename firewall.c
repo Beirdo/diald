@@ -152,6 +152,7 @@ static unsigned int slot_end_timeout(FW_Timeslot *slot, time_t *clock)
     	return maxtime;
 }
 
+#if 0
 #ifdef __linux__
 /* Demasquerade an address. */
 static void
@@ -234,6 +235,7 @@ demasquerade(int proto,
     fclose(fd);
 }
 #endif
+#endif
 
 /* Generate a connection description */
 static char *
@@ -260,9 +262,11 @@ desc_connection(FW_Connection *c)
 			+ (c->id.id[8]));
     dport = c->id.id[12]+(c->id.id[11]<<8);
 
+#if 0
 #if defined(__linux__)
     if (demasq)
 	demasquerade(c->id.id[0], &saddr, &sport, &daddr, &dport);
+#endif
 #endif
 
     strcpy(sad_text, inet_ntoa(saddr));
@@ -855,10 +859,20 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 	    term = &fw->filt.terms[i];
 	    if (FW_TCP_STATE(term->offset))
 		v = (lflags.tcp_flags >> term->shift) && term->mask;
-	    else
-	        v = (ntohl(*(int *)(&(FW_IN_DATA(term->offset)?data:pkt)
-				  [FW_OFFSET(term->offset)]))
-		    >> term->shift) & term->mask;
+	    else {
+		int n;
+	        memcpy(&n, &(FW_IN_DATA(term->offset)?data:pkt)
+				  [FW_OFFSET(term->offset)],
+			sizeof(int));
+	        v = (ntohl(n) >> term->shift) & term->mask;
+#if 1
+n = (ntohl(*(int *)(&(FW_IN_DATA(term->offset)?data:pkt)
+		  [FW_OFFSET(term->offset)]))
+    >> term->shift) & term->mask;
+if (n != v)
+mon_syslog(LOG_NOTICE, "Bogged up: v=0x%08x should be 0x%08x", v, n);
+#endif
+	    }
 #if 0
 	    mon_syslog(LOG_DEBUG,"testing ip %x:%x data %x:%x mask %x shift %x test %x v %x",
 		ntohl(*(int *)(&pkt[FW_OFFSET(term->offset)])),

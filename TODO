@@ -133,6 +133,13 @@ to textual names.
    also be nice to have a way of demasq'ing before feeding the
    address through the firewall rules. That would mean demasqing
    every packet though...
+     Uh... It seems that the snoop socket always sees packets *before*
+   they are masqueraded on their way out and after they are demasqueraded
+   on their way in, which is what we want. However if the link is
+   down we see packets *after* they have been masqueraded because we
+   are watching the remote end of a slip link. This appears to be
+   another vote for snooping a dummy interface rather than using a
+   slip link for the proxy?
 
 It would be nice for dctrl to have some obvious display of how
 long the link has been up somewhere.
@@ -167,3 +174,12 @@ Add Unix domain sockets for monitor connections. I believe they
 have better data buffering than simple pipes. Unfortunately dctrl
 can't use them as Tcl/Tk does not support Unix domain sockets
 (as of tcl 8.0p2 at least)
+
+Firewall rules should be tagged with the file and line no. they
+came from (or something equally meaningful for on-the-fly reconfig).
+We can use that to give more meaningful log messages.
+
+Add IPv6 support...
+
+Have some way of reading config files through cpp or m4 or ??? so
+that they can be parameterized.

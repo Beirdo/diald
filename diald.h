@@ -282,7 +282,9 @@ int two_way;
 int give_way;
 int do_reroute;
 int proxyarp;
+#if 0
 int demasq;
+#endif
 int route_wait;
 
 #ifdef SIOCSKEEPALIVE

@@ -28,11 +28,14 @@
  * applies to TCP monitor connections. The full list of access
  * flags can be found in access.h.
  * (N.B. If ACCESS_CONTROL is not set then *anything* received
- * on the pipe is treated as a messge)
+ * on the pipe is treated as a message)
  */
 #define CONFIG_DEFAULT_ACCESS \
 	(ACCESS_CONTROL | ACCESS_MONITOR | ACCESS_MESSAGE \
 	| ACCESS_UP | ACCESS_DOWN)
+
+#if 0
+/* This is not needed. See the TODO file. */
 
 /* The PORT_MASQ_BEGIN and PORT_MASQ_END defines specify the range
  * of ports which may be used by the kernel masquerade code under Linux.
@@ -46,6 +49,7 @@
  */
 #define PORT_MASQ_BEGIN	61000
 #define PORT_MASQ_END	(PORT_MASQ_BEGIN + 4096)
+#endif
 
 
 /*****************************************************************************
