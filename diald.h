@@ -310,9 +310,7 @@ int tcp_fd;			/* TCP listener. */
 fd_set ctrl_fds;		/* TCP command/monitor connections. */
 PIPE *pipes;			/* List of control/monitor pipes. */
 MONITORS *monitors;		/* List of monitor pipes. */
-int proxy_mfd;			/* master pty fd */
-FILE *proxy_mfp;		/* also have an fp. Hackery for recv_packet. */
-int proxy_sfd;			/* slave pty fd */
+int proxy_fd;			/* proxy */
 int modem_fd;			/* modem device fp (for slip links) */
 int modem_hup;			/* have we seen a modem HUP? */
 int request_down;		/* has the user requested link down? */
@@ -325,7 +323,8 @@ int dial_status;		/* status from last dial command */
 int state_timeout;		/* state machine timeout counter */
 int state;			/* DFA state */
 int current_retry_count;	/* current retry count */
-int proxy_iface;		/* Interface number for proxy pty */
+char *proxy_iftype;		/* Type of proxy interface */
+int proxy_ifunit;		/* Unit number for proxy interface */
 int link_iface;			/* Interface number for ppp line */
 int orig_disc;			/* original PTY line disciple */
 int fwdfd;			/* control socket for packet forwarding */
@@ -364,6 +363,8 @@ void block_signals(void);
 void unblock_signals(void);
 void filter_setup(void);
 void get_pty(int *, int *);
+int proxy_open(void);
+void proxy_close(void);
 void proxy_up(void);
 void proxy_down(void);
 void proxy_config(char *, char *);
@@ -377,7 +378,7 @@ void modem_read(void);
 void advance_filter_queue(void);
 void fire_timers(void);
 int recv_packet(unsigned char *, size_t);
-void send_packet(unsigned char *, size_t);
+void send_packet(unsigned short, unsigned char *, size_t);
 void sig_hup(int);
 void sig_intr(int);
 void sig_term(int);
@@ -406,8 +407,8 @@ void set_dslip_mode(char **, char **);
 void read_config_file(int *, char **);
 void add_filter(void *var, char **);
 int insert_packet(unsigned char *, int);
-int lock(char *dev);
-void unlock(void);
+char *lock(char *);
+void unlock(char *);
 void fork_dialer(char *, char *, int);
 void fork_connect(char *);
 void flush_timeout_queue(void);

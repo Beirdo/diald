@@ -631,7 +631,7 @@ __u16 checksum(__u16 *buf, int nwords)
 }
 
 
-void forge_tcp_reset(struct iphdr *iph, int len)
+void forge_tcp_reset(unsigned short wprot, struct iphdr *iph, int len)
 {
     struct tcphdr *tcph,*ntcph;
     struct iphdr *niph;
@@ -707,7 +707,8 @@ void forge_tcp_reset(struct iphdr *iph, int len)
     /*
      * OK, send the packet now.
      */
-    send_packet((unsigned char *)niph,sizeof(struct tcphdr)+sizeof(struct iphdr));
+    send_packet(wprot, (unsigned char *)niph,
+	sizeof(struct tcphdr)+sizeof(struct iphdr));
 
     free((void *)niph);
 }
@@ -762,7 +763,7 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 	 * shut down do to a link failure.
 	 */
 	if (ip_pkt->protocol == IPPROTO_TCP)
-	    forge_tcp_reset(ip_pkt,len);
+	    forge_tcp_reset(sll->sll_protocol, ip_pkt, len);
 	
 	goto skip;
     }

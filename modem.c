@@ -27,6 +27,7 @@
 
 #include "diald.h"
 
+static char *lock_file = 0;
 static int rotate_offset = 0;
 
 char *current_dev = 0;
@@ -231,8 +232,7 @@ void fork_dialer(char *prog_type, char *program, int fd)
 	unblock_signals();
 
         /* make sure the child doesn't inherit any extra file descriptors */
-	close(proxy_mfd);      /* close the master pty endpoint */
-	close(proxy_sfd);      /* close the slave pty endpoint */
+	proxy_close();
 	if (fifo_fd != -1) close(fifo_fd);
 	if (tcp_fd != -1) close(tcp_fd);
 	if (pipes) {
@@ -337,7 +337,7 @@ int open_modem()
 	for (i = 0; i < device_count; i++) {
 	    current_dev = devices[(i+rotate_offset)%device_count];
 
-	    if (lock_dev && lock(current_dev))
+	    if (lock_dev && !(lock_file = lock(current_dev)))
 		continue;
 
 	    /* OK. Locked one, try to open it */
@@ -348,7 +348,7 @@ int open_modem()
 
 	    /* That didn't work, get rid of the lock */
 	    mon_syslog(LOG_ERR,"Error opening device %s: %m",current_dev);
-	    if (lock_dev) unlock();
+	    if (lock_dev) unlock(lock_file);
 	}
 	if (modem_fd < 0) {
 	    mon_syslog(LOG_WARNING,"No devices free to call out on.");
@@ -532,5 +532,5 @@ void close_modem()
 	    kill(req_pid, SIGKILL);
 	    req_pid = 0;
 	}
-    } else if (lock_dev) unlock();
+    } else if (lock_dev) unlock(lock_file);
 }

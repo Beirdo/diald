@@ -498,9 +498,9 @@ void clear_flag(int *var, char **argv)
 void set_blocked(int *var, char **argv)
 {
     if (!blocked_route && state == STATE_DOWN && *var == 0) {
-	del_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+	del_routes(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
 #if 0 /* del_routes does a del_ptp as well */
-	del_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+	del_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
 #endif
     }
     *var = 1;
@@ -509,8 +509,8 @@ void set_blocked(int *var, char **argv)
 void clear_blocked(int *var, char **argv)
 {
     if (!blocked_route && state == STATE_DOWN && *var == 1) {
-	set_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
-	add_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+	set_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
+	add_routes(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
     }
     *var = 0;
 }
@@ -518,8 +518,8 @@ void clear_blocked(int *var, char **argv)
 void set_blocked_route(int *var, char **argv)
 {
     if (blocked && state == STATE_DOWN && *var == 0) {
-	set_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
-	add_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+	set_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
+	add_routes(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
     }
     *var = 1;
 }
@@ -527,9 +527,9 @@ void set_blocked_route(int *var, char **argv)
 void clear_blocked_route(int *var, char **argv)
 {
     if (blocked && state == STATE_DOWN && *var == 1) {
-	del_routes("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+	del_routes(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
 #if 0 /* del_routes does a del_ptp as well */
-	del_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+	del_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
 #endif
     }
     *var = 0;

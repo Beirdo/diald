@@ -127,8 +127,16 @@ void forward_buffer()
 	clen = (B(head)<<8) | B(head+1);
 	stamp = (B(head+2)<<24) | (B(head+3)<<16) | (B(head+4)<<8) | B(head+5);
         if (stamp+buffer_timeout >= ctime) {
+	    unsigned short wprot;
+	    unsigned char *dpkt;
+	    unsigned int dlen;
+
 	    for (i = 0; i < clen; i++)
 		pkt[i] = B(head+6+i);
+
+	    wprot = *(unsigned short *)pkt;
+	    dpkt = pkt + sizeof(unsigned short);
+	    dlen = clen - sizeof(unsigned short);
 
 	    /* If we are using dynamic addresses we send the packet back
 	     * in to the kernel on the proxy so that it will go through
@@ -138,9 +146,15 @@ void forward_buffer()
 	     * to start with will never work :-).
 	     */
 	    if (dynamic_addrs) {
-		send_packet(pkt, clen);
+		send_packet(wprot, dpkt, dlen);
 	    } else {
-		if (sendto(snoopfd, pkt, clen, 0, to, to_len) < 0)
+#ifdef HAVE_AF_PACKET
+		if (af_packet)
+		    sl.sll_protocol = wprot;
+		else
+#endif
+		    sp.spkt_protocol = wprot;
+		if (sendto(snoopfd, dpkt, dlen, 0, to, to_len) < 0)
 		    mon_syslog(LOG_ERR,"Error forwarding data packet to physical device from buffer: %m");
 	    }
 	}

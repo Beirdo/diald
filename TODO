@@ -203,3 +203,13 @@ or DISCONNECT to CLOSE?
 The program paths (ifconfig, route, ip etc.) should be verified as
 part of the config checks. If we don't have enough to make things
 work we should not try to do anything.
+
+For masquerading dynamic addressed links we want to run the proxy
+with masquerading _disabled_. When the link comes up we set up
+masquerading (both proxy and real interface). After that point
+packets may be forward from proxy to real as normal (they are
+masqueraded as they hit either interface). The packets we have
+buffered before the link came up have ot been masqueraded. If we
+send them back to the kernel via the proxy the kernel will pass
+them through the routing/firewalling/masquerading again and should
+do the right thing?

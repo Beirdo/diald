@@ -114,7 +114,7 @@ void idle_filter_proxy()
 	}
     }
 
-    sprintf(snoop_dev,"sl%d",proxy_iface);
+    sprintf(snoop_dev,"%s%d", proxy_iftype, proxy_ifunit);
     if (debug) mon_syslog(LOG_DEBUG,"Changed snoop device to %s",snoop_dev);
 
 #ifdef HAVE_AF_PACKET

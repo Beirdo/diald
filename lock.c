@@ -6,13 +6,13 @@
 
 #include "diald.h"
 
-static char *lock_file;
 
 /*
  *	Create a lock file for the named lock device
  */
-int lock(char *dev)
+char * lock(char *dev)
 {
+    char *lock_file;
     char hdb_lock_buffer[12];
     int fd, pid, n;
     char *p;
@@ -21,7 +21,7 @@ int lock(char *dev)
 	dev = p + 1;
     lock_file = malloc(strlen(lock_prefix) + strlen(dev) + 1);
     if (lock_file == NULL)
-	return -1;
+	return NULL;
     strcat(strcpy(lock_file, lock_prefix), dev);
 
     while ((fd = open(lock_file, O_EXCL | O_CREAT | O_RDWR, 0644)) < 0) {
@@ -70,8 +70,7 @@ int lock(char *dev)
 	} else
 	    mon_syslog(LOG_ERR, "Can't create lock file %s: %m", lock_file);
 	free(lock_file);
-	lock_file = NULL;
-	return -1;
+	return NULL;
     }
 
     if (pidstring) {
@@ -83,18 +82,16 @@ int lock(char *dev)
     }
 
     close(fd);
-    return 0;
+    return lock_file;
 }
 
 /*
  *	Remove our lockfile
  */
-void unlock()
+void unlock(char *lock_file)
 {
     if (lock_file) {
 	unlink(lock_file);
 	free(lock_file);
-	lock_file = NULL;
     }
 }
-

@@ -52,7 +52,7 @@ int running_pid = 0;		/* current system command pid */
 int running_status = 0;		/* status of last system command */
 int dial_status = 0;		/* status from last dial command */
 int state_timeout = -1;		/* state machine timeout counter */
-int proxy_iface = 0;		/* Interface for the proxy */
+int proxy_ifunit = 0;		/* Interface for the proxy */
 int link_iface = -1;		/* Interface for the link */
 int force_dynamic = 0;		/* true if connect passed back an addr */
 int redial_rtimeout = -1;	/* initialized value */
@@ -153,9 +153,7 @@ main(int argc, char *argv[])
     open_fifo();
     filter_setup();
 
-    /* get a pty and open up a proxy link on it */
-    get_pty(&proxy_mfd,&proxy_sfd);
-    proxy_mfp = fdopen(proxy_mfd,"r+");
+    proxy_fd = proxy_open();
     proxy_up();
     idle_filter_proxy();
 
@@ -171,7 +169,7 @@ main(int argc, char *argv[])
     while (!terminate) {
 	/* wait up to a second for an event */
         readfds = ctrl_fds;
-        FD_SET(proxy_mfd,&readfds);
+        FD_SET(proxy_fd,&readfds);
         FD_SET(snoopfd,&readfds);
 	/* Compute the likely timeout for the next second boundary */
 	ts = tstamp + PAUSETIME*CLK_TCK - ticks();
@@ -253,7 +251,7 @@ main(int argc, char *argv[])
 	    if (FD_ISSET(snoopfd,&readfds)) filter_read();
 
 	    /* deal with packets coming into the pty proxy link */
-	    if (FD_ISSET(proxy_mfd,&readfds)) proxy_read();
+	    if (FD_ISSET(proxy_fd,&readfds)) proxy_read();
 	}
 	/* check if ticks() has advanced a second since last check.
 	 * This is immune to wall clock skew because we use the ticks count.
@@ -739,20 +737,21 @@ void ctrl_read(PIPE *pipe)
  */
 void proxy_read()
 {
+    int len, dlen;
     char buffer[4096];
-    int len;
 
     /* read the SLIP packet */
     len = recv_packet(buffer,4096);
+    dlen = len - sizeof(unsigned short);
 
     if (!do_reroute) {
 	/* if we are doing unsafe routing, all counting is in the filter.
 	 * otherwise we can see transmitted bytes directly at this spot.
 	 */
-	txtotal += len;
-	itxtotal += len;
-	rxtotal -= len;	/* since it will double count on the snoop */
-	irxtotal -= len;
+	txtotal += dlen;
+	itxtotal += dlen;
+	rxtotal -= dlen;	/* since it will double count on the snoop */
+	irxtotal -= dlen;
     }
 
     /* If we get here with the link up and fwdfd not -1,
@@ -801,7 +800,7 @@ void proxy_read()
 	if (af_packet) {
 	    memset(&sl, 0, sizeof(sl));
 	    sl.sll_family = AF_PACKET;
-	    sl.sll_protocol = htons(ETH_P_IP);
+	    sl.sll_protocol = *(unsigned short *)buffer;
 	    sl.sll_ifindex = snoop_index;
 	    to = (struct sockaddr *)&sl;
 	    to_len = sizeof(sl);
@@ -811,14 +810,14 @@ void proxy_read()
 	    memset(&sp, 0, sizeof(sp));
 	    sp.spkt_family = AF_INET;
 	    strcpy(sp.spkt_device, snoop_dev);
-	    sp.spkt_protocol = htons(ETH_P_IP);
+	    sp.spkt_protocol = *(unsigned short *)buffer;
 	    to = (struct sockaddr *)&sp;
 	    to_len = sizeof(sp);
 	}
 
 	if (debug&DEBUG_VERBOSE)
-	    mon_syslog(LOG_DEBUG,"Forwarding packet of length %d",len);
-	if (sendto(fwdfd, buffer, len, 0, to, to_len) < 0) {
+	    mon_syslog(LOG_DEBUG,"Forwarding packet of length %d", dlen);
+	if (sendto(fwdfd, buffer+sizeof(unsigned short), dlen, 0, to, to_len) < 0) {
 	    mon_syslog(LOG_ERR,
 		"Error forwarding data packet to physical device: %m");
 	}
@@ -1012,8 +1011,7 @@ int system(const char *buf)
 	close(2);
 #endif
 	if (modem_fd >= 0) close(modem_fd);
-	close(proxy_mfd);      /* close the master pty endpoint */
-	close(proxy_sfd);      /* close the slave pty endpoint */
+	proxy_close();
 	if (fifo_fd != -1) close(fifo_fd);
 	if (tcp_fd != -1) close(tcp_fd);
 	if (pipes) {
@@ -1104,8 +1102,7 @@ void background_system(const char *buf)
 	close(2);
 #endif
 	if (modem_fd >= 0) close(modem_fd);
-	close(proxy_mfd);      /* close the master pty endpoint */
-	close(proxy_sfd);      /* close the slave pty endpoint */
+	proxy_close();
 	if (fifo_fd != -1) close(fifo_fd);
 	if (tcp_fd != -1) close(tcp_fd);
 	if (pipes) {

@@ -10,6 +10,12 @@
 
 #include "diald.h"
 
+char *proxy_iftype = "sl";
+
+static int proxy_mfd;		/* master pty fd */
+static FILE *proxy_mfp;		/* also have an fp. Hackery for recv_packet. */
+static int proxy_sfd;		/* slave pty fd */
+
 /*
  * SLIP PACKET READING AND WRITING CODE FROM RFC 1055 by J. Romkey.
  *
@@ -24,7 +30,7 @@
 /* SEND_PACKET: sends a packet of length "len", starting at
  * location "p".
  */
-void send_packet(unsigned char *p, size_t len)
+void send_packet(unsigned short wprot, unsigned char *p, size_t len)
 {
     /* send an initial END character to flush out any data that may
      * have accumulated in the receiver due to line noise
@@ -79,6 +85,8 @@ int recv_packet(unsigned char *p, size_t len)
     int c;
     int received = 0;
 
+    *(unsigned short *)p = htons(ETH_P_IP);
+    p += sizeof(unsigned short);
 
     /* sit in a loop reading bytes until we put together
     * a whole packet.
@@ -162,7 +170,7 @@ void proxy_up(void)
 
     /* change line disciple to SLIP and set the SLIP encapsulation */
     disc = N_SLIP;
-    if ((proxy_iface = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
+    if ((proxy_ifunit = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
 	if (errno == ENFILE) {
 	   mon_syslog(LOG_ERR,"No free slip device available for proxy."), die(1);
 	} else if (errno == EEXIST) {
@@ -187,17 +195,17 @@ void proxy_up(void)
         mon_syslog(LOG_ERR,"Couldn't set up the proxy link correctly!"), die(1);
 
     if (debug&DEBUG_VERBOSE)
-        mon_syslog(LOG_INFO,"Proxy device established on interface sl%d",
-	    proxy_iface);
+        mon_syslog(LOG_INFO,"Proxy device established on interface %s%d",
+	    proxy_iftype, proxy_ifunit);
 
     /* Mark the interface as up */
     /* set the routing to the interface */
     proxy_config(orig_local_ip,orig_remote_ip);
     if (blocked && !blocked_route) {
-	del_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
+	del_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
     } else {
-	set_ptp("sl", proxy_iface, orig_local_ip, orig_remote_ip, metric+1);
-	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
+	set_ptp(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip, metric+1);
+	add_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
     }
 }
 
@@ -211,8 +219,8 @@ void proxy_config(char *lip, char *rip)
     int res;
 
     /* mark the interface as up */
-    sprintf(buf,"%s sl%d %s pointopoint %s netmask %s mtu %d up",
-	path_ifconfig,proxy_iface,lip,rip,
+    sprintf(buf,"%s %s%d %s pointopoint %s netmask %s mtu %d up",
+	path_ifconfig,proxy_iftype,proxy_ifunit,lip,rip,
 	netmask ? netmask : "255.255.255.255",mtu);
     res = system(buf);
     report_system_result(res,buf);
@@ -228,16 +236,29 @@ void proxy_down()
 
     if (debug&DEBUG_VERBOSE)
 	mon_syslog(LOG_INFO,"taking proxy device down");
-    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,metric+1);
+    del_routes(proxy_iftype,proxy_ifunit,orig_local_ip,orig_remote_ip,metric+1);
 
     /* mark the interface as down */
-    sprintf(buf,"%s sl%d down", path_ifconfig,proxy_iface);
+    sprintf(buf,"%s %s%d down", path_ifconfig,proxy_iftype,proxy_ifunit);
     res = system(buf);
     report_system_result(res,buf);
 
     /* clear the line discipline */
-    if ((proxy_iface = ioctl(proxy_sfd, TIOCSETD, &orig_disc)) < 0)
+    if ((proxy_ifunit = ioctl(proxy_sfd, TIOCSETD, &orig_disc)) < 0)
 	mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
+}
+
+int proxy_open()
+{
+    get_pty(&proxy_mfd,&proxy_sfd);
+    proxy_mfp = fdopen(proxy_mfd,"r+");
+    return proxy_mfd;
+}
+
+void proxy_close()
+{
+    close(proxy_mfd);
+    close(proxy_sfd);
 }
 
 void run_state_script(char *name, char *script, int background)
