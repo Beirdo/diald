@@ -35,7 +35,7 @@ static struct timer_lst head = {&head,&head,0,0,0,0};
 unsigned long timestamp()
 {
    struct tms buf;
-   return times(&buf)/CLK_TCK;
+   return times(&buf)/clk_tck;
 }
 
 unsigned long ticks()

@@ -40,6 +40,7 @@
 
 
 /* intialized variables. */
+int clk_tck = 0;		/* clock ticks per second */
 int af_packet = 1;		/* kernel has AF_PACKET sockets */
 int modem_fd = -1;		/* modem device fp (for proxy reads) */
 MONITORS *monitors = 0;		/* Monitor pipes */
@@ -143,6 +144,18 @@ main(int argc, char *argv[])
     /* initialize system log interface */
     openlog("diald", LOG_PID | LOG_NDELAY,  LOG_LOCAL2);
 
+    /* figure out clock granularity */
+#ifdef _SC_CLK_TCK
+    clk_tck = sysconf(_SC_CLK_TCK);
+#endif
+#if CLK_TCK
+    if (clk_tck <= 0)
+	clk_tck = CLK_TCK;
+#elif HZ
+    if (clk_tck <= 0)
+	clk_tck = HZ;
+#endif
+
     /* initialize a firewall unit so we can store our options */
     /* If I get things into a device this should be an "open" */
     fwunit = ctl_firewall(IP_FW_OPEN,0);
@@ -189,10 +202,10 @@ main(int argc, char *argv[])
         if (proxy.fd >= 0) FD_SET(proxy.fd, &readfds);
         if (snoopfd >= 0) FD_SET(snoopfd, &readfds);
 	/* Compute the likely timeout for the next second boundary */
-	ts = tstamp + PAUSETIME*CLK_TCK - ticks();
+	ts = tstamp + PAUSETIME*clk_tck - ticks();
 	if (ts < 0) ts = 0;
-    	timeout.tv_sec = ts/CLK_TCK;
-    	timeout.tv_usec = 1000*(ts%CLK_TCK)/CLK_TCK;
+    	timeout.tv_sec = ts/clk_tck;
+    	timeout.tv_usec = 1000*(ts%clk_tck)/clk_tck;
 	sel = select(256,&readfds,0,0,&timeout);
 	if (sel < 0 && errno == EBADF) {
 	    PIPE *p;
@@ -278,7 +291,7 @@ main(int argc, char *argv[])
 	/* check if ticks() has advanced a second since last check.
 	 * This is immune to wall clock skew because we use the ticks count.
 	 */
-	ts = tstamp + PAUSETIME*CLK_TCK - ticks();
+	ts = tstamp + PAUSETIME*clk_tck - ticks();
 	if (ts <= 0) {
 	    tstamp = ticks();
 	    fire_timers();
