@@ -314,7 +314,7 @@ int open_modem()
 		}
 
 		if (i == device_count) {
-			mon_syslog(LOG_INFO,
+			mon_syslog(LOG_WARNING,
 				"Couldn't find a free device to call out on.");
 			current_dev = 0;
 			dial_status = -1;
@@ -375,7 +375,7 @@ int open_modem()
 	    if (lock_dev) unlock();
 	}
 	if (modem_fd < 0) {
-	    mon_syslog(LOG_INFO,"Couldn't find a free device to call out on.");
+	    mon_syslog(LOG_WARNING,"Couldn't find a free device to call out on.");
 	    dial_status = -1;
 	    return 2;
 	}

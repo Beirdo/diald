@@ -12,6 +12,9 @@ Major changes between version 0.16 and 0.98.
     monitors can ask (e.g. our dctrl) can ask for the new stuff.
   - Added a title config option that is passed to monitors for
     identification purposes.
+  - If no title is specified on the command line to dctrl we use a
+    string representing the connection to the diald being monitored
+    until (and unless) it gives us a title via the monitor connection.
   - Capture dialler stderr and send to monitors.
   - New dev device open loop that allows for use of lock.
   - Documentation update.
@@ -26,7 +29,6 @@ Major changes between version 0.16 and 0.98.
   - If we have a TCP monitor listener close it before we exit.
   - Monitors can select the level of syslog messages they see.
   - Support both AF_PACKET and SOCK_PACKET.
-  - Do not trap fatal signals - we probably just loop madly if they happen.
   - When we get a request on a ctrl pipe log it to monitor pipes.
   - Add a blocked-route option to control whether we route through
     a blocked link or not.

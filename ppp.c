@@ -141,7 +141,7 @@ int ppp_set_addrs()
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
 	sprintf(ifr.ifr_name,"ppp%d",link_iface);
 	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
-	   mon_syslog(LOG_ERR,"failed to read ppp interface status");
+	   mon_syslog(LOG_ERR,"failed to read ppp interface status: %m");
 	   return 0;
 	}
 	if (!(ifr.ifr_flags & IFF_UP))
@@ -174,9 +174,9 @@ int ppp_set_addrs()
 	    mon_syslog(LOG_ERR,"failed to get ppp mtu setting: %m");
 	} else {
 	    if (ifr.ifr_mtu != mtu) {
-	        mon_syslog(LOG_ERR,"PPP negotiated mtu of %d does not match requested setting %d.",ifr.ifr_mtu,mtu);
-		mon_syslog(LOG_ERR,"Attempting to auto adjust mtu.");
-		mon_syslog(LOG_ERR,"Restart diald with mtu set to %d to avoid errors.",ifr.ifr_mtu);
+	        mon_syslog(LOG_WARNING,"PPP negotiated mtu of %d does not match requested setting %d.",ifr.ifr_mtu,mtu);
+		mon_syslog(LOG_WARNING,"Attempting to auto adjust mtu.");
+		mon_syslog(LOG_WARNING,"Restart diald with mtu set to %d to avoid errors.",ifr.ifr_mtu);
 		mtu = ifr.ifr_mtu;
 	        proxy_config(orig_local_ip,orig_remote_ip);
 	    }

@@ -58,7 +58,7 @@ void idle_filter_init()
      } else if (mode == MODE_DEV) {
        sprintf(snoop_dev,"%s",current_dev);
       }
-    if (debug) mon_syslog(LOG_INFO,"Changed snoop device to %s",snoop_dev);
+    if (debug) mon_syslog(LOG_DEBUG,"Changed snoop device to %s",snoop_dev);
     txtotal = rxtotal = 0;
 
 #ifdef HAVE_AF_PACKET
@@ -68,14 +68,14 @@ void idle_filter_init()
 
 	strncpy(ifr.ifr_name, snoop_dev, IFNAMSIZ);
 	if (ioctl(snoopfd, SIOCGIFINDEX, &ifr) < 0)
-	    mon_syslog(LOG_INFO, "ioctl SIOCGIFINDEX: %m");
+	    mon_syslog(LOG_ERR, "ioctl SIOCGIFINDEX: %m");
 	snoop_index = ifr.ifr_ifindex;
 	memset(&to, 0, sizeof(to));
 	to.sll_family = AF_PACKET;
 	to.sll_protocol = htons(ETH_P_ALL);
 	to.sll_ifindex = snoop_index;
 	if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
-	    mon_syslog(LOG_INFO, "bind snoopfd: %m");
+	    mon_syslog(LOG_ERR, "bind snoopfd: %m");
 	bind(fwdfd, (struct sockaddr *)&to, sizeof(to));
     } else
 #endif
@@ -85,7 +85,7 @@ void idle_filter_init()
 	to.sa_family = AF_INET;
 	strcpy(to.sa_data, snoop_dev);
 	if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
-	    mon_syslog(LOG_INFO, "bind snoopfd: %m");
+	    mon_syslog(LOG_ERR, "bind snoopfd: %m");
 	bind(fwdfd, (struct sockaddr *)&to, sizeof(to));
     }
 }
@@ -96,7 +96,7 @@ void idle_filter_init()
 void idle_filter_proxy()
 {
     if (fwdfd != -1) {
-        if (debug) mon_syslog(LOG_INFO,"Closed fwdfd");
+        if (debug) mon_syslog(LOG_DEBUG,"Closed fwdfd");
 	close(fwdfd);
 	fwdfd = -1;
     }
@@ -115,7 +115,7 @@ void idle_filter_proxy()
     }
 
     sprintf(snoop_dev,"sl%d",proxy_iface);
-    if (debug) mon_syslog(LOG_INFO,"Changed snoop device to %s",snoop_dev);
+    if (debug) mon_syslog(LOG_DEBUG,"Changed snoop device to %s",snoop_dev);
 
 #ifdef HAVE_AF_PACKET
     if (af_packet) {
@@ -124,14 +124,14 @@ void idle_filter_proxy()
 
 	strncpy(ifr.ifr_name, snoop_dev, IFNAMSIZ);
 	if (ioctl(snoopfd, SIOCGIFINDEX, &ifr) < 0)
-	    mon_syslog(LOG_INFO, "ioctl SIOCGIFINDEX: %m");
+	    mon_syslog(LOG_ERR, "ioctl SIOCGIFINDEX: %m");
 	snoop_index = ifr.ifr_ifindex;
 	memset(&to, 0, sizeof(to));
 	to.sll_family = AF_PACKET;
 	to.sll_protocol = htons(ETH_P_ALL);
 	to.sll_ifindex = snoop_index;
 	if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
-	    mon_syslog(LOG_INFO, "bind snoopfd: %m");
+	    mon_syslog(LOG_ERR, "bind snoopfd: %m");
     } else
 #endif
     {
@@ -140,7 +140,7 @@ void idle_filter_proxy()
 	to.sa_family = AF_INET;
 	strcpy(to.sa_data, snoop_dev);
 	if (bind(snoopfd, (struct sockaddr *)&to, sizeof(to)) < 0)
-	    mon_syslog(LOG_INFO, "bind snoopfd: %m");
+	    mon_syslog(LOG_ERR, "bind snoopfd: %m");
     }
 }
 
@@ -255,11 +255,11 @@ int fw_reset_wait()
 void print_filter_queue(int sig)
 {
     struct firewall_req req;
-    mon_syslog(LOG_INFO,"User requested dump of firewall queue.");
-    mon_syslog(LOG_INFO,"--------------------------------------");
+    mon_syslog(LOG_DEBUG,"User requested dump of firewall queue.");
+    mon_syslog(LOG_DEBUG,"--------------------------------------");
     req.unit = fwunit;
     ctl_firewall(IP_FW_PCONN,&req);
-    mon_syslog(LOG_INFO,"--------------------------------------");
+    mon_syslog(LOG_DEBUG,"--------------------------------------");
 }
 
 void monitor_queue()

@@ -47,7 +47,8 @@ void buffer_packet(unsigned int len,unsigned char *pkt)
 
     buffer_check();
     if (len+6 > buffer_size) {
-	mon_syslog(LOG_ERR,"Can't buffer packet of length %d, buffer to small.",
+	mon_syslog(LOG_NOTICE,
+	    "Can't buffer packet of length %d, buffer too small",
 	    len);
 	return;
     }
@@ -82,7 +83,7 @@ void buffer_packet(unsigned int len,unsigned char *pkt)
 	    tail = (tail+1)%buffer_size;
 	}
     } else {
-	mon_syslog(LOG_ERR,
+	mon_syslog(LOG_NOTICE,
 	    "Can't buffer packet of length %d, only %d bytes available.",
 	    len,buffer_size-(used+6));
     }

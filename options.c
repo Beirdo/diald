@@ -319,7 +319,10 @@ void set_scheduler(char **var, char **argv)
 	scheduler = SCHED_OTHER;
     else
 #endif
-	mon_syslog(LOG_ERR,"Unknown scheduling class %s.\nValid classes are: fifo, rr, or other.",argv[0]);
+    {
+	mon_syslog(LOG_ERR, "Unknown scheduling class %s", argv[0]);
+	mon_syslog(LOG_ERR, "Valid classes are: fifo, rr, or other.", argv[0]);
+    }
 }
 
 void set_mode(char **var, char **argv)
@@ -338,8 +341,10 @@ void set_mode(char **var, char **argv)
 	mode = MODE_SLIP, slip_encap = 3;
     else if (strcmp(argv[0],"aslip") == 0)
 	mode = MODE_SLIP, slip_encap = 8;
-    else
-	mon_syslog(LOG_ERR,"Unknown mode %s.\nValid modes are: dev, ppp, slip, cslip, slip6, cslip6, or aslip.",argv[0]);
+    else {
+	mon_syslog(LOG_ERR, "Unknown mode %s", argv[0]);
+	mon_syslog(LOG_ERR, "Valid modes are: dev, ppp, slip, cslip, slip6, cslip6, or aslip", argv[0]);
+    }
 }
 
 void set_dslip_mode(char **var, char **argv)
@@ -354,8 +359,10 @@ void set_dslip_mode(char **var, char **argv)
 	dynamic_mode = DMODE_LOCAL_REMOTE;
     else if (strcmp(argv[0],"bootp") == 0)
 	dynamic_mode = DMODE_BOOTP;
-    else
-	mon_syslog(LOG_ERR,"Unknown dynamic slip mode %s.\nValid modes are: remote, local, remote-local, local-remote or bootp.",argv[0]);
+    else {
+	mon_syslog(LOG_ERR, "Unknown dynamic slip mode %s", argv[0]);
+	mon_syslog(LOG_ERR, "Valid modes are: remote, local, remote-local, local-remote or bootp.", argv[0]);
+    }
 }
 
 void set_flag(int *var, char **argv)

@@ -162,7 +162,7 @@ static int get_ether_addr (unsigned int ipaddr, struct sockaddr *hwaddr)
 	    sizeof (struct sockaddr));
 
     if (debug&DEBUG_PROXYARP)
-    	mon_syslog(LOG_INFO,
+    	mon_syslog(LOG_DEBUG,
 	   "proxy arp: found hwaddr %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
 		(int) ((unsigned char *) &hwaddr->sa_data)[0],
 		(int) ((unsigned char *) &hwaddr->sa_data)[1],

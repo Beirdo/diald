@@ -115,7 +115,7 @@ void slip_start(void)
 
     if (dynamic_addrs && !force_dynamic) {
 	if (debug&DEBUG_VERBOSE)
-	    mon_syslog(LOG_INFO,"Fetching IP addresses from SLIP server");
+	    mon_syslog(LOG_DEBUG,"Fetching IP addresses from SLIP server");
 	if (dynamic_mode != DMODE_BOOTP) {
 	    fail = 0;
 	    failt.data = 0;

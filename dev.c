@@ -69,8 +69,10 @@ int dev_set_addrs()
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
 	sprintf(ifr.ifr_name, current_dev);
 	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
-	   mon_syslog(LOG_ERR,"failed to read interface status from device %s",current_dev);
-	   return 0;
+	    mon_syslog(LOG_ERR,
+		"failed to read interface status from device %s: %m",
+		current_dev);
+	    return 0;
 	}
 	if (!(ifr.ifr_flags & IFF_UP))
 	    return 0;	/* interface is not up yet */
@@ -85,14 +87,18 @@ int dev_set_addrs()
 
 	/* Ok, the interface is up, grab the addresses. */
 	if (ioctl(snoopfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
-		mon_syslog(LOG_ERR,"failed to get local address from device %s: %m",current_dev);
+	    mon_syslog(LOG_ERR,
+		"failed to get local address from device %s: %m",
+		current_dev);
 	else
        	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
 	if (ioctl(snoopfd, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
-	   mon_syslog(LOG_ERR,"failed to get remote address: %m");
+	    mon_syslog(LOG_ERR,
+		"failed to get remote address from device %s: %m",
+		current_dev);
 	else
-	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
+	    raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
 	/* KLUDGE 1:
 	 * If we do not have a valid remote address yet the interface

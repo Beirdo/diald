@@ -44,13 +44,13 @@ int pipe_read(PIPE *pipe)
 	 * pipe, not if it is a capture pipe for a script.
 	 */
 	if ((pipe->access & ACCESS_MONITOR)) {
-	    mon_syslog(LOG_INFO, "Closing %s", pipe->name);
+	    mon_syslog(LOG_NOTICE, "%s closed", pipe->name);
 	}
 	return -1;
     } else if (errno == EINTR) {
 	return 0;
     } else {
-	mon_syslog(LOG_ERR,"Error on %s: %m", pipe->name);
+	mon_syslog(LOG_ERR,"%s read error: %m", pipe->name);
 	return -1;	/* error! shut down reader... */
     }
 }

@@ -211,7 +211,8 @@ main(int argc, char *argv[])
 			fromhost(&rq);
 			if (!hosts_access(&rq)) {
 				close(fd);
-				mon_syslog(LOG_INFO, "Connection from TCP %s:%d - DENIED",
+				mon_syslog(LOG_WARNING,
+				    "Connection from TCP %s:%d - DENIED",
 				    inet_ntoa(sa.sin_addr), sa.sin_port);
 			} else
 #endif
@@ -224,13 +225,13 @@ main(int argc, char *argv[])
 			    pipe_init(strdup(buf), CONFIG_DEFAULT_ACCESS,
 					fd, p, 0);
 			    FD_SET(fd, &ctrl_fds);
-			    mon_syslog(LOG_INFO, "Connection from %s", buf);
+			    mon_syslog(LOG_NOTICE, "Connection from %s", buf);
 			} else {
 			    close(fd);
-			    mon_syslog(LOG_INFO, "malloc: %m");
+			    mon_syslog(LOG_ERR, "malloc: %m");
 			}
 		    } else
-			mon_syslog(LOG_INFO, "accept: %m");
+			mon_syslog(LOG_ERR, "accept: %m");
 		}
 	    }
 
@@ -381,7 +382,7 @@ void stray_signal(int sig)
 
 void fatal_signal(int sig, struct sigcontext_struct sc)
 {
-	mon_syslog(LOG_ERR, "Fatal signal %d, eip=0x%08lx",
+	mon_syslog(LOG_ALERT, "Fatal signal %d, eip=0x%08lx",
 		sig, sc.eip);
 	die(1);
 }
@@ -444,9 +445,18 @@ void signal_setup()
     SIGNAL(SIGPWR, stray_signal);
 }
 
+static int signal_block_depth = 0;
+
 void block_signals()
 {
-    sigprocmask(SIG_BLOCK, &sig_mask, NULL);
+    if (signal_block_depth++ == 0)
+	sigprocmask(SIG_BLOCK, &sig_mask, NULL);
+}
+
+void unblock_signals()
+{
+    if (--signal_block_depth == 0)
+	sigprocmask(SIG_UNBLOCK, &sig_mask, NULL);
 }
 
 void default_sigacts()
@@ -464,11 +474,6 @@ void default_sigacts()
     SIGNAL(SIGCHLD, SIG_DFL);
     SIGNAL(SIGALRM, SIG_DFL);
     SIGNAL(SIGPIPE, SIG_DFL);
-}
-
-void unblock_signals()
-{
-    sigprocmask(SIG_UNBLOCK, &sig_mask, NULL);
 }
 
 /*
@@ -559,57 +564,57 @@ void ctrl_read(PIPE *pipe)
 		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
 	    } else if ((pipe->access & ACCESS_CONFIG)
 	    && strncmp(buf, "config ", 7) == 0) {
-		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
+		mon_syslog(LOG_NOTICE, "%s: %s", pipe->name, buf);
 		parse_options_line(buf+7);
 	    } else if ((pipe->access & ACCESS_BLOCK)
 	    && strcmp(buf,"block") == 0) {
-		mon_syslog(LOG_INFO, "%s: block request", pipe->name);
+		mon_syslog(LOG_NOTICE, "%s: block request", pipe->name);
 		parse_options_line(buf);
 	    } else if ((pipe->access & ACCESS_UNBLOCK)
 	    && strcmp(buf,"unblock") == 0) {
-		mon_syslog(LOG_INFO, "%s: unblock request", pipe->name);
+		mon_syslog(LOG_NOTICE, "%s: unblock request", pipe->name);
 		parse_options_line(buf);
 	    } else if ((pipe->access & ACCESS_FORCE)
 	    && strcmp(buf,"force") == 0) {
-		mon_syslog(LOG_INFO, "%s: force request", pipe->name);
+		mon_syslog(LOG_NOTICE, "%s: force request", pipe->name);
 		forced = 1;
 	    } else if ((pipe->access & ACCESS_UNFORCE)
 	    && strcmp(buf,"unforce") == 0) {
-		mon_syslog(LOG_INFO, "%s: unforce request", pipe->name);
+		mon_syslog(LOG_NOTICE, "%s: unforce request", pipe->name);
 		forced = 0;
 	    } else if ((pipe->access & ACCESS_DOWN)
 	    && strcmp(buf,"down") == 0) {
-		mon_syslog(LOG_INFO, "%s: link down request", pipe->name);
+		mon_syslog(LOG_NOTICE, "%s: link down request", pipe->name);
     		request_down = 1;
     		request_up = 0;
 	    } else if ((pipe->access & ACCESS_UP)
 	    && strcmp(buf,"up") == 0) {
-    		mon_syslog(LOG_INFO, "%s: link up request", pipe->name);
+    		mon_syslog(LOG_NOTICE, "%s: link up request", pipe->name);
     		request_down = 0;
     		request_up = 1;
 	    } else if ((pipe->access & ACCESS_DELQUIT)
 	    && strcmp(buf,"delayed-quit") == 0) {
-    		mon_syslog(LOG_INFO, "%s: delayed termination request", pipe->name);
+    		mon_syslog(LOG_NOTICE, "%s: delayed termination request", pipe->name);
     		delayed_quit = 1;
 	    } else if ((pipe->access & ACCESS_QUIT)
 	    && strcmp(buf,"quit") == 0) {
-    		mon_syslog(LOG_INFO, "%s: termination request", pipe->name);
+    		mon_syslog(LOG_NOTICE, "%s: termination request", pipe->name);
     		terminate = 1;
 	    } else if ((pipe->access & ACCESS_RESET)
 	    && strcmp(buf,"reset") == 0) {
-    		mon_syslog(LOG_INFO, "%s: reset request received - re-reading configuration", pipe->name);
+    		mon_syslog(LOG_NOTICE, "%s: reset request received - re-reading configuration", pipe->name);
 		do_config();
 	    } else if ((pipe->access & ACCESS_QUEUE)
 	    && strcmp(buf,"queue") == 0) {
     		struct firewall_req req;
-    		mon_syslog(LOG_INFO,"%s: user requested dump of firewall queue", pipe->name);
-    		mon_syslog(LOG_INFO,"--------------------------------------");
+    		mon_syslog(LOG_NOTICE,"%s: user requested dump of firewall queue", pipe->name);
+    		mon_syslog(LOG_DEBUG,"--------------------------------------");
     		req.unit = fwunit;
     		ctl_firewall(IP_FW_PCONN,&req);
-    		mon_syslog(LOG_INFO,"--------------------------------------");
+    		mon_syslog(LOG_DEBUG,"--------------------------------------");
 	    } else if ((pipe->access & ACCESS_DEBUG)
 	    && sscanf(buf,"debug %d", &pid) == 1) {
-    		mon_syslog(LOG_INFO,"%s: changing debug flags to 0x%x",
+    		mon_syslog(LOG_NOTICE,"%s: changing debug flags to 0x%x",
 		    pipe->name, pid);
 		debug = pid;
 	    } else if ((pipe->access & ACCESS_DYNAMIC)
@@ -617,7 +622,7 @@ void ctrl_read(PIPE *pipe)
 		buf[k] = 0;
 		if (inet_addr(buf+j) == (unsigned long)0xffffffff
 		||  inet_addr(buf+l) == (unsigned long)0xffffffff) {
-		    mon_syslog(LOG_INFO,"%s: bad parameters '%s' and '%s' to dynamic command ignored",
+		    mon_syslog(LOG_ERR,"%s: bad parameters '%s' and '%s' to dynamic command ignored",
 			pipe->name, buf+j, buf+l);
 		} else {
 		    local_ip = strdup(buf+j);
@@ -632,11 +637,9 @@ void ctrl_read(PIPE *pipe)
 
 		k = 0;
 		if (sscanf(buf,"monitor %i %n",&j,&k) == 1) {
-		    mon_syslog(LOG_INFO,"%s: monitor connection at info level 0x%08x to %s requested",
-			    pipe->name, j, buf+k);
+		    mon_syslog(LOG_NOTICE, "%s: log level 0x%08x", buf + k, j);
 		} else if (buf[7] != 0 && buf[7] == ' ') {
-		    mon_syslog(LOG_INFO,"%s: full monitor connection to %s requested",
-			pipe->name, buf+8);
+		    mon_syslog(LOG_NOTICE, "%s: full monitor connection", buf+8);
 		    j = 255;	/* Heavy weight connection requested */
 		    k = 8;
 		}
@@ -655,11 +658,11 @@ void ctrl_read(PIPE *pipe)
 		    if (!new) {
 			if (pipe == fifo_pipe
 			&& (stat(fifoname,&sbuf) < 0 || !sbuf.st_mode&S_IFIFO)) {
-			    mon_syslog(LOG_INFO, "%s: %s not a pipe.",
+			    mon_syslog(LOG_ERR, "%s: %s not a pipe",
 				pipe->name, buf+k);
 			} else if ((pipe != fifo_pipe && (fd=dup(pipe->fd)) < 0)
 			|| (pipe == fifo_pipe && (fd = open(buf+k,O_WRONLY|O_NDELAY))<0)) {
-			    mon_syslog(LOG_INFO, "%s: could not open pipe %s: %m",
+			    mon_syslog(LOG_ERR, "%s: could not open pipe %s: %m",
 				pipe->name, buf+k);
 			} else {
 			    struct firewall_req req;
@@ -843,7 +846,7 @@ void die(int i)
 
     if (!in_die) {
         sprintf(tmp,"Diald is dieing with code %d",i);
-        mon_syslog(LOG_INFO, tmp);
+        mon_syslog(LOG_NOTICE, tmp);
 	in_die = 1;
 	/* We're killing without a care here. Uhggg. */
 	if (link_pid) kill(link_pid,SIGINT);
@@ -888,7 +891,7 @@ void die(int i)
  */
 void sig_hup(int sig)
 {
-    mon_syslog(LOG_INFO, "SIGHUP: modem got hung up on.");
+    mon_syslog(LOG_NOTICE, "SIGHUP: modem got hung up on.");
     modem_hup = 1;
 }
 
@@ -898,7 +901,7 @@ void sig_hup(int sig)
  */
 void sig_intr(int sig)
 {
-    mon_syslog(LOG_INFO, "SIGINT: Link down request received.");
+    mon_syslog(LOG_NOTICE, "SIGINT: Link down request received.");
     request_down = 1;
     request_up = 0;
 }
@@ -908,7 +911,7 @@ void sig_intr(int sig)
  */
 void linkup(int sig)
 {
-    mon_syslog(LOG_INFO, "SIGUSR1. External link up request received.");
+    mon_syslog(LOG_NOTICE, "SIGUSR1. External link up request received.");
     request_down = 0;
     request_up = 1;
 }
@@ -954,7 +957,7 @@ void sig_chld(int sig)
  */
 void sig_term(int sig)
 {
-    mon_syslog(LOG_INFO, "SIGTERM. Termination request received.");
+    mon_syslog(LOG_NOTICE, "SIGTERM. Termination request received.");
     terminate = 1;
 }
 
@@ -1048,8 +1051,6 @@ int system(const char *buf)
         /* NOTREACHED */
     }
 
-    unblock_signals();
-
     if (p[1] >= 0) close(p[1]);
     if (p[0] >= 0 && (fd = fdopen(p[0], "r"))) {
 	char buf[1024];
@@ -1063,6 +1064,7 @@ int system(const char *buf)
 	fclose(fd);
     }
 
+    unblock_signals();
     while (running_pid)
 	    pause();
 
@@ -1174,7 +1176,7 @@ void mon_write(unsigned int level, char *message, int len)
 		close(c->fd);
 		if (p) p->next = c->next;
 		else monitors = c->next;
-		mon_syslog(LOG_INFO,"Monitor pipe %s closed.",c->name);
+		mon_syslog(LOG_NOTICE,"Monitor pipe %s closed.",c->name);
 		free(c->name);
 		free(c);
 	    } else {

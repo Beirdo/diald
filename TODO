@@ -23,15 +23,8 @@ for this.
    blocked-route changes.
    Now it changes routes when blocked-route changes but not
    when blocked changes.
-
-Because the snoop gets packets as they go out to the device we
-only see masqueraded versions of packets on masqueraded connections.
-Sometimes we might want to know the real addresses for admin or
-even link time control. The only way I can think of doing it is to
-snoop the incoming interface(s) as well - but that means we need
-a router in diald to figure out whether this packet would actually
-go out our link or not, plus it implies a massive system load!
-There seem to be no easy solutions to this one :-(.
+   Now it changes routes when the blocked flag changes but only
+   if the link is down of course.
 
 The diald/dctrl combination makes a useful little traffic monitor
 for an interface. Perhaps we could use it as such without all the
@@ -44,6 +37,8 @@ dial up and proxy baggage?
 Allow monitors to pass configuration commands to diald for on the
 fly reconfiguration? Security?
 -- Done. Use "config <option>". No security yet...
+   Some security now but it's compile time configured and only
+   per connection type so far.
 
 Add authentication on control connections with user/password login,
 maybe SSL?
@@ -53,6 +48,10 @@ Add a toolbar to dctrl.
 
 Use monitor messages for more than just dial messages?
 -- Started...
+   The monitor messages now feed off the same stream that the
+   syslog messages do. Output from external scripts (connect,
+   route etc.) is caught and handled as messages. Monitors are
+   able to set the level of messages they see.
 
 In dctrl the connection queue, dialling log etc. should be
 independently resizable.
@@ -68,12 +67,20 @@ The behaviour of the horizontal scrollbar on the dctrl information
 window is "unpleasant".
 
 Need a menu on the dctrl information window to select log level.
+-- Done.
 
 If we have ISDN ippp links that are both dial out and dial in there
 is no way to get locking right. If we have more than one link there
 are all kinds of races when adding phone numbers to links, dialling
 and accepting incoming calls that seem unavoidable. Mainly because
 the ISDN layers don't have any form of blocking dial.
+-- We can use the lock option to have diald use lock files for
+   devices other than ttys and thus prevent two dialds from
+   trying to use the same ippp interface to dial out at once.
+   If you have static IP addresses you can make the connect
+   scripts fairly robust too. If you have dynamic IP addresses
+   I can see no obvious way of knowing if your diald out succeeded
+   or if the ippp interface just accepted an incoming call.
 
 We currently have several ways of forking scripts in diald, most
 of which are very similar. There must be opportunity for rationalization
@@ -90,7 +97,21 @@ Does diald allow us to (not) do that?
 The chat I have doesn't flush stderr at appropriate times (i.e.
 when waiting for a response) nor does it report all fails to
 stderr.
+-- Don't just have it write its output to stderr. Use the -v -s -S
+   options to have it write debug messages to stderr but not
+   syslog. This is not as nice but works as you might expect.
 
 If we get an EAGAIN back on writing to a monitor pipe we should
 try and flush the pipe in order to avoid a stalled monitor from
 causing diald to suck resources.
+
+When dctrl is not displaying the packet queue it should not ask
+diald for it.
+
+Should a link down request abort an in-progress dial?
+
+Need to sort out keyboard accelerators and shortcuts on dctrl's menus.
+
+When building the description string for a connection we should optionally
+unmasquerade (using /proc/net/ip_masquerade) and convert addresses
+to textual names.
