@@ -9,6 +9,8 @@ Major changes between version 0.16 and 0.98.1.
     set of devices to mix, say, ippp<n> or isdn<n> with modem
     fallback using ppp or slip. It is not currently possible
     to mix ppp and slip - it is under consideration.
+  - The location of the file used for simple authentication
+    on TCP connections is now a config option.
 
 
 Major changes between version 0.16 and 0.98.0.
