@@ -1,5 +1,8 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - The proxy should never be downed - it needs to be up in case
+    we want to pass packets back to the kernel - instead we just
+    remove the address.
   - If the remote end drops the link and we are in two-way mode
     we just go DOWN and wait for outgoing traffic. If we are not
     in two-way mode we have to do an immediate retry because we

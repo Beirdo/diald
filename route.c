@@ -199,12 +199,22 @@ iface_stop(char *mode, char *iftype, int ifunit,
      */
     del_routes(desc, iface, lip, rip);
 
-    sprintf(buf, "%s %s %s",
-	path_ifconfig, iface,
+    if (strcmp(mode, "proxy") == 0) {
+	sprintf(buf, "%s %s %s",
+	    path_ifconfig, iface,
 #ifdef HAVE_AF_PACKET
-	(af_packet && current_mode == MODE_DEV) ? "0.0.0.0" : "down");
+	    af_packet ? "0.0.0.0" : "127.0.0.2");
 #else
-	current_mode == MODE_DEV ? "0.0.0.0" : "down");
+	    "127.0.0.2");
 #endif
+    } else {
+	sprintf(buf, "%s %s %s",
+	    path_ifconfig, iface,
+#ifdef HAVE_AF_PACKET
+	    (af_packet && current_mode == MODE_DEV) ? "0.0.0.0" : "down");
+#else
+	    current_mode == MODE_DEV ? "0.0.0.0" : "down");
+#endif
+    }
     run_shell(SHELL_WAIT, desc, buf, -1);
 }
