@@ -174,6 +174,7 @@
 
 typedef struct monitors {
     struct monitors *next;
+    int is_pipe;		/* is this a pipe? Or TCP? */
     int fd;			/* monitor output fp. */
     unsigned int level;		/* Information level requested */
     char *name;
@@ -467,6 +468,7 @@ int set_proxyarp (unsigned int);
 int clear_proxyarp (unsigned int);
 int report_system_result(int,char *);
 void mon_syslog(int pri, char *fmt, ...);
+void mon_cork(int);
 void mon_write(unsigned int,char *,int);
 void block_timer();
 void unblock_timer();

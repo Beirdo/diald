@@ -1071,6 +1071,8 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    char tbuf1[10], tbuf2[10], tbuf3[10];
             char buf[1024];
 
+	    mon_cork(1);
+
 	    sprintf(buf,"STATUS\n%d %d %d %d %d %d %s %s %s %c %c %c\n",
 		unit->up, unit->force, unit->impulse_mode,
 		impulse_init_time, impulse_time,
@@ -1113,6 +1115,7 @@ int ctl_firewall(int op, struct firewall_req *req)
                 mon_write(MONITOR_VER1|MONITOR_QUEUE, buf, strlen(buf));
 	    }
 	    mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
+	    mon_cork(0);
 	    return 0;
 	}
 	return 0;

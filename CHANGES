@@ -1,5 +1,7 @@
 Major changes between version 0.99.4 and 0.99.5.
 ------------------------------------------------
+  - Use TCP_CORK on monitor output (if available) to make sure we
+    keep the number of packets to a minimum.
   - Fixed a %d which should have been a %s in a debug message.
   - Handle a down request received between starting the protocol
     and the interface becoming available for traffic.

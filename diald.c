@@ -687,6 +687,7 @@ void ctrl_read(PIPE *pipe)
 			    fcntl(fd, F_SETFD, FD_CLOEXEC);
 			    new = (MONITORS *)malloc(sizeof(MONITORS));
 			    new->name = strdup(buf+k);
+			    new->is_pipe = (pipe == fifo_pipe);
 			    new->next = monitors;
 			    new->fd = fd;
 			    new->level = j;
@@ -974,6 +975,25 @@ void sig_term(int sig)
 {
     mon_syslog(LOG_NOTICE, "SIGTERM. Termination request received.");
     terminate = 1;
+}
+
+
+void mon_cork(int onoff)
+{
+#ifdef __linux__
+#  ifndef TCP_CORK
+#    define TCP_CORK 3
+#  endif
+#endif
+    MONITORS *mon = monitors;
+    while (mon) {
+	if (!mon->is_pipe) {
+	    setsockopt(mon->fd, SOL_TCP, TCP_CORK,
+		(void *)&onoff, sizeof(onoff));
+	}
+	mon = mon->next;
+    }
+    unblock_signals();	/* don't let anything mess up the data */
 }
 
 
