@@ -32,7 +32,8 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
     /* FIXME: this is only needed for 2.0 kernels. 2.2 and beyond
      * create routes automatically when the interface is configured.
      * On 2.2 and later kernels this just creates some annoying
-     * duplicate routes.
+     * duplicate routes. But if the metric is non-zero we can,
+     * and should, get rid of the original zero metric route.
      */
     if (path_ip) {
 	sprintf(buf,"%s route add %s dev %s%d scope link src %s metric %d %s",
@@ -43,6 +44,18 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
     }
     res = system(buf);
     report_system_result(res, buf);
+
+    if (metric) {
+	if (path_ip) {
+	    sprintf(buf,"%s route del %s dev %s%d scope link src %s metric 0 %s",
+		path_ip, rip, iftype, ifunit, lip, win); 
+	} else {
+	    sprintf(buf,"%s del %s metric 0 %s dev %s%d",
+		path_route, rip, win, iftype, ifunit); 
+	}
+	res = system(buf);
+	report_system_result(res, buf);
+    }
 #endif
 
     /* Add in a default route for the link if required. */
