@@ -750,12 +750,13 @@ void ctrl_read(PIPE *pipe)
  */
 void proxy_read()
 {
-    int len, dlen;
+    int len;
     char buffer[4096];
 
     /* read the SLIP packet */
     len = recv_packet(buffer,4096);
-    dlen = len - sizeof(unsigned short);
+    if (len == 0)
+	return;
 
     /* If we get here with the link up and fwdfd not -1,
      * and we are rerouting, then it must be
@@ -771,6 +772,7 @@ void proxy_read()
 
     /* if the external iface is up then probably we can send it on */
     if (link_iface != -1 && fwdfd != -1) {
+	int dlen;
 	struct sockaddr_pkt sp;
 #ifdef HAVE_AF_PACKET
 	struct sockaddr_ll sl;
@@ -817,6 +819,8 @@ void proxy_read()
 	    to = (struct sockaddr *)&sp;
 	    to_len = sizeof(sp);
 	}
+
+	dlen = len - sizeof(unsigned short);
 
 	if (debug&DEBUG_VERBOSE)
 	    mon_syslog(LOG_DEBUG,"Forwarding packet of length %d", dlen);
