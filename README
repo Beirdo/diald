@@ -66,12 +66,12 @@ your kernel. You must also have a program like "chat" to do dialing.
 
 Configuring Diald
 
-Various pathnames that diald needs to know can be configured in "config.h".
-Edit this file appropriately. Most of what is here can be changed at run
-time, but it's nice to not have to specify extra runtime options because you
-where to lazy to edit the config.h file. The eventual installation location
-for the diald binaries, the man pages and the diald definitions files can be
-configured in the Makefile.
+Run the ./configure script. By default configure will set diald up
+to live under /usr/local. For a live installation you probably
+want to use:
+
+	./configure --prefix=/usr --sysconfdir=/etc \
+		--localstatedir=/var --mandir=%{_mandir}
 
 Basic Installation (First Time Users)
 

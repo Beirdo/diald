@@ -29,7 +29,7 @@
 #include "diald.h"
 #include "version.h"
 
-#ifdef TCP_WRAPPERS
+#if HAVE_LIBWRAP
 #  include <tcpd.h>
 
    int allow_severity = LOG_INFO;
@@ -219,7 +219,7 @@ main(int argc, char *argv[])
 		    fcntl(tcp_fd, F_SETFL, flags);
 		    if (fd >= 0) {
 			PIPE *p;
-#ifdef TCP_WRAPPERS
+#if HAVE_LIBWRAP
 			struct request_info rq;
 			request_init(&rq,
 				RQ_DAEMON, "diald",

@@ -24,7 +24,7 @@ int metric = DEFAULT_METRIC;
 char *link_name = 0;
 char *link_desc = 0;
 char *authsimple = 0;
-#ifdef AUTH_PAM
+#if HAVE_LIBPAM
 char *authpam = 0;
 #endif
 char *initializer = 0;
@@ -143,7 +143,7 @@ struct {
     {"linkname","<name>",1,&link_name,set_str},
     {"linkdesc","<description>",1,&link_desc,set_str},
     {"authsimple","<file>",1,&authsimple,set_str},
-#ifdef AUTH_PAM
+#if HAVE_LIBPAM
     {"authpam","<file>",1,&authpam,set_str},
 #endif
     {"initializer","<script>",1,&initializer,set_str},
@@ -266,7 +266,7 @@ void init_vars()
     link_desc = 0;
     if (authsimple) free(authsimple);
     authsimple = 0;
-#ifdef AUTH_PAM
+#if HAVE_LIBPAM
     if (authpam) free(authpam);
     authpam = 0;
 #endif

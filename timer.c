@@ -11,9 +11,13 @@
 #include "diald.h"
 
 #include <signal.h>
-#include <sys/time.h>
+#if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+#endif
 #include <sys/times.h>
-#include <unistd.h>
+#if HAVE_UNISTD_H
+#  include <unistd.h>
+#endif
 
 static struct timer_lst head = {&head,&head,0,0,0,0};
 

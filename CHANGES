@@ -1,5 +1,7 @@
 Major changes between version 0.99.5 and 1.0
 ------------------------------------------------
+  - Added Makefile rule to build RPMs.
+  - Changed to use GNU autoconf.
   - Added config save/restore to dctrl. Patch from someone but
     I forget who. If it was you please tell me!
   - Handle dynamic changes of netmask.

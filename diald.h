@@ -6,26 +6,39 @@
  * All rights reserved. Please see the file LICENSE which should be
  * distributed with this software for terms of use.
  */
+#include <config.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
-#include <unistd.h>
+#if HAVE_UNISTD_H
+#  include <unistd.h>
+#endif
 #include <string.h>
-#include <dirent.h>
-#include <fcntl.h>
+#if HAVE_DIRENT_h
+#  include <dirent.h>
+#endif
+#if HAVE_FCNTL_H
+#  include <fcntl.h>
+#endif
 #include <ctype.h>
 #include <errno.h>
-#include <syslog.h>
+#if HAVE_SYSLOG_H
+#  include <syslog.h>
+#endif
 #include <signal.h>
-#include <time.h>
+#if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+#endif
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #  include <sched.h>
 #endif
-#include <sys/time.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
+#if HAVE_SYS_IOCTL_H
+#  include <sys/ioctl.h>
+#endif
 #include <sys/socket.h>
 #include <sys/termios.h>
 /* #include <sys/bitypes.h> */
@@ -73,13 +86,12 @@
    typedef struct { int sll_protocol; } sockaddr_ll_t;
 #endif
 
-#include "config.h"
-#include "access.h"
-#include "fsm.h"
-#include "timer.h"
-#include "firewall.h"
-#include "bufio.h"
-#include "proxy.h"
+#include <access.h>
+#include <fsm.h>
+#include <timer.h>
+#include <firewall.h>
+#include <bufio.h>
+#include <proxy.h>
 
 #define LOG_DDIAL	LOG_LOCAL2
 
@@ -197,7 +209,7 @@ int metric;
 char *link_name;
 char *link_desc;
 char *authsimple;
-#ifdef AUTH_PAM
+#if HAVE_LIBPAM
 char *authpam;
 #endif
 char *initializer;

@@ -6,7 +6,9 @@
  * distributed with this software for terms of use.
  */
 
-#include <syslog.h>
+#if HAVE_SYSLOG_H
+#  include <syslog.h>
+#endif
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +16,7 @@
 
 #include "diald.h"
 
-#ifdef AUTH_PAM
+#if HAVE_LIBPAM
 #include <security/pam_appl.h>
 #endif
 
@@ -108,7 +110,7 @@ acc_simple(char *buf)
 }
 
 
-#ifdef AUTH_PAM
+#if HAVE_LIBPAM
 
 static char *acc_pam_user;
 static char *acc_pam_pass;
@@ -249,7 +251,7 @@ ctrl_access(char *buf)
 		if (!strncmp(buf, "simple ", 7)) {
 			new_access = acc_simple(buf+7);
 		}
-#ifdef AUTH_PAM
+#if HAVE_LIBPAM
 		else if (!strncmp(buf, "pam ", 4)) {
 			new_access = acc_pam(buf+4);
 		}

@@ -1,0 +1,104 @@
+RPM_STAGING_DIR	= /usr/src/packages/SOURCES
+
+
+SHELL           = @SHELL@
+
+srcdir          = @srcdir@
+top_srcdir      = @top_srcdir@
+VPATH           = @srcdir@
+prefix          = @prefix@
+exec_prefix     = @exec_prefix@
+
+bindir          = @bindir@
+sbindir         = @sbindir@
+libexecdir      = @libexecdir@
+datadir         = @datadir@
+sysconfdir      = @sysconfdir@
+sharedstatedir  = @sharedstatedir@
+localstatedir   = @localstatedir@
+libdir          = @libdir@/diald
+infodir         = @infodir@
+mandir          = @mandir@
+
+
+CC              = @CC@
+CFLAGS          = @CFLAGS@ @DEFS@ -I$(srcdir) \
+			-DDIALD_CONFIG_FILE=\"@sysconfdir@/diald.conf\" \
+			-DDIALD_DEFS_FILE=\"@libdir@/diald/diald.defs\" \
+			-DRUN_PREFIX=\"@localstatedir@/run\"
+INSTALL         = @INSTALL@
+LDFLAGS         = @LDFLAGS@
+LIBS		= @LIBS@
+
+
+# Linux, libc.so.6, TCP access control via /etc/hosts.allow (tcp_wrappers)
+# and PAM authentication protocol
+#CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS -DAUTH_PAM
+#LIBS = -lwrap -lnsl -lpam -ldl
+
+
+OBJFILES=diald.o options.o modem.o filter.o slip.o lock.o ppp.o dev.o \
+	proxyarp.o fsm.o timer.o parse.o buffer.o \
+	route.o bufio.o utils.o firewall.o log.o access.o \
+	proxy.o proxy_tap.o proxy_tun.o proxy_slip.o proxy_dev.o shell.o
+
+
+diald: version.h $(OBJFILES)
+	./fixwrappers
+	$(CC) $(CFLAGS) $(LDFLAGS) -o diald $(OBJFILES) $(LIBS)
+
+install: diald
+	$(INSTALL) -d $(DESTDIR)$(bindir)
+	$(INSTALL) -m 0755 bin/dctrl $(DESTDIR)$(bindir)/dctrl
+	$(INSTALL) -d $(DESTDIR)$(sbindir)
+	$(INSTALL) -s -o root -g bin diald $(DESTDIR)$(sbindir)/diald
+	$(INSTALL) -d $(DESTDIR)$(mandir)/man1 $(DESTDIR)$(mandir)/man5 \
+		$(DESTDIR)$(mandir)/man8
+	$(INSTALL) -o root -g bin -m 0644 doc/diald.man $(DESTDIR)$(mandir)/man8/diald.8
+	$(INSTALL) -o root -g bin -m 0644 doc/dctrl.man $(DESTDIR)$(mandir)/man1/dctrl.1
+	$(INSTALL) -o root -g bin -m 0644 doc/diald-examples.man $(DESTDIR)$(mandir)/man5/diald-examples.5
+	$(INSTALL) -o root -g bin -m 0644 doc/diald-control.man $(DESTDIR)$(mandir)/man5/diald-control.5
+	$(INSTALL) -o root -g bin -m 0644 doc/diald-monitor.man $(DESTDIR)$(mandir)/man5/diald-monitor.5
+	-mkdir -p $(DESTDIR)$(libdir)
+	$(INSTALL) -o root -g bin lib/*.gif $(DESTDIR)$(libdir)
+	$(INSTALL) -o root -g bin -m 0644 config/diald.defs $(DESTDIR)$(libdir)/diald.defs
+	$(INSTALL) -o root -g bin -m 0644 config/standard.filter $(DESTDIR)$(libdir)/standard.filter
+	$(INSTALL) -d -m 0755 $(DESTDIR)/etc/pam.d
+	$(INSTALL) -o root -g root -m 0644 config/diald.pam $(DESTDIR)/$(sysconfdir)/pam.d/diald
+	$(INSTALL) -o root -g bin bin/connect $(DESTDIR)$(libdir)/connect
+
+clean:
+	rm -f *.o diald
+
+
+distclean:
+	rm -f *.o diald
+	rm -f config.h config.log config.cache config.status version.h
+	rm -f Makefile
+
+rpm rpms:
+	rm -f *.o diald
+	rm -f config.h config.log config.cache config.status version.h
+	rm -f Makefile
+	myname=`basename $$PWD`; \
+        myver=`awk '/^Version:/ { print $$2 }' $$myname.spec`; \
+        cd ..; mv "$$myname" "$$myname-$$myver"; \
+        tar cfz "$(RPM_STAGING_DIR)/$$myname-$$myver.tar.gz" "$$myname-$$myver"; \
+        mv "$$myname-$$myver" "$$myname"; cd "$$myname"; \
+        rpm -ba *.spec
+
+version.h:	*.spec
+	myver=`awk '/^Version:/ { print $$2 }' diald.spec`; \
+	echo "#define VERSION \"$$myver\"" > version.h
+
+dummy:
+
+depend:
+	$(CPP) -MM *.c > .depend
+
+#
+# include a dependency file if one exists
+#
+ifeq (.depend,$(wildcard .depend))
+include .depend
+endif
