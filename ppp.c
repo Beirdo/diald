@@ -53,7 +53,7 @@ void ppp_start()
         unblock_signals();
 
 	ADD_ARG(path_pppd);
-	ADD_ARG("nodefaultroute");
+	ADD_ARG("-defaultroute");
 	ADD_ARG("-detach");
 	if (modem) ADD_ARG("modem");
 	if (crtscts) ADD_ARG("crtscts");
