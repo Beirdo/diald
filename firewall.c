@@ -24,7 +24,236 @@ int impulse_init_time = 0;
 int impulse_time = 0;
 int impulse_fuzz = 0;
 
+
 void del_connection(FW_Connection *);
+
+
+static int
+var_eval(FW_unit *unit, FW_ProtocolRule *pprule, struct var *v)
+{
+    unsigned char *hdr = pprule->hdr;
+    unsigned char *data = pprule->data;
+    unsigned char *n_p;
+
+#if 0
+mon_syslog(LOG_INFO, "    var 0x%08lx: valid %d, prule %d, type %d", v, v->valid, v->prule, v->type);
+#endif
+    /* If the var names a specific protocol header it must exist
+     * in the current packet and the var value can be cached.
+     * Unspecific var names are recalulated every time.
+     */
+    if ((v->valid & 2)) {
+	pprule = &unit->prules[v->prule];
+	if (!pprule->hdr)
+	    return 0;
+	if ((v->valid & 1))
+	    return 1;
+    }
+
+    if (v->type == FW_VAR_STRING) {
+#if 0
+mon_syslog(LOG_DEBUG, "    var: prule %d: \"%s\"", v->prule, v->u.s);
+#endif
+    } else {
+	int i, j;
+
+	hdr = pprule->hdr;
+	data = pprule->data;
+
+	memset(v->u.n.value, 0, sizeof(v->u.n.value));
+	if (v->u.n.width > 0) {
+	    n_p = &(FW_IN_DATA(v->u.n.offset)?data:hdr)[FW_OFFSET(v->u.n.offset)];
+	    /* Yes, it's a Duff's Device! */
+	    i = FW_MAX_ADDR_UINTS-1-((v->u.n.width-1)/sizeof(v->u.n.value[0]));
+	    switch (v->u.n.width % sizeof(v->u.n.value[0])) {
+	    case 0: do {	v->u.n.value[i] = *(n_p++);
+if (sizeof(v->u.n.value[0]) == 8) {
+	    case 7:		v->u.n.value[i] = (v->u.n.value[i]<<8)|*(n_p++);
+	    case 6:		v->u.n.value[i] = (v->u.n.value[i]<<8)|*(n_p++);
+	    case 5:		v->u.n.value[i] = (v->u.n.value[i]<<8)|*(n_p++);
+	    case 4:		v->u.n.value[i] = (v->u.n.value[i]<<8)|*(n_p++);
+}
+	    case 3:		v->u.n.value[i] = (v->u.n.value[i]<<8)|*(n_p++);
+	    case 2:		v->u.n.value[i] = (v->u.n.value[i]<<8)|*(n_p++);
+	    case 1:		v->u.n.value[i] = (v->u.n.value[i]<<8)|*(n_p++);
+	    } while (++i < FW_MAX_ADDR_UINTS);
+	    }
+#if 0
+mon_syslog(LOG_INFO, "got value: %08x:%08x:%08x:%08x", v->u.n.value[0], v->u.n.value[1], v->u.n.value[2], v->u.n.value[3]);
+#endif
+
+	    if (v->u.n.shift < 0) {
+		j = 0;
+		for (i=0; i<FW_MAX_ADDR_UINTS; i++) {
+		    unsigned int bits = j;
+		    j = v->u.n.value[i]
+			<< (8*sizeof(v->u.n.value[0]) + v->u.n.shift);
+		    v->u.n.value[i] = (v->u.n.value[i] >> -v->u.n.shift) | bits;
+		}
+	    } else if (v->u.n.shift > 0) {
+		j = 0;
+		for (i=FW_MAX_ADDR_UINTS-1; i>=0; i--) {
+		    unsigned char bits = j;
+		    j = v->u.n.value[i]
+			>> (8*sizeof(v->u.n.value[0]) - v->u.n.shift);
+		    v->u.n.value[i] = (v->u.n.value[i] << v->u.n.shift) | bits;
+		}
+	    }
+#if 0
+mon_syslog(LOG_INFO, "shifted: %08x:%08x:%08x:%08x", v->u.n.value[0], v->u.n.value[1], v->u.n.value[2], v->u.n.value[3]);
+#endif
+	}
+	for (i=0; i<FW_MAX_ADDR_UINTS; i++)
+	    v->u.n.value[i] = (v->u.n.value[i] & v->u.n.mask[i]);
+#if 0
+mon_syslog(LOG_INFO, "masked: %08x:%08x:%08x:%08x", v->u.n.value[0], v->u.n.value[1], v->u.n.value[2], v->u.n.value[3]);
+#endif
+	j = 0;
+	for (i=FW_MAX_ADDR_UINTS-1; i>=0; i--) {
+	    unsigned int old = v->u.n.value[i];
+	    v->u.n.value[i] += v->u.n.cval[i] + j;
+	    j = (v->u.n.value[i] < old) ? 1 : 0;
+	}
+#if 0
+mon_syslog(LOG_INFO, "summed: %08x:%08x:%08x:%08x", v->u.n.value[0], v->u.n.value[1], v->u.n.value[2], v->u.n.value[3]);
+#endif
+#if 0
+mon_syslog(LOG_DEBUG,"    var: prule %d: %s (0x%x[%d] << %d) & 0x%x + 0x%x = 0x%x",
+	    v->prule,
+	    FW_IN_DATA(v->u.n.offset) ? "data" : "hdr",
+	    FW_HDR_OFFSET(v->u.n.offset),
+	    v->u.n.width, v->u.n.shift,
+	    v->u.n.mask[FW_MAX_ADDR_UINTS-1],
+	    v->u.n.cval[FW_MAX_ADDR_UINTS-1],
+	    v->u.n.value[FW_MAX_ADDR_UINTS-1]);
+#endif
+    }
+
+    if (!(v->valid & 2))
+	return 1;
+
+    v->valid |= 1;
+    v->next_dirty = pprule->var_dirty;
+    pprule->var_dirty = v;
+    return 1;
+}
+
+
+static void
+var_format(char *buf, int bufsiz, char *fmt, struct var *var)
+{
+    if (var->type == FW_VAR_STRING) {
+	snprintf(buf, bufsiz, fmt ? fmt : "%s", var->u.s);
+    } else if (var->type == FW_VAR_PROTOCOL) {
+	char *p, tbuf[16];
+	unsigned int n = var->u.n.value[FW_MAX_ADDR_UINTS-1];
+	p = getprotonumber(n);
+	if (!p) {
+	    sprintf(tbuf, "%u", n);
+	    p = tbuf;
+	}
+	snprintf(buf, bufsiz, fmt ? fmt : "%s", p);
+    } else if (var->type == FW_VAR_PORT) {
+	char tbuf[16];
+	unsigned int n = var->u.n.value[FW_MAX_ADDR_UINTS-1];
+	sprintf(tbuf, "%u", n);
+	snprintf(buf, bufsiz, fmt ? fmt : "%s", tbuf);
+    } else if (var->type == FW_VAR_TCPPORT) {
+	char *p, tbuf[16];
+	unsigned int n = var->u.n.value[FW_MAX_ADDR_UINTS-1];
+	p = NULL; /* getservicenumber("tcp", n); */
+	if (!p) {
+	    sprintf(tbuf, "%u", n);
+	    p = tbuf;
+	}
+	snprintf(buf, bufsiz, fmt ? fmt : "%s", p);
+    } else if (var->type == FW_VAR_UDPPORT) {
+	char *p, tbuf[16];
+	unsigned int n = var->u.n.value[FW_MAX_ADDR_UINTS-1];
+	p = NULL; /* getservicenumber("udp", n); */
+	if (!p) {
+	    sprintf(tbuf, "%u", n);
+	    p = tbuf;
+	}
+	snprintf(buf, bufsiz, fmt ? fmt : "%s", p);
+    } else if (var->type == FW_VAR_DOTQUAD) {
+	struct in_addr in;
+	in.s_addr = htonl(var->u.n.value[FW_MAX_ADDR_UINTS-1]);
+	snprintf(buf, bufsiz, fmt ? fmt : "%s", inet_ntoa(in));
+    } else if (var->type == FW_VAR_INET6) {
+	int i;
+	unsigned int *w, words[FW_MAX_ADDR_BYTES/2];
+	struct { int base, len; } best, curr;
+	char *p, tmp[128];
+
+	memset(words, 0, sizeof(words));
+	for (w=words,i=0; i<FW_MAX_ADDR_UINTS; i++) {
+	    if (sizeof(var->u.n.value[0]) == 8) {
+		/* N.B. The shift values are 48 and 32 but we express
+		 * them like this because otherwise the compiler gives
+		 * warnings and the wannabe C gurus keep asking why
+		 * they get compile "errors".
+		 */
+		*(w++) = (var->u.n.value[i]
+			>> 8*3*(sizeof(var->u.n.value[0])/4)) & 0xffff;
+		*(w++) = (var->u.n.value[i]
+			>> 8*(sizeof(var->u.n.value[0])/2)) & 0xffff;
+	    }
+	    *(w++) = (var->u.n.value[i] >> 16) & 0xffff;
+	    *(w++) = (var->u.n.value[i]) & 0xffff;
+	}
+	best.base = curr.base = -1;
+	for (i=0; i<sizeof(words)/sizeof(words[0]); i++) {
+	    if (words[i] == 0) {
+		if (curr.base == -1)
+		    curr.base = i, curr.len = 1;
+		else
+		    curr.len++;
+	    } else if (curr.base != -1) {
+		if (best.base == -1 || curr.len > best.len)
+		    best = curr;
+		curr.base = -1;
+	    }
+	}
+	if (curr.base != -1
+	&& (best.base == -1 || curr.len > best.len))
+	    best = curr;
+	if (best.base != -1 && best.len < 2)
+	    best.base = -1;
+	p = tmp;
+	for (i=0; i<sizeof(words)/sizeof(words[0]); i++) {
+	    if (best.base != -1 && i >= best.base && i < (best.base+best.len)) {
+		if (i == best.base)
+		    *(p++) = ':';
+		continue;
+	    }
+	    if (i) *(p++) = ':';
+	    if (i == 6 && best.base == 0
+	    && (best.len == 6 || (best.len == 5 && words[5] == 0xffff))) {
+		struct in_addr in;
+		in.s_addr = htonl(var->u.n.value[FW_MAX_ADDR_UINTS-1]);
+		strcpy(p, inet_ntoa(in));
+		break;
+	    }
+	    p += sprintf(p, "%x", words[i]);
+	}
+	if (best.base != -1
+	&& (best.base + best.len == sizeof(words)/sizeof(words[0])))
+	    *(p++) = ':';
+	*p = '\0';
+	snprintf(buf, bufsiz, fmt ? fmt : "%s", tmp);
+    } else {
+	int n = var->u.n.value[FW_MAX_ADDR_UINTS-1];
+	/* FIXME: should print the other bytes in the value too. */
+#if 1
+	snprintf(buf, bufsiz, fmt ? fmt : "0x%x", n);
+#else
+	mon_syslog(LOG_WARNING, "Unknown var type %d", var->type);
+	snprintf(buf, bufsiz, "0x%x", n);
+#endif
+    }
+}
+
 
 /*
  * Initialize the units.
@@ -157,157 +386,41 @@ static unsigned int slot_end_timeout(FW_Timeslot *slot, time_t *clock)
     	return maxtime;
 }
 
-#ifdef __linux__
-/* Demasquerade an address. */
-static void
-demasquerade(int proto,
-	struct in_addr *saddr, int *sport,
-	struct in_addr *daddr, int *dport)
-{
-    struct in_addr *addr = NULL;
-    int *port = NULL;
-    FILE *fd;
-    int plen;
-    char protoname[8], pname[16], line[256];
-
-    /* If we are using an AF_PACKET socket then we know the source
-     * address is the first. If not all we know is that the first
-     * address is the numerically smaller.
-     *   Remember: only _one_ end of the link can be masqueraded
-     * by this system...
-     */
-
-    if (saddr->s_addr == local_addr
-#ifdef PORT_MASQ_BEGIN
-    && *sport >= PORT_MASQ_BEGIN
-#endif
-#ifdef PORT_MASQ_END
-    && *sport <= PORT_MASQ_END
-#endif
-    ) {
-	addr = saddr;
-	port = sport;
-    }
-
-    if (!addr
-#ifdef HAVE_AF_PACKET
-    && !af_packet
-#endif
-    && (daddr->s_addr == local_addr
-#ifdef PORT_MASQ_BEGIN
-    && *dport >= PORT_MASQ_BEGIN
-#endif
-#ifdef PORT_MASQ_END
-    && *dport <= PORT_MASQ_END
-#endif
-    )) {
-	addr = daddr;
-	port = dport;
-    }
-
-    if (!addr)
-	return;
-
-    if (!(fd = fopen("/proc/net/ip_masquerade", "r")))
-	return;
-
-    /* This matches what the kernel masquerade code says... */
-    switch (proto) {
-	case IPPROTO_UDP:
-	    strcpy(protoname, "UDP"); break;
-	case IPPROTO_TCP:
-	    strcpy(protoname, "TCP"); break;
-	case IPPROTO_ICMP:
-	    strcpy(protoname, "ICMP"); break;
-	default:
-	    sprintf(protoname, "IP_%d", proto); break;
-    }
-    plen = strlen(protoname);
-
-    sprintf(pname, "%04X", *port);
-
-    while (fgets(line, sizeof(line), fd)) {
-	if (strncmp(line, protoname, plen))
-	    continue;
-
-	if (!strncmp(line+plen+29, pname, 4)) {
-	    addr->s_addr = htonl(strtoul(line+plen+1, NULL, 16));
-	    *port = strtoul(line+plen+10, NULL, 16);
-	    break;
-	}
-    }
-    fclose(fd);
-}
-#endif
-
-/* Generate a connection description */
-static char *
-desc_connection(FW_Connection *c)
-{
-    struct in_addr saddr, daddr;
-    int sport, dport;
-    char sad_text[20], dad_text[20];
-    char *pent;
-    char proto[20];
-    char *buf;
-
-    /* The packet has network byte order, we want to preserve it
-     * in the address regardless of the host ordering.
-     */
-    saddr.s_addr = htonl((c->id.id[1] << 24)
-			+ (c->id.id[2] << 16)
-			+ (c->id.id[3] << 8)
-			+ (c->id.id[4]));
-    sport = c->id.id[10]+(c->id.id[9]<<8);
-    daddr.s_addr = htonl((c->id.id[5] << 24)
-			+ (c->id.id[6] << 16)
-			+ (c->id.id[7] << 8)
-			+ (c->id.id[8]));
-    dport = c->id.id[12]+(c->id.id[11]<<8);
-
-#ifdef __linux__
-    if (demasq)
-	demasquerade(c->id.id[0], &saddr, &sport, &daddr, &dport);
-#endif
-
-    strcpy(sad_text, inet_ntoa(saddr));
-    strcpy(dad_text, inet_ntoa(daddr));
-
-    pent = getprotonumber(c->id.id[0]);
-    if (pent) {
-	strncpy(proto, pent, sizeof(proto)-1);
-	proto[sizeof(proto)-1] = '\0';
-    } else {
-	sprintf(proto, "%d", c->id.id[0]);
-    }
-
-    buf = malloc(64);
-    if (buf) {
-	snprintf(buf, 64-1, "%-4s  %15s/%-5d  %15s/%-5d",
-		proto, sad_text, sport, dad_text, dport);
-	buf[64-1] = '\0';
-    }
-
-    return buf;
-}
 
 /* Find a connection in the queue */
 static FW_Connection *find_connection(FW_unit *unit, FW_ID *id)
 {
     FW_Connection *c = unit->connections->next;
 
+#if 0
+{
+int i;
+for (i=0; i<id->nhdrs; i++)
+mon_syslog(LOG_INFO, "got: %d: p=%d l=%d [ %02x %02x %02x %02x ]", i, id->hdr[i].proto, id->hdr[i].len, id->hdr[i].id[0], id->hdr[i].id[1], id->hdr[i].id[2], id->hdr[i].id[3]);
+}
+#endif
     /* look for a connection that matches this one */
-    while (c != unit->connections) {
-	if (memcmp((unsigned char *)&c->id,
-		(unsigned char *)id,sizeof(FW_ID))==0)
-	   break;
-	c = c->next;
+    for (c = unit->connections->next; c != unit->connections; c = c->next) {
+	int i;
+#if 0
+{
+int i;
+for (i=0; i<c->id.nhdrs; i++)
+mon_syslog(LOG_INFO, "cmp: %d: p=%d l=%d [ %02x %02x %02x %02x ]", i, c->id.hdr[i].proto, c->id.hdr[i].len, c->id.hdr[i].id[0], c->id.hdr[i].id[1], c->id.hdr[i].id[2], c->id.hdr[i].id[3]);
+}
+#endif
+	if (c->id.nhdrs != id->nhdrs)
+	    continue;
+	for (i=0; i<id->nhdrs; i++) {
+	    if (c->id.hdr[i].prule != id->hdr[i].prule
+	    || c->id.hdr[i].len != id->hdr[i].len
+	    || memcmp(c->id.hdr[i].id, id->hdr[i].id, c->id.hdr[i].len))
+		break;
+	}
+	if (i == id->nhdrs)
+	    return c;
     }
-    if (c == unit->connections) {
-	return 0;
-    } else {
-	return c;
-    }
+    return 0;
 }
 
 /*
@@ -321,14 +434,42 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
     /* look for a connection that matches this one */
     if (c == NULL) {
 	if (timeout > 0) {
+	    int d;
+	    struct var **v;
+	    char *p, *q;
+
 	    /* no matching connection, add one */
 	    c = malloc(sizeof(FW_Connection));
 	    if (c == 0) {
 	       mon_syslog(LOG_ERR,"Out of memory! AIIEEE!");
 	       die(1);
 	    }
+	    p = c->description;
+	    for (d=0; d<unit->ndescs; d++) {
+		char **fmt;
+		p = c->description;
+		q = c->description + sizeof(c->description)-1;
+		for (v=unit->descs[d].vars,fmt=unit->descs[d].fmt; *v; v++,fmt++) {
+		    struct var *it = *v;
+		    if (it->valid != 1
+		    && !var_eval(unit, &unit->prules[0], it))
+			break;
+		    var_format(p, q-p, *fmt, it);
+		    *q = '\0';
+		    p += strlen(p);
+#if 0
+*p = '\0';
+mon_syslog(LOG_INFO, "desc part: \"%s\"", c->description);
+#endif
+		}
+		if (!*v) break;
+	    }
+	    *p = '\0';
+	    c->desc_len = p - c->description;
+#if 0
+mon_syslog(LOG_INFO, "desc: len=%d, \"%s\"", c->desc_len, c->description);
+#endif
 	    c->id = *id;
-	    c->description = NULL;
 	    c->packets[0] = c->packets[1] = 0;
 	    c->bytes[0] = c->bytes[1] = 0;
 	    c->bytes_total[0] = c->bytes_total[1] = 0;
@@ -340,11 +481,8 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    c->timer.data = (void *)c;
 	    c->timer.function = (void *)(void *)del_connection;
 	    if (unit->connections->next == unit->connections
-	    && state != STATE_UP && !blocked && demand) {
-		c->description = desc_connection(c);
-		if (c->description)
-		    mon_syslog(LOG_NOTICE, "Trigger: %s", c->description);
-	    }
+	    && state != STATE_UP && !blocked && demand)
+		mon_syslog(LOG_NOTICE, "Trigger: %s", c->description);
 	    c->next = unit->connections->next;
 	    c->prev = unit->connections;
 	    unit->connections->next->prev = c;
@@ -365,7 +503,7 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    c->timer.expires = timeout;
 	    add_timer(&c->timer);
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-    		mon_syslog(LOG_DEBUG,"Adding connection %p @ %ld - timeout %d",c,
+    		mon_syslog(LOG_DEBUG,"Updating connection %p @ %ld - timeout %d",c,
 			time(0),timeout);
 	} else {
 	    /* timeout = 0, so toss the connection */
@@ -386,7 +524,6 @@ void del_connection(FW_Connection *c)
 
     c->next->prev = c->prev;
     c->prev->next = c->next;
-    if (c->description) free(c->description);
     free(c);
 }
 
@@ -577,33 +714,6 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
     }
 }
 
-/* Check if we need to reorder IP addresses for cannonical ordering */
-static int ip_direction(struct iphdr *pkt)
-{
-    struct udphdr *udp = (struct udphdr *)((char *)pkt + 4*pkt->ihl);
-    if (ntohl(pkt->saddr) > ntohl(pkt->daddr)
-    || (ntohl(pkt->saddr) == ntohl(pkt->daddr) &&
-       (pkt->protocol == IPPROTO_TCP || pkt->protocol == IPPROTO_UDP)
-       && ntohs(udp->source) > ntohs(udp->dest)))
-	return 2;
-    else
-	return 1;
-}
-
-static void ip_swap_addrs(struct iphdr *pkt)
-{
-    struct udphdr *udp = (struct udphdr *)((char *)pkt + 4*pkt->ihl);
-    unsigned long taddr;
-    unsigned short tport;
-    if (pkt->protocol == IPPROTO_TCP || pkt->protocol == IPPROTO_UDP) {
-	tport = udp->source;
-	udp->source = udp->dest;
-	udp->dest = tport;
-    } 
-    taddr = pkt->saddr;
-    pkt->saddr = pkt->daddr;
-    pkt->daddr = taddr;
-}
 
 void print_filter(FW_Filter *filter)
 {
@@ -612,11 +722,16 @@ void print_filter(FW_Filter *filter)
 	filter->prule,filter->log,filter->type,
 	filter->count,filter->timeout);
     for (i = 0; i < filter->count; i++) {
-	mon_syslog(LOG_DEBUG,"    term: shift %d op %d off %d%c msk %x tst %x",
-	    filter->terms[i].shift, filter->terms[i].op,
-	    filter->terms[i].offset&0x7f,
-	    (filter->terms[i].offset&0x80)?'d':'h',
-	    filter->terms[i].mask, filter->terms[i].test);
+	mon_syslog(LOG_DEBUG,"    term: %s (%d[%d] << %d) & %x op<%d> %x",
+	    FW_IN_DATA(filter->terms[i].var->u.n.offset) ? "data" : "hdr",
+	    FW_HDR_OFFSET(filter->terms[i].var->u.n.offset),
+	    filter->terms[i].var->u.n.width,
+	    filter->terms[i].var->u.n.shift,
+	    filter->terms[i].var->u.n.mask[FW_MAX_ADDR_UINTS-1]
+		& (filter->terms[i].mask
+		    ? filter->terms[i].mask->u.n.value[FW_MAX_ADDR_UINTS-1] : (~0)),
+	    filter->terms[i].op,
+	    filter->terms[i].test ? filter->terms[i].test->u.n.value[FW_MAX_ADDR_UINTS-1] : 0);
     }
 }
 
@@ -715,90 +830,77 @@ void forge_tcp_reset(unsigned short wprot, struct iphdr *iph, int len)
     free((void *)niph);
 }
 
+
 /* Check if a packet passes the filters */
-int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
+static int
+check_packet(FW_unit *unit, FW_ID *id,
+    sockaddr_ll_t *sll, unsigned char direction, unsigned char *pkt, int len,
+    FW_ProtocolRule *tcp_prule)
 {
-    FW_unit *unit;
     FW_Filters *fw;
-    unsigned char *data;
-    FW_ProtocolRule *prule, *pprule = 0;
+    FW_ProtocolRule *pprule;
+    int i;
     FW_Term *term;
-    int i,v,rule;
-    int direction,opdir;
+    int rule;
+    int opdir;
+#if 1 /* TCP KLUDGE */
     TCP_STATE lflags;
+#endif
     clock_t clock = time(0);
-    FW_ID id;
     FW_Connection *conn;
     struct iphdr * ip_pkt = (struct iphdr *)pkt;
 
-
-    memset(&lflags,0,sizeof(lflags));
-    if (!initialized) init_units();
-
-    if (unitnum < 0 || unitnum >= FW_NRUNIT) {
-	/* FIXME: set an errorno? */
-	return -1;
-    }
-
-    unit = &units[unitnum];
-    fw = unit->filters;
-
-    data = pkt + 4*((struct iphdr *)pkt)->ihl;
-
-    /* Find the correct protocol rule */
-    for (i = 0; i < unit->nrules; i++) {
-	pprule = &unit->prules[i];
-	if (FW_PROTO_ALL(pprule->protocol)
-	|| pprule->protocol == ip_pkt->protocol)
-	break;
-    }
-
-    if (pprule == 0) {
-	return -1;	/* No protocol rules? */
-    }
-
-     /* If we have the "strict-forwarding" option set then unless one of
-     * the two addresses matches the local address we should ignore it.
+    /* Now swap the source and dest id elements for packets
+     * going out so we see one connection regardless of packet
+     * direction.
      */
-    if (strict_forwarding
-    && (!sll || sll->sll_protocol == htons(ETH_P_IP))
-    && ip_pkt->saddr != local_addr && ip_pkt->daddr != local_addr) {
-	/* We forge resets for TCP protocol stuff that has been
-	 * shut down do to a link failure.
-	 */
-	if (ip_pkt->protocol == IPPROTO_TCP)
-	    forge_tcp_reset(htons(ETH_P_IP), ip_pkt, len);
-	
-	goto skip;
-    }
-
-    /* Build the connection ID, and set the direction flag */
-#ifdef HAVE_AF_PACKET
-    if (af_packet) {
-	direction = 1;
-	if (sll->sll_pkttype != PACKET_OUTGOING) {
-	    direction = 2;
-	    ip_swap_addrs(ip_pkt);
-	}
-    } else
+#if 0
+for (i=0; i<id->nhdrs; i++) {
+int j;
+char *p, buf[256];
+p = buf + sprintf(buf, "A %d: proto %d, len %d,", i, unit->prules[id->hdr[i].prule].protocol, id->hdr[i].len);
+for (j=0; j<id->hdr[i].len; j++)
+    p += sprintf(p, " %02x", id->hdr[i].id[j]);
+mon_syslog(LOG_INFO, buf);
+}
 #endif
-    {
-	direction = ip_direction(ip_pkt);
-	if (direction == 2) ip_swap_addrs(ip_pkt);
+    if (direction == 1) {
+	for (i=0; i<id->nhdrs; i++) {
+	    FW_ProtocolRule *idp = &unit->prules[id->hdr[i].prule];
+	    int s, d;
+	    s = d = 0;
+	    while (s<id->hdr[i].len && d<id->hdr[i].len) {
+		unsigned char t;
+		while (s<id->hdr[i].len && !FW_IN_SRC(idp->codes[s])) s++;
+		while (d<id->hdr[i].len && !FW_IN_DST(idp->codes[d])) d++;
+		t = id->hdr[i].id[s];
+		id->hdr[i].id[s] = id->hdr[i].id[d];
+		id->hdr[i].id[d] = t;
+		s++, d++;
+	    }
+	}
     }
+#if 0
+for (i=0; i<id->nhdrs; i++) {
+int j;
+char *p, buf[256];
+p = buf + sprintf(buf, "B %d: proto %d, len %d,", i, unit->prules[id->hdr[i].prule].protocol, id->hdr[i].len);
+for (j=0; j<id->hdr[i].len; j++)
+    p += sprintf(p, " %02x", id->hdr[i].id[j]);
+mon_syslog(LOG_INFO, buf);
+}
+#endif
 
-    memset(&id,0,sizeof(id));
-    for (i = 0; i < FW_ID_LEN; i++)
-	id.id[i] = (FW_IN_DATA(pprule->codes[i])?data:pkt)
-		    [FW_OFFSET(pprule->codes[i])];
-    if (direction == 2) ip_swap_addrs(ip_pkt);
-    conn = find_connection(unit,&id);
+    conn = find_connection(unit, id);
     opdir = (direction==1)?2:1;
 
 
+#if 1 /* TCP KLUDGE */
+    /* FIXME: how do I get this out of here? */
     /* Do the TCP liveness changes */
-    if (ip_pkt->protocol == IPPROTO_TCP) {
-	struct tcphdr *tcp = (struct tcphdr *)((char *)ip_pkt + 4*ip_pkt->ihl);
+    memset(&lflags, 0, sizeof(lflags));
+    if (tcp_prule) {
+	struct tcphdr *tcp = (struct tcphdr *)tcp_prule->hdr;
 	int tcp_data_len = ntohs(ip_pkt->tot_len) - (4*ip_pkt->ihl + tcp->doff*4);
 
 	if (conn) {
@@ -833,8 +935,10 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 	    conn->tcp_state = lflags;
 	}
     }
+#endif
 
     rule = 1;
+    fw = unit->filters;
     while (fw) {
 #if 0
 	print_filter(&fw->filt);
@@ -848,52 +952,102 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 	   || fw->filt.type == FW_TYPE_DOWN)
 	    goto next_rule;
 
-	/* Check the protocol rule */
-	prule = &unit->prules[fw->filt.prule];
-	if (!(FW_PROTO_ALL(prule->protocol)
-	|| prule->protocol == ip_pkt->protocol))
+	/* Check the protocol rule for this filter is active */
+	pprule = &unit->prules[fw->filt.prule];
+	if (pprule->hdr == NULL)
 	    goto next_rule;
 
 	/* Check the terms */
 	for (i = 0;
 	(fw->filt.count > FW_MAX_TERMS) || (i < fw->filt.count); i++) {
+	    static unsigned int vzero[FW_MAX_ADDR_UINTS] = { 0, };
+	    unsigned int v[FW_MAX_ADDR_UINTS];
+	    unsigned int *vref;
+	    int j;
+
 	    if (i > FW_MAX_TERMS && fw->filt.count == 0) {
 		fw = fw->next, i = 0;
 		if (fw == NULL) break;
 	    }
 	    term = &fw->filt.terms[i];
-	    if (FW_TCP_STATE(term->offset))
-		v = (lflags.tcp_flags >> term->shift) && term->mask;
-	    else {
-		int n;
-	        memcpy(&n, &(FW_IN_DATA(term->offset)?data:pkt)
-				  [FW_OFFSET(term->offset)],
-			sizeof(int));
-	        v = (ntohl(n) >> term->shift) & term->mask;
-	    }
 #if 0
-	    mon_syslog(LOG_DEBUG,"testing ip %x:%x data %x:%x mask %x shift %x test %x v %x",
-		ntohl(*(int *)(&pkt[FW_OFFSET(term->offset)])),
-		*(int *)(&pkt[FW_OFFSET(term->offset)]),
-		ntohl(*(int *)(&data[FW_OFFSET(term->offset)])),
-		*(int *)(&data[FW_OFFSET(term->offset)]),
-		term->mask,
-		term->shift,
-		term->test,
-		v);
+mon_syslog(LOG_INFO, "check var %s", term->var->name ? term->var->name : "???");
 #endif
+#if 1 /* TCP KLUDGE */
+	    if (FW_TCP_STATE(term->var->u.n.offset)) {
+#if 0
+		v = (lflags.tcp_flags >> term->var->shift) && term->mask;
+#endif
+		memset(v, 0, sizeof(v));
+		v[FW_MAX_ADDR_UINTS-1] = lflags.tcp_flags;
+	    } else {
+#endif
+	    /* vars with no specified prule look at the entire packet.
+	     * vars with a prule override whatever we pass as the default.
+	     */
+	    if (term->var->valid != 1
+	    && !var_eval(unit, &unit->prules[0], term->var))
+		goto next_rule;
+	    memcpy(v, term->var->u.n.value, sizeof(v));
+#if 1 /* TCP KLUDGE */
+	    }
+#endif
+
+#if 0
+mon_syslog(LOG_INFO, "cmp 0x%x & 0x%x op=%d 0x%x", v[FW_MAX_ADDR_UINTS-1], term->mask ? term->mask->u.n.value[FW_MAX_ADDR_UINTS-1] : (~0), term->op, term->test ? term->test->u.n.value[FW_MAX_ADDR_UINTS-1] : 0);
+#endif
+	    if (term->mask) {
+		int i;
+		if (term->mask->valid != 1
+		&& !var_eval(unit, &unit->prules[0], term->mask))
+		    goto next_rule;
+		for (i=0; i<FW_MAX_ADDR_UINTS; i++)
+		    v[i] &= term->mask->u.n.value[i];
+	    }
+
+	    if (term->test
+	    && term->test->valid != 1
+	    && !var_eval(unit, &unit->prules[0], term->test))
+		goto next_rule;
+
+	    vref = (term->test ? term->test->u.n.value : vzero);
+
 	    switch (term->op) {
-	    case FW_EQ: if (v != term->test) goto next_rule; break;
-	    case FW_NE: if (v == term->test) goto next_rule; break;
-	    case FW_GE: if (v < term->test) goto next_rule; break;
-	    case FW_LE: if (v > term->test) goto next_rule; break;
+	    case FW_EQ:
+		for (j=FW_MAX_ADDR_UINTS-1; j>=0; j--)
+		    if (v[j] != vref[j])
+			goto next_rule;
+		break;
+	    case FW_NE:
+#if 0
+mon_syslog(LOG_INFO, "cmp 0x%x & 0x%x op=%d 0x%x", v[FW_MAX_ADDR_UINTS-1], term->mask ? term->mask->u.n.value[FW_MAX_ADDR_UINTS-1] : (~0), term->op, vref[FW_MAX_ADDR_UINTS-1]);
+#endif
+		for (j=FW_MAX_ADDR_UINTS-1; j>=0; j--) {
+		    if (v[j] != vref[j])
+			break;
+		}
+		if (j < 0) goto next_rule;
+		break;
+	    case FW_GE:
+		for (j=0; j<FW_MAX_ADDR_UINTS; j++)
+		    if (v[j] < vref[j])
+			    goto next_rule;
+		break;
+	    case FW_LE:
+		for (j=0; j<FW_MAX_ADDR_UINTS; j++)
+		    if (v[j] > vref[j])
+			    goto next_rule;
+		break;
 	    }
 	}
 	/* Ok, we matched a rule. What are we suppose to do? */
 #if 0
 	if (fw->filt.log)
 #endif
+#if 1
+	/* FIXME: need to pass id headers */
         if (debug&DEBUG_FILTER_MATCH)
+#endif
 	    log_packet(fw->filt.type!=FW_TYPE_IGNORE,ip_pkt,len,rule);
 
 	/* Check if this entry goes into the queue or not */
@@ -901,7 +1055,7 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 	    add_connection(
 		unit,
 		conn,
-		&id,
+		id,
 		fw->filt.timeout,
 		lflags,
 		direction-1,
@@ -926,9 +1080,183 @@ next_rule: /* try the next filter */
 
 skip:
     /* Failed to match any rule. This means we ignore the packet */
+    /* FIXME: need to pass id headers */
     if (debug&DEBUG_FILTER_MATCH)
         log_packet(0,ip_pkt,len,0);
     return 0;
+}
+
+
+int
+check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
+{
+    FW_unit *unit;
+    unsigned char *plist;
+    FW_ProtocolRule *pprule;
+    FW_ID id;
+    unsigned short proto;
+    struct var *v;
+    int i, n;
+#if 1 /* TCP KLUDGE */
+    FW_ProtocolRule *tcp_prule = NULL;
+#endif
+    unsigned char *data;
+    unsigned char direction;
+
+    if (!initialized) init_units();
+
+    if (unitnum < 0 || unitnum >= FW_NRUNIT) {
+	/* FIXME: set an errorno? */
+	return -1;
+    }
+
+    unit = &units[unitnum];
+
+#if 0 /* XXXXX */
+     /* If we have the "strict-forwarding" option set then unless one of
+     * the two addresses matches the local address we should ignore it.
+     */
+    if (strict_forwarding
+    && (!sll || sll->sll_protocol == htons(ETH_P_IP))
+    && ip_pkt->saddr != local_addr && ip_pkt->daddr != local_addr) {
+	/* We forge resets for TCP protocol stuff that has been
+	 * shut down do to a link failure.
+	 */
+	if (ip_pkt->protocol == IPPROTO_TCP)
+	    forge_tcp_reset(htons(ETH_P_IP), ip_pkt, len);
+	
+	goto skip;
+    }
+#endif
+
+    /* Flush any old header data. (We stomp prule 0 anyway below...) */
+    i = unit->prules[0].next_dirty;
+    while (i) {
+	int j = i;
+	unit->prules[j].hdr = unit->prules[j].data = NULL;
+	unit->prules[j].next_dirty = 0;
+	i = unit->prules[j].next_dirty;
+    }
+    unit->prules[0].next_dirty = 0;
+
+    /* Invalidate all vars associated with prule 0. */
+    for (v = unit->prules[0].var_dirty; v; v = v->next_dirty)
+	v->valid &= 2;
+    unit->prules[0].var_dirty = NULL;
+    unit->prules[0].hdr = pkt;
+    unit->prules[0].data = pkt;
+
+    /* Find the protocol headers */
+    proto = (sll ? ntohs(sll->sll_protocol) : ETH_P_IP);
+    data = pkt;
+    id.nhdrs = 0;
+    plist = unit->prules[0].sub;
+    n = unit->prules[0].nsubs;
+    /* FIXME: watch for packet/header overruns */
+    for (i = 0; i < n; i++) {
+	pprule = &unit->prules[plist[i]];
+#if 0
+mon_syslog(LOG_INFO, "    proto 0x%x, rule 0x%x", proto, pprule->protocol);
+#endif
+	if (FW_PROTO_ALL(pprule->protocol)
+	|| pprule->protocol == proto) {
+	    unsigned char *hdr = data;
+	    int j;
+
+	    /* Invalidate all vars associated with this prule. */
+	    for (v = pprule->var_dirty; v; v = v->next_dirty)
+		v->valid &= 2;
+	    pprule->var_dirty = NULL;
+
+	    pprule->hdr = hdr;
+	    pprule->data = data;
+	    if (!pprule->next_dirty) {
+		pprule->next_dirty = unit->prules[0].next_dirty;
+		unit->prules[0].next_dirty = plist[i];
+	    }
+
+	    if (pprule->nxt_offset) {
+	        if (pprule->nxt_offset->valid == 1
+		|| var_eval(unit, pprule, pprule->nxt_offset)) {
+		    data += pprule->nxt_offset->u.n.value[FW_MAX_ADDR_UINTS-1];
+		    pprule->data = data;
+		}
+	    }
+
+#if 0
+mon_syslog(LOG_INFO, "prule %d, proto 0x%x  hdr 0x%08lx  data 0x%08lx", plist[i], proto, hdr, data);
+#endif
+
+	    /* FIXME: all headers are considered significant here
+	     * but if we have a tunnel with connections through it
+	     * and then tear it down and go direct the connections
+	     * are still the same even though we are a header less.
+	     */
+	    if (pprule->clen > 0) {
+		id.hdr[id.nhdrs].prule = plist[i];
+		id.hdr[id.nhdrs].len = pprule->clen;
+		for (j = 0; j < pprule->clen; j++)
+		    id.hdr[id.nhdrs].id[j] =
+			(FW_IN_DATA(pprule->codes[j]) ? data : hdr)
+				[FW_OFFSET(pprule->codes[j])];
+		id.nhdrs++;
+	    }
+
+#if 1 /* TCP KLUDGE */
+	    if (proto == IPPROTO_TCP)
+		tcp_prule = pprule;
+#endif
+
+	    if (!pprule->nxt_proto)
+		break;
+	    if (pprule->nxt_proto->valid != 1
+	    && !var_eval(unit, pprule, pprule->nxt_proto))
+		break;
+	    proto = pprule->nxt_proto->u.n.value[FW_MAX_ADDR_UINTS-1];
+	    plist = pprule->sub;
+	    n = pprule->nsubs;
+	    i = -1;
+	}
+    }
+
+    if (data == pkt)
+	return -1;	/* No protocol rules? */
+
+#ifdef HAVE_AF_PACKET
+    if (sll) {
+	direction = 1;
+	if (sll->sll_pkttype != PACKET_OUTGOING)
+	    direction = 2;
+    } else
+#endif
+    {
+	direction = 0;
+	for (i=0; !direction && i<id.nhdrs; i++) {
+	    FW_ProtocolRule *idp = &unit->prules[id.hdr[i].prule];
+	    int s, d;
+	    s = d = 0;
+	    while (!direction && s<id.hdr[i].len && d<id.hdr[i].len) {
+		while (s<id.hdr[i].len && !FW_IN_SRC(idp->codes[s])) s++;
+		while (d<id.hdr[i].len && !FW_IN_DST(idp->codes[d])) d++;
+		if (s<id.hdr[i].len && d<id.hdr[i].len) {
+		    if (id.hdr[i].id[s] < id.hdr[i].id[d])
+			direction = 1;
+		    else if (id.hdr[i].id[s] < id.hdr[i].id[d])
+			direction = 2;
+		}
+		s++, d++;
+	    }
+	}
+    }
+
+    /* The outermost packet header is a single byte giving the
+     * direction the packet is travelling (1=in, 2=out). The
+     * outermost packet data is the entire packet as received.
+     */
+    unit->prules[0].hdr = &direction;
+    unit->prules[0].data = pkt;
+
+    return check_packet(unit, &id, sll, direction, pkt, len, tcp_prule);
 }
 
 static char * pcountdown(char *buf, long secs)
@@ -978,6 +1306,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 		    && unit->connections == unit->connections->next));
 
 
+    /* FIXME: we do not appear to actually free things properly... */
     case IP_FW_PFLUSH:
 	if (!req) return -1; /* ERRNO */
 	unit->nrules = 0;
@@ -1014,6 +1343,22 @@ int ctl_firewall(int op, struct firewall_req *req)
 	if (unit->nrules >= FW_MAX_PRULES) return -1; /* ERRNO */
 	unit->prules[(int)unit->nrules] = req->fw_arg.rule;
 	return unit->nrules++;
+    case IP_FW_ADESC:
+	if (!req) return -1; /* ERRNO */
+	if (unit->ndescs >= FW_MAX_DESCS) return -1; /* ERRNO */
+	unit->descs[(int)unit->ndescs] = req->fw_arg.desc;
+	return unit->ndescs++;
+    case IP_FW_APSUB: {
+	int n;
+	FW_ProtocolRule *prule;
+	if (!req) return -1; /* ERRNO */
+	n = req->fw_arg.vals[0];
+	if (n >= unit->nrules) return -1;
+	prule = &unit->prules[n];
+	if (prule->nsubs >= FW_MAX_PRULES) return -1; /* ERRNO */
+	prule->sub[(int)prule->nsubs] = req->fw_arg.vals[1];
+	return prule->nsubs++;
+    }
     /* Printing does nothing right now */
     case IP_FW_PCONN:
 	if (!req) return -1; /* ERRNO */
@@ -1030,17 +1375,18 @@ int ctl_firewall(int op, struct firewall_req *req)
 		next_alarm());
 	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
 		if (c->timer.next == 0) c->timer.expected = tstamp;
-                addr.s_addr = c->id.id[1] + (c->id.id[2]<<8)
-                        + (c->id.id[3]<<16) + (c->id.id[4]<<24);
+                addr.s_addr = c->id.hdr[0].id[1] + (c->id.hdr[0].id[2]<<8)
+                        + (c->id.hdr[0].id[3]<<16) + (c->id.hdr[0].id[4]<<24);
                 strcpy(saddr,inet_ntoa(addr));
-                addr.s_addr = c->id.id[5] + (c->id.id[6]<<8)
-                        + (c->id.id[7]<<16) + (c->id.id[8]<<24);
+                addr.s_addr = c->id.hdr[0].id[5] + (c->id.hdr[0].id[6]<<8)
+                        + (c->id.hdr[0].id[7]<<16) + (c->id.hdr[0].id[8]<<24);
                 strcpy(daddr,inet_ntoa(addr));
                 mon_syslog(LOG_DEBUG,
                         "ttl %ld, %d - %s/%d => %s/%d (tcp state ([%lx,%lx] %d,%d))",
-                        c->timer.expected-tstamp, c->id.id[0],
-                        saddr, c->id.id[10]+(c->id.id[9]<<8),
-                        daddr, c->id.id[12]+(c->id.id[11]<<8),
+                        c->timer.expected-tstamp,
+			unit->prules[c->id.hdr[0].prule].protocol,
+                        saddr, c->id.hdr[0].id[10]+(c->id.hdr[0].id[9]<<8),
+                        daddr, c->id.hdr[0].id[12]+(c->id.hdr[0].id[11]<<8),
 			c->tcp_state.fin_seq[0],
 			c->tcp_state.fin_seq[1],
 			c->tcp_state.saw_fin,
@@ -1066,8 +1412,10 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    unsigned long atime = time(0);
             unsigned long tstamp = timestamp();
 	    FW_Connection *c;
+#if 0
 	    int i;
 	    char *p;
+#endif
 	    char tbuf1[10], tbuf2[10], tbuf3[10];
             char buf[1024];
 
@@ -1088,6 +1436,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    );
 	    mon_write(MONITOR_VER2|MONITOR_STATUS, buf, strlen(buf));
 
+#if 0
 	    p = buf + 7;
 	    for (i=9; i > 0; i--) {
 		while (*p != ' ') p++;
@@ -1095,26 +1444,40 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    }
 	    *(p+1) = '\0';
 	    mon_write(MONITOR_VER1|MONITOR_STATUS, buf, strlen(buf));
+#endif
 
-	    mon_write(MONITOR_QUEUE,"QUEUE\n",6);
+	    mon_write(MONITOR_QUEUE, "QUEUE\n", 6);
+#if 1
+	    mon_write(MONITOR_QUEUE2, "QUEUE\n", 6);
+#endif
 	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
 		if (c->timer.next == 0) continue;
-		if (!c->description) c->description = desc_connection(c);
 		strcpy(buf, c->description);
-                sprintf(buf+50,
-                        "  %8.8s %ld %ld %ld %ld %ld %ld\n",
+#if 0
+		buf[c->desc_len] = '\n';
+		buf[c->desc_len+1] = '\0';
+                mon_write(MONITOR_VER1|MONITOR_QUEUE, buf, c->desc_len+1);
+#endif
+		c->bytes_total[0] += c->bytes[0];
+		c->bytes_total[1] += c->bytes[1];
+                sprintf(buf + c->desc_len,
+                        "\n%8.8s %ld %ld %ld %ld %ld %ld\n",
 			pcountdown(tbuf1, c->timer.expected-tstamp),
 			c->packets[0], c->bytes[0], c->bytes_total[0],
 			c->packets[1], c->bytes[1], c->bytes_total[1]);
-		c->bytes_total[0] += c->bytes[0];
-		c->bytes_total[1] += c->bytes[1];
 		c->packets[0] = c->packets[1] = c->bytes[0] = c->bytes[1] = 0;
+                mon_write(MONITOR_VER2|MONITOR_QUEUE2, buf, strlen(buf));
+#if 1
+		memmove(buf+52, buf+c->desc_len+1, strlen(buf+c->desc_len+1)+1);
+		if (c->desc_len < 52)
+			memset(buf+c->desc_len, ' ', 52 - c->desc_len);
                 mon_write(MONITOR_VER2|MONITOR_QUEUE, buf, strlen(buf));
-		buf[60] = '\n';
-		buf[61] = '\0';
-                mon_write(MONITOR_VER1|MONITOR_QUEUE, buf, strlen(buf));
+#endif
 	    }
-	    mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
+	    mon_write(MONITOR_QUEUE2, "END QUEUE\n", 10);
+#if 1
+	    mon_write(MONITOR_QUEUE, "END QUEUE\n", 10);
+#endif
 	    mon_cork(0);
 	    return 0;
 	}

@@ -22,6 +22,11 @@
 #define TOK_NUM 261
 #define TOK_ERR 262
 #define TOK_EOF 263
+#define TOK_LSHIFT 264
+#define TOK_RSHIFT 265
+#define TOK_QSTR 266
+#define TOK_HEX 267
+#define TOK_INET6 268
 #define ADVANCE token = token->next
 
 struct prule {
@@ -29,13 +34,7 @@ struct prule {
 } prules[FW_MAX_PRULES];
 static int nprules = 0;
 
-static struct var {
-   char *name;
-   int offset;
-   int shift;
-   unsigned int mask;
-   struct var *next;
-} *vars = 0;
+static struct var *vars = 0;
 
 typedef struct token {
     int offset;
@@ -102,6 +101,18 @@ void tokenize(char *cntxt, int argc, char **argv)
 	    new->type = TOK_GE; s += 2;
 	} else if (*s == '!' && s[1] == '=') {
 	    new->type = TOK_NE; s += 2;
+	} else if (*s == '<' && s[1] == '<') {
+	    new->type = TOK_LSHIFT; s += 2;
+	} else if (*s == '>' && s[1] == '>') {
+	    new->type = TOK_RSHIFT; s += 2;
+	} else if (*s == '"') {
+	    new->type = TOK_QSTR;
+	    s++;
+	    while (*s && *s != '"') {
+		if (*s == '\\' && s[1] != 0) s++;
+		s++;
+	    };
+	    if (*s) s++;
 	} else if (isalpha(*s) || *s == '.' || *s == '_') {
 	    new->type = TOK_STR;
 	    while (isalnum(*s) || *s == '.' || *s == '_' || *s == '-') s++;
@@ -109,14 +120,27 @@ void tokenize(char *cntxt, int argc, char **argv)
 	    new->type = TOK_NUM;
 	    s += 2;
 	    while (isxdigit(*s)) s++;
+	    len = (s-errstr)-new->offset;
+	    if (len > sizeof(((struct var*)0)->u.n.value[0])<<1)
+		new->type = TOK_HEX;
 	} else if (*s == '0' && isdigit(s[1])) {
 	    new->type = TOK_NUM;
 	    s++;
 	    while (isdigit(*s)) s++;
-	} else if (isdigit(*s)) {
-	    while (isdigit(*s)) s++;
-	    if (*s == '.') {
-	        new->type = TOK_INET;
+	} else if (isxdigit(*s)) {
+	    new->type = TOK_NUM;
+	    while (isxdigit(*s) || *s == ':') {
+		if (*s == ':')
+		    new->type = TOK_INET6;
+		else if (!isdigit(*s))
+		    new->type = TOK_HEX;
+		s++;
+	    }
+	    if ((new->type == TOK_NUM
+	    || new->type == TOK_INET6)
+	    && *s == '.') {
+	        if (new->type == TOK_NUM)
+		    new->type = TOK_INET;
 		s++;
 		if (!isdigit(*s)) goto tokerr;
 		while (isdigit(*s)) s++;
@@ -132,17 +156,19 @@ void tokenize(char *cntxt, int argc, char **argv)
 	        goto done;
 tokerr:
 		new->type = TOK_ERR;
-	    } else {
-		new->type = TOK_NUM;
 	    }
 	} else {
 	    new->type = *s++;
 	}
 done:
 	len = (s-errstr)-new->offset;
+	if (new->type == TOK_QSTR) len = (len > 2 ? len - 2 : 0);
 	new->str = malloc(len+1);
 	if (new->str == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
-	strncpy(new->str,errstr+new->offset,len);
+	if (new->type == TOK_QSTR)
+	    strncpy(new->str,errstr+new->offset+1,len);
+	else
+	    strncpy(new->str,errstr+new->offset,len);
 	new->str[len] = 0;
     }
     new = malloc(sizeof(Token));
@@ -379,14 +405,13 @@ void parse_protocol_name(FW_ProtocolRule *prule)
     int proto;
     if (token->type == TOK_STR) {
 	if (strcmp(token->str,"any") == 0)
-	    { prule->protocol = 255; ADVANCE; return; }
+	    { prule->protocol = 0xffff; ADVANCE; return; }
         if ((proto = getprotocol(token->str)))
 	    { prule->protocol = proto; ADVANCE; return; }
 	parse_error("Expecting a protocol name or 'any'.");
     } else if (token->type == TOK_NUM) {
 	int p;
 	sscanf(token->str,"%i",&p);
-	if (p > 254) parse_error("Expecting number from 0-254.");
 	prule->protocol = p;
 	ADVANCE;
     } else
@@ -402,34 +427,90 @@ int parse_offset(void)
 	sscanf(token->str,"%i",&v);
 	ADVANCE;
 	if (FW_OFFSET(v) != v) parse_error("Offset definition out of range.");
-	return ((flag) ? FW_DATA_OFFSET(v) : FW_IP_OFFSET(v));
+	return ((flag) ? FW_DATA_OFFSET(v) : FW_HDR_OFFSET(v));
     }
     parse_error("Expecting an offset definition: <num> or +<num>.");
     return 0; /* NOTREACHED */
 }
 
+int parse_width(void)
+{
+    if (token->type == TOK_STR) {
+	if (!strcmp(token->str, "b")) { /* b(yte) */
+	    ADVANCE; return 1;
+	} else if (!strcmp(token->str, "w")) { /* w(ord) */
+	    ADVANCE; return 2;
+	} else if (!strcmp(token->str, "t")) { /* t(riple) */
+	    ADVANCE; return 3;
+	} else if (!strcmp(token->str, "q")) { /* q(uad) */
+	    ADVANCE; return 4;
+	}
+	parse_error("Expecting a width: b, w, t, q or [<n>]");
+    } else if (token->type == TOK_NUM) {
+	    int width = 0;
+	    sscanf(token->str, "%i", &width);
+	    if (width <= 0
+	    || width > FW_MAX_ADDR_UINTS*sizeof(unsigned int))
+		parse_error("Width value must be 1-16.");
+	    ADVANCE;
+	    return width;
+    }
+    return 1; /* default to 1 byte */
+}
+
 void parse_prule_spec(FW_ProtocolRule *prule)
 {
-    int i;
-    prule->codes[0] = parse_offset();
-    for (i = 1; i < FW_ID_LEN; i++) {
-	if (token->type != ':') parse_error("Expecting ':'");
+    prule->clen = 0;
+    if (token->type == '-') {
+	ADVANCE; return;
+    }
+    while (prule->clen < FW_ID_LEN) {
+	char flag;
+	unsigned int offset, width;
+
+	flag = ' ';
+	if (token->type == '<' || token->type == '>') {
+	    flag = token->type;
+	    ADVANCE;
+	}
+
+	offset = parse_offset();
+	if (flag == '<')
+	    offset = FW_SRC_OFFSET(offset);
+	else if (flag == '>')
+	    offset = FW_DST_OFFSET(offset);
+
+	width = 1;
+	if (token->type == '[') {
+	    ADVANCE;
+	    width = parse_width();
+	    if (token->type != ']') parse_error("Expecting a ']'.");
+	    ADVANCE;
+	}
+
+	while (width-- > 0) {
+	    prule->codes[prule->clen++] = offset++;
+	    if (prule->clen == FW_ID_LEN)
+		parse_error("ID specification too long.");
+	}
+
+	if (token->type == TOK_EOF) return;
+	if (token->type != ',') parse_error("Expecting ','");
 	ADVANCE;
-	prule->codes[i] = parse_offset();
     }
 }
 
-void parse_prule_name(FW_Filter *filter)
+int parse_prule_name()
 {
     int i;
     if (token->type != TOK_STR) parse_error("Expecting a string.");
     for (i = 0; i < nprules; i++)
 	if (strcmp(token->str,prules[i].name) == 0) {
-	    filter->prule = i;
 	    ADVANCE;
-	    return;
+	    return i;
 	}
     parse_error("Not a known protocol rule.");
+    return 0; /* NOTREACHED */
 }
 
 void parse_timeout(FW_Filter *filter)
@@ -444,61 +525,264 @@ void parse_timeout(FW_Filter *filter)
 }
 
 /* <rvalue> ::= <num> | <name> | <inet> */
-int parse_rvalue(void)
+void parse_rvalue(unsigned char *type, unsigned int *v)
 {
-    int v;
+    memset(v, 0, sizeof(v));
+
     if (token->type == TOK_NUM) {
-	sscanf(token->str,"%i",&v);
-	ADVANCE; return v;
+	/* A "simple" number, possibly with a 0 or 0x prefix for
+	 * octal or hex, no bigger than an int.
+	 */
+	sscanf(token->str,"%i", &v[FW_MAX_ADDR_UINTS-1]);
+	*type = FW_VAR_NUMERIC;
+	ADVANCE; return;
+    } else if (token->type == TOK_HEX) {
+	char *p;
+	int i;
+
+	i = 0;
+	p = token->str;
+	if (p[0] == '0' && p[1] == 'x') p += 2;
+	while (*p) {
+	    /* Hex strings can have colons separating terms but if
+	     * so all digits *must* be specified because we do not
+	     * know how wide each term is.
+	     */
+	    if (p[0] == ':')
+		continue;
+
+	    for (i=0; i<FW_MAX_ADDR_UINTS-2; i++)
+		v[i] = (v[i] << 4) | (v[i+1] >> (8*sizeof(v[0])-4));
+	    if (isdigit(p[0]))
+		v[i] = (v[i] << 4) | (p[0] - '0');
+	    else
+		v[i] = (v[i] << 4) | (toupper(p[0]) - 'A' + 10);
+
+	    p++;
+	}
+#if 0
+mon_syslog(LOG_INFO, "hex val: %08x:%08x:%08x:%08x", v[0], v[1], v[2], v[3]);
+#endif
+	*type = FW_VAR_HEX;
+	ADVANCE; return;
     } else if (token->type == TOK_INET) {
-	if ((v = ntohl(inet_addr(token->str))) == -1)
+	unsigned int ipa, ipb, ipc, ipd;
+	if (sscanf(token->str, "%u.%u.%u.%u", &ipa, &ipb, &ipc, &ipd) != 4)
 	    parse_error("Bad inet address specification.");
-	ADVANCE; return v;
+	v[FW_MAX_ADDR_UINTS-1] = (ipa<<24)|(ipb<<16)|(ipc<<8)|ipd;
+	*type = FW_VAR_DOTQUAD;
+	ADVANCE; return;
+    } else if (token->type == TOK_INET6) {
+	char *p;
+	int i, j, k, split = -1;
+	unsigned short ip6[128/16];
+
+	i = 0;
+	p = token->str;
+	if (*p == ':' && *(++p) != ':')
+	    parse_error("Leading ':' should be leading '::'?");
+	while (*p) {
+	    char *q = p;
+
+	    ip6[i] = 0;
+	    while (isxdigit(*p)) {
+		ip6[i] = (ip6[i] << 4)
+		    | (*p <= '9' ? *p-'0' : toupper(*p)-'A'+10);
+		p++;
+	    }
+	    if (p != q) {
+		if (*p == '.') {
+		    unsigned int ipa, ipb, ipc, ipd;
+		    if (sscanf(q, "%u.%u.%u.%u", &ipa, &ipb, &ipc, &ipd) != 4)
+			parse_error("Bad inet address specification.");
+		    ip6[i++] = (ipa<<8)|ipb;
+		    ip6[i++] = (ipc<<8)|ipd;
+		    break;
+		}
+		i++;
+		if (*p == ':') p++;
+		continue;
+	    }
+
+	    if (*p != ':')
+		parse_error("Trailing garbage?");
+
+	    split = i;
+	    p++;
+	}
+	if (split < 0) split = i;
+
+	j = 0;
+	k = FW_MAX_ADDR_UINTS
+	    - (sizeof(ip6) + sizeof(v[0])-1) / sizeof(v[0]);
+	while (j < split) {
+	    v[k] |= ip6[j]
+		<< (16 * ((sizeof(v[0])/sizeof(ip6[0]) - 1)
+			- (j % (sizeof(v[0])/sizeof(ip6[0])))));
+	    if ((++j % (sizeof(v[0])/sizeof(ip6[0]))) == 0)
+		k++;
+	}
+
+	j = split;
+	k = FW_MAX_ADDR_UINTS
+	    - ((i-split)*sizeof(ip6[0]) + sizeof(v[0])-1) / sizeof(v[0]);
+	while (j < i) {
+	    v[k] |= ip6[j]
+		<< (16 * ((sizeof(v[0])/sizeof(ip6[0]) - 1)
+			- ((i-j) % (sizeof(v[0])/sizeof(ip6[0])))));
+	    if (((i-(++j)) % (sizeof(v[0])/sizeof(ip6[0]))) == 0)
+		k++;
+	}
+
+	*type = FW_VAR_INET6;
+	ADVANCE; return;
     } else if (token->type == TOK_STR) {
-	int proto;
-	int serv;
-	if ((proto = getprotocol(token->str))) {
-	    ADVANCE; return proto;
-	} else if (strncmp("udp.",token->str,4) == 0) {
-	    if ((serv = getservice(token->str+4,"udp"))) {
-	 	ADVANCE; return serv;
+	if (strncmp("udp.",token->str,4) == 0) {
+	    if ((v[FW_MAX_ADDR_UINTS-1] = getservice(token->str+4,"udp"))) {
+		*type = FW_VAR_UDPPORT;
+	 	ADVANCE; return;
 	    }
 	    parse_error("Not a known udp service port.");
 	} else if (strncmp("tcp.",token->str,4) == 0) {
-	    if ((serv = getservice(token->str+4,"tcp"))) {
-	 	ADVANCE; return serv;
+	    if ((v[FW_MAX_ADDR_UINTS-1] = getservice(token->str+4,"tcp"))) {
+		*type = FW_VAR_TCPPORT;
+	 	ADVANCE; return;
 	    }
 	    parse_error("Not a known tcp service port.");
+	} else if ((v[FW_MAX_ADDR_UINTS-1] = getprotocol(token->str))) {
+	    *type = FW_VAR_PROTOCOL;
+	    ADVANCE; return;
 	}
 	parse_error("Not a known value name.");
     } else {
 	parse_error("Expecting an <rvalue> specification.");
     }
-    return 0; /* NOTREACHED */
 }
 
 
-/* <varspec> ::= <offset> [(<shift>)] [&<mask>] */
+unsigned char parse_vartype()
+{
+    static struct {
+	char *name;
+	unsigned char val;
+    } types[] = {
+	{ "protocol",	FW_VAR_PROTOCOL },
+	{ "port",	FW_VAR_PORT },
+	{ "tcpport",	FW_VAR_TCPPORT },
+	{ "udpport",	FW_VAR_UDPPORT },
+	{ "dotquad",	FW_VAR_DOTQUAD },
+	{ "ipv4",	FW_VAR_DOTQUAD },
+	{ "ip",		FW_VAR_DOTQUAD },
+	{ "ipv6",	FW_VAR_INET6 },
+	{ "ip6",	FW_VAR_INET6 }
+    };
+    int i;
+
+    if (token->type != TOK_STR)
+	parse_error("Expecting a var type.");
+    for (i=0; i<sizeof(types)/sizeof(types[0]); i++) {
+	if (!strcmp(types[i].name, token->str)) {
+	    ADVANCE;
+	    return types[i].val;
+	}
+    }
+    parse_error("Expecting a var type.");
+    return 0; /* NOTREACHED */
+}
+
+/* <varspec> ::= [<constant>]
+ *             | [{proto} @[+]<offset> \[[bwtq]\] [[<<>>]<shift>]
+ *               [&<mask>] [+<const>] [?<type>]
+ */
 void parse_varspec(struct var *variable)
 {
-    int shift  = 0;
-    variable->offset = parse_offset();
-    if (token->type == '(') {
-	ADVANCE;
-	if (token->type != TOK_NUM)
-	    parse_error("Expecting a bit shift value.");
-	sscanf(token->str,"%i",&shift);
-	if (shift > 31) parse_error("Shift value must be in [0,31].");
-	ADVANCE;
-	if (token->type != ')') parse_error("Expecting a ')'.");
-	ADVANCE;
+    int is_first = 1;
+
+    variable->valid = 1;
+    variable->type = FW_VAR_NUMERIC;
+    variable->next_dirty = NULL;
+    memset(variable->u.n.mask, ~0, sizeof(variable->u.n.mask));
+    memset(variable->u.n.cval, 0, sizeof(variable->u.n.cval));
+    variable->u.n.offset = 0;
+    variable->u.n.width = 0;
+    variable->u.n.shift = 0;
+
+    while (token->type != TOK_EOF
+    && token->type != ' '
+    && token->type != ',') {
+	if (token->type == '?') {
+	    ADVANCE;
+	    variable->type = parse_vartype();
+	} else if (token->type == '{') {
+	    ADVANCE;
+	    variable->prule = parse_prule_name();
+	    if (token->type != '}') parse_error("Expecting a '}'.");
+	    ADVANCE;
+	    variable->valid |= 2;
+	} else if (token->type == '@') {
+	    ADVANCE;
+	    variable->u.n.offset = parse_offset();
+	    variable->valid &= 2;
+	} else if (token->type == '[') {
+	    ADVANCE;
+	    variable->u.n.width = parse_width();
+	    if (token->type != ']') parse_error("Expecting a ']'.");
+	    ADVANCE;
+	} else if (token->type == TOK_LSHIFT) {
+	    int shift;
+	    ADVANCE;
+	    if (token->type != TOK_NUM)
+		parse_error("Expecting a bit shift value.");
+	    sscanf(token->str, "%i", &shift);
+	    if (shift > 31) parse_error("Shift value must be 0-31.");
+	    variable->u.n.shift = shift;
+	    ADVANCE;
+	} else if (token->type == TOK_RSHIFT) {
+	    int shift;
+	    ADVANCE;
+	    if (token->type != TOK_NUM)
+		parse_error("Expecting a bit shift value.");
+	    sscanf(token->str, "%i", &shift);
+	    if (shift > 31) parse_error("Shift value must be 0-31.");
+	    variable->u.n.shift = -shift;
+	    ADVANCE;
+        } else if (token->type == '&') {
+	    unsigned char type;
+	    ADVANCE;
+	    parse_rvalue(&type, variable->u.n.mask);
+	    variable->type = type;
+	} else if (token->type == '+') {
+	    unsigned char type;
+	    ADVANCE;
+	    parse_rvalue(&type, variable->u.n.cval);
+	    variable->type = type;
+	} else
+	    break;
+	is_first = 0;
     }
-    variable->shift = shift;
-    if (token->type == '&') {
-	ADVANCE;
-	variable->mask = parse_rvalue();
-    } else {
-	variable->mask = 0xffffffffU;
+
+    if (is_first
+    && token->type != TOK_EOF
+    && token->type != ' '
+    && token->type != ',') {
+	if (token->type == TOK_QSTR) {
+	    variable->type = FW_VAR_STRING;
+	    variable->u.s = strdup(token->str);
+	    ADVANCE;
+	} else {
+	    unsigned char type;
+	    parse_rvalue(&type, variable->u.n.cval);
+	    variable->type = type;
+	}
+    }
+
+    /* If it is still valid we have a simple constant so assign
+     * the value now.
+     */
+    if (variable->type != FW_VAR_STRING
+    && (variable->valid & 1)) {
+	memcpy(variable->u.n.value, variable->u.n.cval,
+	    sizeof(variable->u.n.value));
     }
 }
 
@@ -517,33 +801,39 @@ void parse_var_name(struct var *variable)
        parse_error("Expecting a variable name.");
 }
 
-/* <varref> ::= <name> */
-void parse_varref(FW_Term *term)
+/* <varref> ::= <name> | <varspec> */
+struct var *
+parse_varref()
 {
     struct var *cvar;
 
     if (token->type == TOK_STR) {
 	for (cvar = vars; cvar; cvar = cvar->next) {
 	    if (strcmp(cvar->name,token->str) == 0) {
-		term->offset = cvar->offset;
-		term->shift = cvar->shift;
-		term->mask = cvar->mask;
+		cvar->refs++;
 		ADVANCE;
-		return;
+		return cvar;
 	    }
 	}
-	parse_error("Not a known variable name.");
     }
-    parse_error("Expecting a variable name.");
+
+    cvar = malloc(sizeof(struct var));
+    if (cvar == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+    cvar->name = NULL;
+    parse_varspec(cvar);
+    cvar->refs = 1;
+    cvar->name = NULL;
+    return cvar;
 }
 
 /* <lvalue> ::= <varref> | <varref>&<rvalue> */
 void parse_lvalue(FW_Term *term)
 {
-    parse_varref(term);
+    term->var = parse_varref();
+    term->mask = NULL;
     if (token->type == '&') {
 	ADVANCE;
-	term->mask &= parse_rvalue();
+	term->mask = parse_varref();
     }
 }
 
@@ -565,14 +855,14 @@ void parse_term(FW_Filter *filter)
 	ADVANCE;
 	parse_lvalue(&filter->terms[filter->count]);
 	filter->terms[filter->count].op = FW_EQ;
-	filter->terms[filter->count].test = 0;
+	filter->terms[filter->count].test = NULL;
     } else {
 	parse_lvalue(&filter->terms[filter->count]);
 	if (parse_op(&filter->terms[filter->count])) {
-	    filter->terms[filter->count].test = parse_rvalue();
+	    filter->terms[filter->count].test = parse_varref();
 	} else {
 	    filter->terms[filter->count].op = FW_NE;
-	    filter->terms[filter->count].test = 0;
+	    filter->terms[filter->count].test = NULL;
 	}
     }
     filter->count++;
@@ -586,15 +876,27 @@ void parse_terms(FW_Filter *filter)
     while (token->type == ',') { ADVANCE; parse_term(filter); }
 }
 
-void parse_prule(void *var, char **argv)
+void parse_proto(void *var, char **argv)
 {
     FW_ProtocolRule prule;
     struct firewall_req req;
-    tokenize("prule",3,argv);
+    tokenize("proto",5,argv);
     if (setjmp(unwind)) { token = 0; free_tokens(); return; }
+    prule.hdr = prule.data = NULL;
+    prule.var_dirty = NULL;
+    prule.next_dirty = 0;
+    prule.nsubs = 0;
     parse_new_prule_name();
     parse_whitespace();
     parse_protocol_name(&prule);
+    parse_whitespace();
+    prule.nxt_offset = parse_varref();
+    if (prule.nxt_offset->type == FW_VAR_STRING)
+	parse_error("Expecting a numeric variable type");
+    parse_whitespace();
+    prule.nxt_proto = parse_varref();
+    if (prule.nxt_proto->type == FW_VAR_STRING)
+	parse_error("Expecting a numeric variable type");
     parse_whitespace();
     parse_prule_spec(&prule);
     free_tokens();
@@ -605,6 +907,56 @@ void parse_prule(void *var, char **argv)
     ctl_firewall(IP_FW_APRULE,&req);
 }
 
+void parse_sub_proto(int proto)
+{
+    struct firewall_req req;
+    req.unit = fwunit;
+    req.fw_arg.vals[0] = proto;
+    req.fw_arg.vals[1] = parse_prule_name();
+    ctl_firewall(IP_FW_APSUB, &req);
+}
+
+void parse_subproto(void *var, char **argv)
+{
+    int proto;
+    tokenize("subproto",2,argv);
+    if (setjmp(unwind)) { token = 0; free_tokens(); return; }
+    proto = parse_prule_name();
+    parse_whitespace();
+    parse_sub_proto(proto);
+    while (token->type == ',') { ADVANCE; parse_sub_proto(proto); }
+    free_tokens();
+}
+
+/* <describe> ::= <varref> ["<fmt>"] */
+void parse_describe(void *var, char **argv)
+{
+    FW_Desc desc;
+    int i;
+    struct firewall_req req;
+    tokenize("describe",1,argv);
+    if (setjmp(unwind)) { token = 0; free_tokens(); return; }
+    desc.vars[0] = parse_varref();
+    desc.fmt[0] = NULL;
+    if (token->type == TOK_QSTR)
+	{ desc.fmt[0] = strdup(token->str); ADVANCE; }
+    i = 1;
+    while (token->type == ',') {
+	ADVANCE;
+	desc.vars[i] = parse_varref();
+	desc.fmt[i] = NULL;
+	if (token->type == TOK_QSTR)
+	    { desc.fmt[i] = strdup(token->str); ADVANCE; }
+	if (++i == FW_MAX_DESCVARS)
+	    parse_error("Too many vars in description.");
+    }
+    desc.vars[i] = NULL;
+    free_tokens();
+    /* Save the filter in the kernel */
+    req.unit = fwunit;
+    req.fw_arg.desc = desc;
+    ctl_firewall(IP_FW_ADESC,&req);
+}
 
 void parse_bringup(void *var, char **argv)
 {
@@ -614,7 +966,7 @@ void parse_bringup(void *var, char **argv)
     filter.type = FW_TYPE_BRINGUP;
     tokenize("bringup",3,argv);
     if (setjmp(unwind)) { token = 0; free_tokens(); return; }
-    parse_prule_name(&filter);
+    filter.prule = parse_prule_name();
     parse_whitespace();
     parse_timeout(&filter);
     parse_whitespace();
@@ -634,7 +986,7 @@ void parse_keepup(void *var, char **argv)
     filter.type = FW_TYPE_KEEPUP;
     tokenize("keepup",3,argv);
     if (setjmp(unwind)) { token = 0; free_tokens(); return; }
-    parse_prule_name(&filter);
+    filter.prule = parse_prule_name();
     parse_whitespace();
     parse_timeout(&filter);
     parse_whitespace();
@@ -654,7 +1006,7 @@ void parse_accept(void *var, char **argv)
     filter.type = FW_TYPE_ACCEPT;
     tokenize("accept",3,argv);
     if (setjmp(unwind)) { token = 0; free_tokens(); return; }
-    parse_prule_name(&filter);
+    filter.prule = parse_prule_name();
     parse_whitespace();
     parse_timeout(&filter);
     parse_whitespace();
@@ -674,7 +1026,7 @@ void parse_ignore(void *var, char **argv)
     filter.type = FW_TYPE_IGNORE;
     tokenize("ignore",2,argv);
     if (setjmp(unwind)) { token = 0; free_tokens(); return; }
-    parse_prule_name(&filter);
+    filter.prule = parse_prule_name();
     parse_whitespace();
     parse_terms(&filter);
     free_tokens();
@@ -762,6 +1114,7 @@ void parse_var(void *var, char **argv)
     parse_varspec(variable);
     free_tokens();
     /* add the new variable to the linked list */
+    variable->refs = 1;
     variable->next = vars;
     vars = variable;
 }
@@ -779,8 +1132,10 @@ void flush_vars(void)
     struct var *next;
     for (; vars; vars = next) {
 	next = vars->next;
-	free(vars->name);
-	free(vars);
+	if (!--vars->refs) {
+	    if (vars->name) free(vars->name);
+	    free(vars);
+	}
     }
     vars = 0;
 }

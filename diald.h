@@ -73,10 +73,12 @@
 #  include <linux/if_packet.h>
 #else
 #  include <net/ethernet.h>
+#  include <net/if_packet.h>
 #  if __GLIBC_MINOR__ >= 1
 #    include <netpacket/packet.h>
+#    include <netinet/ip6.h>
+     typedef struct ip6_hdr ip6hdr_t;
 #  endif
-#  include <net/if_packet.h>
 #endif
 
 #if defined(AF_PACKET) && defined(PACKET_OUTGOING)
@@ -135,6 +137,7 @@
 #define MONITOR_QUEUE		0x00000020
 #define MONITOR_VER1		0x00000080
 #define MONITOR_VER2		0x00000100
+#define MONITOR_QUEUE2		0x00010000
 
 /*
  * Originally diald just threw away any packets it received when
@@ -427,7 +430,9 @@ void parse_ignore(void *var, char **argv);
 void parse_wait(void *var, char **argv);
 void parse_up(void *var, char **argv);
 void parse_down(void *var, char **argv);
-void parse_prule(void *var, char **argv);
+void parse_proto(void *var, char **argv);
+void parse_subproto(void *var, char **argv);
+void parse_describe(void *var, char **argv);
 void parse_var(void *var, char **argv);
 void iface_start(char *, char *, int, char *, char *, char *, int);
 void iface_stop(char *, char *, int, char *, char *, char *, int);

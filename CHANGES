@@ -1,3 +1,14 @@
+Major changes between version 1.0 and 2.0
+------------------------------------------------
+  - Common config stuff moved from /usr/lib/diald to /usr/share/diald
+    so 2.0 can coexist with 1.0.
+  - Major rewrite of much of the packet handling engine and related
+    config options. Diald can now be configured to handle arbitrary
+    protocols other than IPv4. If you have IPv6 in your kernel then
+    every time a link comes up you should see an IPv6 router discovery
+    in dctrl's connection window :-).
+
+
 Major changes between version 0.99.5 and 1.0
 ------------------------------------------------
   - Use openpty to get a pseudo terminal if it is available.

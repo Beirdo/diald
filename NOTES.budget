@@ -1,0 +1,60 @@
+1. Need a companion to impulse that sets the cost of the initial
+   impulse period and each subsequent impulse period.
+
+	impulse 180,58,4
+	charge	3,1
+
+
+2. Each connection in the connection queue is assigned to a cost
+   centre slot using firewall-like rules.
+
+	costcentre 0 ip.saddr=192.168.1.1
+	costcentre 1 ip.saddr=192.168.1.1,tcp.dest=tcp.www
+	costcentre 2 any
+
+
+3. For each cost centre we have:
+
+	struct costcentre {
+		struct {
+			unsigned long bytes_in;
+			unsigned long bytes_out;
+			double charge;
+		} total;
+		struct {
+			unsigned long bytes_in;
+			unsigned long bytes_out;
+			double charge;
+		} budget;
+		struct {
+			unsigned long bytes_in;
+			unsigned long bytes_out;
+		} impulse;
+	};
+
+
+4. At the end of an impulse the cost of the period is distributed
+   over the budgets according to the proportion of the traffic during
+   the period that was assigned to each budget. The budgets for the
+   cost centres are reduced and the totals accumulate.
+
+
+5. When a cost centre is over budget connections assigned to that
+   cost centre are not able to open or maintain the link regardless
+   of what the firewall rules say. Packets may still be sent and
+   received though (they are effectively treated as "ignore").
+     Optional: An external script could be run when budgets are
+   exhausted and replenished. This could add/remove reject or
+   blackhole routes or could reprioritize traffic using "tc".
+
+
+6. When the link goes down the current impulse period must be
+   ended as if it had actually expired.
+
+
+7. Need a fifo command to add to budgets at run time.
+
+
+8. Cost centre data should be persistent between runs/reboots. It should
+   be in a mmap'd file. We should have funky tools to snapshot the
+   data at intervals and generate cool web pages with graphs and things.

@@ -1,10 +1,10 @@
-.\" manual page [] for diald 1.0
+.\" manual page [] for diald 2.0
 .\" SH section heading
 .\" SS subsection heading
 .\" LP paragraph
 .\" IP indented paragraph
 .\" TP hanging label
-.TH DIALD-MONITOR 5 "DIALD 1.0 - 2001.06.15"
+.TH DIALD-MONITOR 5 "DIALD 2.0 - 2001.06.16"
 .SH NAME
 diald-monitor \- output format of the diald monitor command
 .SH SYNOPSIS

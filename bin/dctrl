@@ -3,7 +3,7 @@
 exec wish "$0" "$@"
 
 # User tunable parameters
-set imagepath "/usr/lib/diald"
+set imagepath "/usr/share/diald/dctrl"
 set diald_TITLE ""
 set diald_FIFO ""
 set diald_HOST ""
@@ -17,7 +17,8 @@ set fifo_counter 0
 
 # Initial values
 set monloglevel 6
-set monlevel 0x0000017f
+#set monlevel 0x0000017f
+set monlevel 0x0001017f
 set monstate 0.0
 set queue_list [list]
 set max_info_lines 500
@@ -79,6 +80,18 @@ proc _toolTipShow {w} {
 }
 
 
+proc user_number { n } {
+    if { $n > 1073741824 } {
+	format " %4.0fG" [expr $n/1073741824]
+    } elseif { $n > 1048576 } {
+	format " %4.0fM" [expr $n/1048576]
+    } elseif { $n > 1024 } {
+	format " %4.0fk" [expr $n/1024]
+    } else {
+	format " %4.0f " $n
+    }
+}
+
 # strip chart code
 proc stripchart {win x y label} {
     upvar #0 var$win type
@@ -100,7 +113,7 @@ proc addtick {w val} {
     set s $type(scale)
     set o $type(height)
     set h [winfo height $win]
-    set w [expr "[winfo width $win]"]
+    set w [winfo width $win]
 
     $win delete ticks
 
@@ -157,11 +170,17 @@ proc addtick {w val} {
     $win dtag ok extra
     $win delete extra
     $win dtag all ok
-    set x 1
-    while {$x < $s} {
+    set x 0
+    while {$x <= [expr "3*($s/3)"]} {
 	set th [expr "($x*$h)/$s"]
 	$win create line 1 $th $w $th -tag ticks -fill red
-	incr x
+#	incr x
+#	$win create text 1 $th -anchor w -fill yellow -tags ticks -text "xxx"
+	$win create text $w $th -anchor e -fill green -tags ticks -text [user_number [expr ($s - $x) * 1000]]
+	set x [expr $x + ($s/3)]
+	if {$x == 0} {
+	    break
+	}
     }
     $win create text 2 2 -anchor nw -fill blue -tags ticks -text $type(label)
 
@@ -526,18 +545,6 @@ proc updateIcon {} {
 
 
 
-proc user_number { n } {
-    if { $n > 1073741824 } {
-	format " %4.0fG" [expr $n/1073741824]
-    } elseif { $n > 1048576 } {
-	format " %4.0fM" [expr $n/1048576]
-    } elseif { $n > 1024 } {
-	format " %4.0fk" [expr $n/1024]
-    } else {
-	format " %4.0f " $n
-    }
-}
-
 proc readMonitor {} {
     global monstate monfd status
     global queue_list status trans colors gload tload
@@ -598,18 +605,27 @@ proc readMonitor {} {
 #	    3.2	{ set forced $foo; set monstate 0.0 }
 #	}
     } elseif {$monstate < 5.0} {
+	set cdown ""
 	set outp 0
 	set outb 0
 	set outtot 0
 	set inp 0
 	set inb 0
 	set intot 0
-	set desc [string range $foo 0 59]
-	scan [string range $foo 61 end] \
+	if {[scan [string range $foo 61 end] \
 	    "%f %f %f %f %f %f" \
-	    outp outb outtot inp inb intot
+	    outp outb outtot inp inb intot] == 6} {
+		set desc [string range $foo 0 49]
+		set cdown [string range $foo 52 59]
+	} else {
+		set desc $foo
+		gets $monfd foo
+		scan $foo \
+		    "%s %f %f %f %f %f %f" \
+		    cdown outp outb outtot inp inb intot
+	}
 	set foo ""
-	lappend queue_list [append foo $desc \
+	lappend queue_list [append foo $desc " $cdown" \
 	    [switch $in_usage {
 		pps { user_number $inp }
 		bps { user_number $inb }

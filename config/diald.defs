@@ -1,44 +1,120 @@
-# Define default protocol rules
-prule tcp tcp 9:12:13:14:15:16:17:18:19:+0:+1:+2:+3:9:9:9
-prule udp udp 9:12:13:14:15:16:17:18:19:+0:+1:+2:+3:9:9:9
-prule icmp icmp 9:12:13:14:15:16:17:18:19:9:9:9:9:9:9:9
-prule igmp 2 9:12:13:14:15:16:17:18:19:9:9:9:9:9:9:9
-prule ospfigp 89 9:12:13:14:15:16:17:18:19:9:9:9:9:9:9:9
-prule any any 9:12:13:14:15:16:17:18:19:9:9:9:9:9:9:9
-# Define the internet packet header fields.
-var ip.ihl 0(24)&0xf
-var ip.version 0(28)&0xf
-var ip.tos 1(24)&0xff
-var ip.tot_len 2(16)&0xffff
-var ip.id 4(16)&0xffff
-var ip.frag_off 6(16)&0x3fff
-var ip.ttl 8(24)&0xff
-var ip.protocol 9(24)&0xff
-var ip.check 10(16)&0xffff
-var ip.saddr 12
-var ip.daddr 16
+# Key	Name	Proto	NxtOffset	NxtProto	Spec
+proto	any	0	0		0		-
+proto	pkt.ip	0x0800	0		@0[1]>>4&0xf	-
+proto	pkt.ip6	0x86dd	0		@0[1]>>4&0xf	-
+proto	pkt.ipx	0x8137	0		1		-
+#proto	pkt.unk	any	0		@0[1]>>4&0xf	-
+
+proto	ip	4	@0[1]<<2&0x3f	@9[1]		<12[4],>16[4]
+proto	ip6	6	40		@6[1]		<8[16],>24[16]
+proto	ipx	1	30		@5[1]		-
+
+proto	icmp	icmp	8		0		-
+proto	igmp	igmp	0		0		-
+proto	ipip	4	0		4		-
+proto	tcp	tcp	@12[1]>>2&0x3f	0		<0[2],>2[2]
+#proto	egp	egp
+proto	udp	udp	8		0		<0[2],>2[2]
+proto	ip6ip	41	0		6		-
+#proto	rsvp	46
+#proto	gre	47
+proto	ospfigp	89	0		0		-
+#proto	pim	103
+
+proto	icmpv6	58	8		0		-
+
+proto	rip	0x01	0		0		-
+proto	sap	0x04	0		0		-
+proto	spx	0x05	0		0		-
+proto	ncp	0x11	0		0		-
+proto	pprop	0x14	0		0		-
+
+# Key		Parent	Possibly contains...
+subproto	any	pkt.ip,pkt.ip6,pkt.ipx
+subproto	pkt.ip	ip,ipip
+subproto	pkt.ip6	ip6
+subproto	pkt.ipx	ipx
+#subproto	pkt.unk	ip,ip6
+subproto	ip	tcp,udp,icmp,igmp,ip6ip,ospfigp
+subproto	ip6ip	ip6
+subproto	ipip	ip
+subproto	ip6	tcp,udp,icmpv6,igmp,ospfigp
+subproto	ipx	rip,sap,spx,ncp,pprop
+
+# Define the outermost "virtual" packet header.
+var	any.direction	{any}@0[1]
+
+# Define the IPv4 packet header fields.
+var	ip.version	{ip}@0[1]>>4&0xf
+var	ip.ihl		{ip}@0[1]>>2&0x3f
+var	ip.tos		{ip}@1[1]
+var	ip.tot_len	{ip}@2[2]
+var	ip.id		{ip}@4[2]
+var	ip.frag_off	{ip}@6[2]&0x3fff
+var	ip.ttl		{ip}@8[1]
+var	ip.protocol	{ip}@9[1]?protocol
+var	ip.check	{ip}@10[2]
+var	ip.saddr	{ip}@12[4]?dotquad
+var	ip.daddr	{ip}@16[4]?dotquad
+
+# Define the IPv6 packet header fields.
+var	ip6.version	{ip6}@0[1]>>4&0xf
+var	ip6.class	{ip6}@0[1]&0xf
+var	ip6.flow	{ip6}@1[3]
+var	ip6.payload_len	{ip6}@4[2]
+var	ip6.nexthdr	{ip6}@6[1]?protocol
+var	ip6.hop_limit	{ip6}@7[1]
+var	ip6.saddr	{ip6}@8[16]?ip6
+var	ip6.daddr	{ip6}@24[16]?ip6
+
 # Define the TCP packet header fields.
-var tcp.source +0(16)&0xffff
-var tcp.dest +2(16)&0xffff
-var tcp.seq +4
-var tcp.ack_seq +8
-var tcp.doff +12(28)&0xf
-var tcp.fin +13(24)&0x1
-var tcp.syn +13(25)&0x1
-var tcp.rst +13(26)&0x1
-var tcp.psh +13(27)&0x1
-var tcp.ack +13(28)&0x1
-var tcp.urg +13(29)&0x1
-var tcp.live +127
+var	tcp.source	{tcp}@0[2]?port
+var	tcp.dest	{tcp}@2[2]?port
+var	tcp.seq		{tcp}@4[4]
+var	tcp.ack_seq	{tcp}@8[4]
+var	tcp.doff	{tcp}@12[1]>>2&0x3f
+var	tcp.urg		{tcp}@13[1]&0x20
+var	tcp.ack		{tcp}@13[1]&0x10
+var	tcp.psh		{tcp}@13[1]&0x08
+var	tcp.rst		{tcp}@13[1]&0x04
+var	tcp.syn		{tcp}@13[1]&0x02
+var	tcp.fin		{tcp}@13[1]&0x01
+var	tcp.live	{tcp}@0x0fff
+var	tcp.window	{tcp}@14[2]
+var	tcp.check	{tcp}@16[2]
+var	tcp.urg_ptr	{tcp}@18[2]
+
 # Define the UDP packet header fields.
-var udp.source +0(16)&0xffff
-var udp.dest +2(16)&0xffff
-var udp.len +4(16)&0xffff
-var udp.check +6(16)&0xffff
+var	udp.source	{udp}@0[2]?port
+var	udp.dest	{udp}@2[2]?port
+var	udp.len		{udp}@4[2]
+var	udp.check	{udp}@6[2]
+
 # Define the ICMP packet header fields.
-var icmp.type +0(24)&0xff
-var icmp.code +1(24)&0xff
-var icmp.checksum +2(16)&0xffff
-var icmp.echo.id +4(16)&0xffff
-var icmp.echo.sequence +6(16)&0xffff
-var icmp.gateway +4
+var	icmp.type	{icmp}@0[1]
+var	icmp.code	{icmp}@1[1]
+var	icmp.checksum	{icmp}@2[2]
+var	icmp.echo.id	{icmp}@4[2]
+var	icmp.echo.seq	{icmp}@6[2]
+var	icmp.gateway	{icmp}@4[4]
+var	icmp.mtu	{icmp}@6[2]
+
+# saw_fin 0-1, tcp_flags 2-3, fin_seq 4-7 8-11
+#state	tcp	@0[4]	tcp.rst		0
+#state	tcp	@0[1]	tcp.fin,pkt.direction=1	1
+#state	tcp	@1[1]	tcp.fin,pkt.direction=2	1
+#state	tcp	@4[4]	tcp.fin,pkt.direction=1	tcp.seq #+tcp_data_len+1
+#state	tcp	@8[4]	tcp.fin,pkt.direction=2	tcp.seq #+tcp_data_len+1
+#state	tcp	@0[1]	tcp.syn,pkt.direction=2 0
+#state	tcp	@3[1]	tcp.syn,pkt.direction=2 1
+#state	tcp	@1[1]	tcp.syn,pkt.direction=1 0
+#state	tcp	@2[1]	tcp.syn,pkt.direction=1 1
+#state	tcp	@3[1]	tcp.ack,pkt_direction=1,{pkt}@1[1],{pkt}@8[4]=tcp.ack_seq 0
+#state	tcp	@2[1]	tcp.ack,pkt_direction=2,{pkt}@0[1],{pkt}@4[4]=tcp.ack_seq 0
+
+describe {tcp}"tcp   ",ip.saddr"%15s/",tcp.source"%-5s ",ip.daddr"%15s/",tcp.dest"%-5s"
+describe {udp}"udp   ",ip.saddr"%15s/",udp.source"%-5s ",ip.daddr"%15s/",udp.dest"%-5s"
+describe ip.protocol"%-5s ",ip.saddr"%15s       ",ip.daddr"%15s      "
+describe {tcp}"tcp   ",ip6.saddr"%15s/",tcp.source"%-5s ",ip6.daddr"%15s/",tcp.dest"%-5s"
+describe {udp}"udp   ",ip6.saddr"%15s/",udp.source"%-5s ",ip6.daddr"%15s/",udp.dest"%-5s"
+describe ip6.nexthdr"%-5s ",ip6.saddr"%15s       ",ip6.daddr"%15s      "

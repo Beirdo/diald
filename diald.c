@@ -658,6 +658,9 @@ void ctrl_read(PIPE *pipe)
 
 		k = 0;
 		if (sscanf(buf,"monitor %i %n",&j,&k) == 1) {
+		    /* Use the most advanced flags we know */
+		    if ((j & MONITOR_QUEUE2))
+			j &= (~MONITOR_QUEUE);
 		    mon_syslog(LOG_NOTICE, "%s: log level 0x%08x", buf + k, j);
 		} else if (buf[7] != 0 && buf[7] == ' ') {
 		    mon_syslog(LOG_NOTICE, "%s: full monitor connection", buf+8);

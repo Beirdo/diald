@@ -4,7 +4,7 @@ Packager:     Mike Jagdis <jaggy@purplet.demon.co.uk>
 
 Group:        Networking/Daemons
 Name:         diald
-Version:      1.0
+Version:      2.0
 Release:      1
 Copyright:    GNU General Public License
 
@@ -40,6 +40,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %doc %{_mandir}/man5/diald-control.5
 %doc %{_mandir}/man5/diald-monitor.5
 %doc %{_mandir}/man8/diald.8
+%config %attr (0644, root, root) /usr/lib/diald/connect
 %attr (0755, root, root) /usr/sbin/diald
 %attr (0755, root, root) /usr/bin/dctrl
-%attr (0644, root, root) /usr/lib/diald/*.gif
+%attr (0644, root, root) /usr/share/diald/*.gif
+%attr (0644, root, root) /usr/share/diald/diald.defs
+%attr (0644, root, root) /usr/share/diald/standard.filter

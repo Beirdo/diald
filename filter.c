@@ -184,7 +184,16 @@ void filter_read()
      * themselves but currently this is only exposed by /proc/net/dev.
      */
 
+#if 1
+    len = recvfrom(snoopfd,packet,sizeof(packet),0,(struct sockaddr *)&from,&from_len);
+    if (len == 0)
+	mon_syslog(LOG_DEBUG,"snoop read error: zero length data");
+    if (len < 0)
+	mon_syslog(LOG_DEBUG,"snoop read error: %m");
+    if (len > 0) {
+#else
     if ((len = recvfrom(snoopfd,packet,sizeof(packet),0,(struct sockaddr *)&from,&from_len)) > 0) {
+#endif
 	/* FIXME: really if the bind succeeds, then I don't need
 	 * this check. How can I shortcut this effectly?
 	 * perhaps two different filter_read routines?
@@ -214,7 +223,12 @@ void filter_read()
 	    irxtotal += len;
 	}
 	
-	if ((ntohs(((struct iphdr *)packet)->frag_off) & 0x1fff) == 0) {
+	if (
+#ifdef HAVE_AF_PACKET
+	(af_packet && from.sl.sll_protocol != htons(ETH_P_IP))
+	||
+#endif
+	(ntohs(((struct iphdr *)packet)->frag_off) & 0x1fff) == 0) {
 	    /* Mark passage of first packet */
 	    if (check_firewall(fwunit,
 		(af_packet ? (sockaddr_ll_t *)&from : NULL), packet, len)

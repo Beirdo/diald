@@ -1,10 +1,10 @@
-.\" manual page [] for diald 1.0
+.\" manual page [] for diald 2.0
 .\" SH section heading
 .\" SS subsection heading
 .\" LP paragraph
 .\" IP indented paragraph
 .\" TP hanging label
-.TH DIALD 8 "DIALD 1.0 - 2001.06.15"
+.TH DIALD 8 "DIALD 2.0 - 2001.06.16"
 .SH NAME
 diald \- demand dialing daemon for IP links over phone lines
 .SH SYNOPSIS
@@ -68,7 +68,7 @@ never necessary. The use of command line arguments is depreciated.
 
 On startup
 .B diald
-reads options first from /usr/lib/diald/diald.defs,
+reads options first from /usr/share/diald/diald.defs,
 then from /etc/diald.conf and then from the command line.
 Additional files to be read may be specified on the command line,
 or within the options files themselves.
@@ -119,16 +119,16 @@ note in the section below that documents the "pppd-options" command.
 .SH CONFIGURATION FILES
 As mentioned before, on startup
 .B diald
-reads options first from /usr/lib/diald/diald.defs,
+reads options first from /usr/share/diald/diald.defs,
 then from /etc/diald.conf and then from the command line.
 Additional files to be read may be specified on the command line,
 or within the options files themselves.
 
-Note that the file /usr/lib/diald/diald.defs is intended to
+Note that the file /usr/share/diald/diald.defs is intended to
 contain only
 .B var
 and
-.B prule
+.B proto
 options. This is not enforced, but it should never be necessary to
 violate this convention. Furthermore, in all but the most extreme cases
 the distributed diald.defs file will not need to be changed.
@@ -962,49 +962,75 @@ diald constructs entries for the connection set. The
 .B diald-examples
 manual page gives some examples of how these options can be used.
 .TP
-.B prule \fI<name> <protocol> <spec>
+.B proto \fI<name> <protocol> <next offset> <next proto> <spec>\fR
 Define a new protocol rule called \fI<name>\fR to be used
 in filter statements. The \fI<protocol>\fR field
 must either be the name of a protocol defined in /etc/protocols,
-the special keyword "any", or an integer between 0 and 254 inclusive.
-The \fI<spec>\fR field is a list of 16 colon separated offset
-codes that specify the bytes to be extracted from a packet
-to build a \fIconnection identifier\fR.
-Each offset code is an integer, possibly prefixed with a '+'.
-Values that are not prefixed are offsets into the ip header,
-values with the '+' prefix are offsets into the data segment
-of the ip packet. 
+the special keyword "any", or a 16 bit integer.
+The \fI<next offset>\fR field is a var name or specification
+that is used to extract the offset of the data that follows
+this packet header - which may itself be a packet header of
+an encapsulated protocol.
+The \fI<next protocol>\fR field is a var name or specfication
+that is used to extract the protocol number of the data
+enclosed in this packet.
+The \fI<spec>\fR field is a list of comma separated offset
+codes that specify up to 64 bytes to be extracted from a packet
+to build a \fIconnection identifier\fR. The offset codes that
+represent source addresses are prefixed with '<' and the offset
+codes that represent destination addresses are prefixed with '>'
+to enable packets to be matched with a connections regardless
+of the direction they are travelling.
+Each offset code may be prefixed with a '+'. Values that are not
+prefixed are offsets into the packet header, values with the '+'
+prefix are offsets into the data portion of the packet. 
+.TP
+.B subproto \fI<parent> <proto>[,<proto>...]\fR
+Define the protocol hierarchy by listing the protocols that may
+appear inside the protocol \fI<parent>\fR.
+.TP
+.B describe \fI<spec>\fR
+Describes a connection. When a new connection is created each
+describe rule is tried in turn until one is found in which all
+the var references are resolvable.
 .TP
 .B var \fI<name> <spec>\fR
 Define a new variable called \fI<name>\fR to be used in filter
 statements. The \fI<spec>\fR portion of the definition
 defines how to construct the value of the variable from a packet.
-It consists of a byte offset to a 4 byte word, possibly prefixed with a '+', 
-optionally followed by a right shift value in brackets,
-optionally followed by a '&' character and a bit mask value.
+It may consist of a constant or a reference to packet data.
+A reference to packet data consists of an optional protocol
+name in braces,
+optionally followed by a '@' and a byte offset, possibly prefixed with a '+', 
+optionally followed by a byte width in square brackets,
+optionally followed by ">>" and a right shift value
+or "<<" and a left shift value,
+optionally followed by a '&' character and a bit mask value,
+optionally followed by a '?' and a format type used for printing
+the value of the var.
 Offsets prefixed with '+' are offsets into the data segment
 of the ip packet, otherwise they are offsets into the ip header
 of the packet. For example, the ip source address of a packet is
 defined by
 .IP
-	var ip.saddr 12
+	var ip.saddr {ip}12[4]
 .IP
 which means to get the four bytes located starting at an
-offset of 12 into the packet header.
+offset of 12 into the packet header for the protocol "ip".
 Similarly, the ip protocol of a packet is defined by
 .IP
-	var ip.protocol 9(24)&0xff
+	var ip.protocol {ip}@9[1]?protocol
 .IP
-which means to get the four bytes located starting at an
-offset of 9 bytes into the header, right shift the obtained
-value by 24 bits, and mask it with 0xff.
-As a final example, the source port in a tcp header is defined as
+which means to get the byte located starting at an
+offset of 9 bytes into the "ip" packet header and format it,
+if it is ever to be printed in a description, using the protocol
+formatting method.
+As a final example, the IP version is defined as
 .IP
-	var tcp.source +0(16)&0xffff
+	var ip.version {ip}@0[1]>>4&0xf
 .IP
-which says to obtain the four bytes starting at the beginning
-of the ip data segment, shift the value right by 16 bits,
-and mask it with 0xffff.
+which says to obtain the first byte in the "ip" packet header,
+shift it right 4 bits, and mask it with 0x0f.
 .TP
 .B accept \fI<protocol-rule> <timeout> <packet-rule>\fR
 Define a packet matching rule to control the link.

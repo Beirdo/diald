@@ -2,7 +2,7 @@ The Diald README File
 
 ----------------------------------------------------------------------------
 
-This is release 1.0 of diald.
+This is release 2.0 of diald.
 
 Diald is a daemon that provides on demand IP links via SLIP or PPP. The
 purpose of diald is to make it transparently appear that you have a
@@ -19,7 +19,7 @@ passing over the link.
 
 Getting Diald
 
-The file is called diald-1.0.tar.gz. It can be obtained from the diald
+The file is called diald-2.0.tar.gz. It can be obtained from the diald
 project on "http://sourceforge.net/". Note that the diald home page has
 moved from its old locations of "http://diald.unix.ch" and
 "http://www.loonie.net/~erics/diald.html". It can now be found at

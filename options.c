@@ -230,7 +230,9 @@ struct {
     {"redial-backoff-limit","<time>",1,&redial_backoff_limit,set_int},
     {"dial-fail-limit","<count>",1,&dial_fail_limit,set_int},
 /* Filter rules */
-    {"prule","<name> <protocol> <spec>",3,0,&parse_prule},
+    {"proto","<name> <protocol> <len> <nxt proto> <spec>",5,0,&parse_proto},
+    {"subproto","<protocol> <protocol>[,<protocol>...]",2,0,&parse_subproto},
+    {"describe","<spec>",1,0,&parse_describe},
     {"var","<name> <spec>",2,0,&parse_var},
     {"restrict","<start-time> <end-time> <weekday> <day> <month>",5,0,&parse_restrict},
     {"or-restrict","<start-time> <end-time> <weekday> <day> <month>",5,0,&parse_or_restrict},
@@ -742,6 +744,16 @@ void parse_options_line(char *line)
 	    argv[argc++] = s;
 	    while (*s) {
 		if (*s == ' ' || *s == '\t') break;
+		if (*s == '\"' || *s == '\'') {
+		    char delim = *s;
+		    /* start of a quoted sub-string */
+		    s++;
+		    while (*s && *s != delim) {
+			if (*s == '\\' && s[1] != 0) s++;
+			s++;
+		    }
+		    if (!*s) break;
+		}
 		s++;
 	    }
 	    s--;
