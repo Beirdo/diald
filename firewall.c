@@ -26,6 +26,7 @@ int impulse_fuzz = 0;
 
 
 void del_connection(FW_Connection *);
+void zombie_connection(FW_Connection *);
 
 
 static int
@@ -428,12 +429,12 @@ mon_syslog(LOG_INFO, "cmp: %d: p=%d l=%d [ %02x %02x %02x %02x ]", i, c->id.hdr[
  */
 
 static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
-			unsigned int timeout, TCP_STATE lflags,
+			unsigned int timeout, unsigned int conn_hold,
+			TCP_STATE lflags,
 			int direction, int len)
 {
     /* look for a connection that matches this one */
     if (c == NULL) {
-	if (timeout > 0) {
 	    int d;
 	    struct var **v;
 	    char *p, *q;
@@ -475,43 +476,54 @@ mon_syslog(LOG_INFO, "desc: len=%d, \"%s\"", c->desc_len, c->description);
 	    c->bytes_total[0] = c->bytes_total[1] = 0;
 	    c->packets[direction] = 1;
 	    c->bytes[direction] = len;
-	    init_timer(&c->timer);
             c->tcp_state = lflags;
 	    c->unit = unit;
-	    c->timer.data = (void *)c;
-	    c->timer.function = (void *)(void *)del_connection;
-	    if (unit->connections->next == unit->connections
+	    if (unit->live == 0 && timeout
 	    && state != STATE_UP && !blocked && demand)
 		mon_syslog(LOG_NOTICE, "Trigger: %s", c->description);
+
 	    c->next = unit->connections->next;
 	    c->prev = unit->connections;
 	    unit->connections->next->prev = c;
 	    unit->connections->next = c;
-	    c->timer.expires = timeout;
-	    add_timer(&c->timer);
+
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-    		mon_syslog(LOG_DEBUG,"Adding connection %p @ %ld - timeout %d",c,
-			time(0),timeout);
-	}
+    		mon_syslog(LOG_DEBUG,
+		    "Adding connection %p @ %ld - timeout %d, conn hold %d",
+		    c, time(0), timeout, conn_hold);
     } else {
 	/* found a matching connection, toss it's old timer */
-	if (timeout > 0) {
-	    /* reanimating a ghost? */
 	    del_timer(&c->timer);
+	    if (c->timer.function == (void *)zombie_connection)
+		unit->live--;
+
 	    c->packets[direction]++;
 	    c->bytes[direction] += len;
 	    c->timer.expires = timeout;
 	    add_timer(&c->timer);
+
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-    		mon_syslog(LOG_DEBUG,"Updating connection %p @ %ld - timeout %d",c,
-			time(0),timeout);
-	} else {
-	    /* timeout = 0, so toss the connection */
-	    del_timer(&c->timer);
-	    del_connection(c);
-	}
+    		mon_syslog(LOG_DEBUG,
+		    "Updating connection %p @ %ld - timeout %d",
+		    c, time(0), timeout);
     }
+
+    c->conn_hold = conn_hold;
+    init_timer(&c->timer);
+    c->timer.data = (void *)c;
+    if (timeout) {
+	c->timer.expires = timeout;
+	c->timer.function = (void *)zombie_connection;
+	unit->live++;
+	goto out;
+    }
+
+    c->timer.function = (void *)del_connection;
+    c->timer.expires = conn_hold;
+out:
+    add_timer(&c->timer);
 }
+
 
 /*
  * Get a connection out of a queue.
@@ -525,6 +537,22 @@ void del_connection(FW_Connection *c)
     c->next->prev = c->prev;
     c->prev->next = c->next;
     free(c);
+}
+
+void zombie_connection(FW_Connection *c)
+{
+    if (debug&DEBUG_CONNECTION_QUEUE)
+	mon_syslog(LOG_DEBUG,"Connection zombie %p @ %ld",c,time(0));
+
+    if (!c->conn_hold) {
+	del_connection(c);
+	goto out;
+    }
+
+    c->timer.function = (void *)del_connection;
+    c->timer.expires = c->conn_hold;
+    add_timer(&c->timer);
+out:
 }
 
 void del_impulse(FW_unit *unit)
@@ -1051,12 +1079,13 @@ mon_syslog(LOG_INFO, "cmp 0x%x & 0x%x op=%d 0x%x", v[FW_MAX_ADDR_UINTS-1], term-
 	    log_packet(fw->filt.type!=FW_TYPE_IGNORE,ip_pkt,len,rule);
 
 	/* Check if this entry goes into the queue or not */
-	if (fw->filt.type != FW_TYPE_IGNORE && fw->filt.type != FW_TYPE_WAIT) {
+	if (conn || fw->filt.timeout || fw->filt.conn_hold) {
 	    add_connection(
 		unit,
 		conn,
 		id,
 		fw->filt.timeout,
+		fw->filt.conn_hold,
 		lflags,
 		direction-1,
 		len);
@@ -1303,7 +1332,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 		|| (unit->force == 0
 		    && !(unit->up && unit->impulse_mode == 0
 		   	 && (impulse_init_time > 0 || impulse_time > 0))
-		    && unit->connections == unit->connections->next));
+		    && unit->live == 0));
 
 
     /* FIXME: we do not appear to actually free things properly... */

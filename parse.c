@@ -515,13 +515,26 @@ int parse_prule_name()
 
 void parse_timeout(FW_Filter *filter)
 {
-    int to;
-    if (token->type != TOK_NUM) parse_error("Expecting a number.");
-    sscanf(token->str,"%i",&to);
-    if (to < 0)
-	parse_error("Out of acceptable range for a timeout.");
-    filter->timeout = to;
-    ADVANCE;
+    if (token->type == TOK_NUM) {
+	int to;
+
+	sscanf(token->str,"%i",&to);
+	if (to < 0)
+	    parse_error("Out of acceptable range for a timeout.");
+	filter->timeout = to;
+	ADVANCE;
+    } else if (token->type == TOK_INET6) {
+	int to, ch;
+
+	sscanf(token->str,"%i:%i", &to, &ch);
+	if (to < 0 || ch < 0)
+	    parse_error("Out of acceptable range for a timeout.");
+	filter->timeout = to;
+	filter->conn_hold = ch;
+	ADVANCE;
+    } else {
+	parse_error("Expecting a number.");
+    }
 }
 
 /* <rvalue> ::= <num> | <name> | <inet> */
@@ -1024,10 +1037,14 @@ void parse_ignore(void *var, char **argv)
     struct firewall_req req;
     init_filter(&filter);
     filter.type = FW_TYPE_IGNORE;
-    tokenize("ignore",2,argv);
+    tokenize("ignore",3,argv);
     if (setjmp(unwind)) { token = 0; free_tokens(); return; }
     filter.prule = parse_prule_name();
     parse_whitespace();
+    if (token->type == TOK_NUM || token->type == TOK_INET6) {
+	parse_timeout(&filter);
+	parse_whitespace();
+    }
     parse_terms(&filter);
     free_tokens();
     /* Save the filter in the kernel */

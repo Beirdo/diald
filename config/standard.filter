@@ -148,8 +148,9 @@ accept igmp 10 igmp.vertype=IGMP_MTRACE
 # Bring the link up for new membership reports.
 accept igmp 10 igmp.vertype=IGMP_HOST_NEW_MEMBERSHIP_REPORT
 
-# All other IGMP packets are ignored.
-ignore igmp any
+# All other IGMP packets are ignored but listed in the connection
+# queue for 5 seconds.
+ignore igmp 0:5 any
 
 
 # Rules for ICMP/ICMP6 packets

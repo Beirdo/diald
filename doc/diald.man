@@ -948,14 +948,13 @@ The general approach used by
 to determine when to change between these two modes is to
 keep a \fIconnection set\fR of \fIconnection identities\fR,
 each with an associated timeout.
-When a timeout associated with a connection identity
-expires, it is removed from the set.
-When the connection set is empty
-.B diald
-expects the physical link to be down,
-otherwise
-.B diald
-expects the physical link to be up.
+A timeout is either a single number or two numbers separated
+by a ':'. The first number is how long the connection will hold
+the link up. When this expires the link will be taken down unless
+required by other connections. The second number is how long the
+connection should remain in the connection queue after the first
+number has expired. If the second number is omitted the connection
+will be removed from the connection queue immediately.
 .LP
 This section describes the configuration options that control how
 diald constructs entries for the connection set. The

@@ -141,6 +141,7 @@ typedef struct firewall_rule {
     unsigned int timeout;	/* timeout in seconds. Max approx 136 years */
     unsigned int fuzz;		/* fuzz to apply to impulse rules */
     unsigned int timeout2;	/* impulse timeout after first used */
+    unsigned int conn_hold;	/* how long to remember idle connection */
     FW_Term terms[FW_MAX_TERMS];	/* terms in the rule */
 } FW_Filter;
 
@@ -223,6 +224,7 @@ typedef struct tcp_state {
  */
 typedef struct fw_connection {
     struct timer_lst timer;		/* timer for this connection */
+    int conn_hold;			/* time to remember after time out */
     FW_ID id;				/* identifier for this connection */
     unsigned long packets[2];		/* packet counts out/in */
     unsigned long bytes[2];		/* byte count out/in */
