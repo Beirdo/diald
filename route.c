@@ -185,17 +185,20 @@ iface_stop(char *mode, char *iftype, int ifunit,
 
     /* With no ifsetup script we have to do it all ourselves. */
 
-    /* We do not simply down the interface because it may be required
+    /* For modes with transient interfaces (ppp<n> and sl<n>) we do
+     * nothing. For non-transient interfaces we delete the address.
+     * We do not simply down the interface because it may be required
      * to up (ISDN, for instance, will not answer an incoming call if
-     * there is not up interface). Instead we delete the address
-     * which has much the same effect of stopping traffic through it.
+     * there is not up interface).
      * Deleting the addresses has the effect of deleting routes as well
      * but we still call del_routes first because the user delroutes
      * scripts may have been abused to do something "special".
      */
     del_routes(desc, iface, lip, rip);
 
-    sprintf(buf, "%s %s 0.0.0.0",
-	path_ifconfig, iface);
-    run_shell(SHELL_WAIT, desc, buf, -1);
+    if (current_mode == MODE_DEV) {
+	sprintf(buf, "%s %s 0.0.0.0",
+	    path_ifconfig, iface);
+	run_shell(SHELL_WAIT, desc, buf, -1);
+    }
 }
