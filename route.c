@@ -10,7 +10,7 @@
 #include "diald.h"
 
 static void
-add_routes(char *iftype, int ifunit, char *lip, char *rip)
+add_routes(char *desc, char *iface, char *lip, char *rip)
 {
     char win[32];
     char buf[1024];
@@ -21,7 +21,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
      */
 
     if (debug&DEBUG_VERBOSE)
-	mon_syslog(LOG_DEBUG,"Establishing routes for %s%d", iftype, ifunit);
+	mon_syslog(LOG_DEBUG, "%s: Establishing routes for %s", desc, iface);
 
     if (window == 0)
 	win[0] = 0;
@@ -37,29 +37,29 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
      */
     if (rip) {
 	if (path_ip && *path_ip) {
-	    sprintf(buf,"%s route add %s dev %s%d scope link%s%s metric %d %s",
-		path_ip, rip, iftype, ifunit,
+	    sprintf(buf,"%s route add %s dev %s scope link%s%s metric %d %s",
+		path_ip, rip, iface,
 		lip ? " src " : "",
 		lip ? lip : "",
 		metric, win); 
 	} else {
-	    sprintf(buf,"%s add %s metric %d %s dev %s%d",
-		path_route, rip, metric, win, iftype, ifunit); 
+	    sprintf(buf,"%s add %s metric %d %s dev %s",
+		path_route, rip, metric, win, iface);
 	}
-	run_shell(SHELL_WAIT, "add route", buf, -1);
+	run_shell(SHELL_WAIT, desc, buf, -1);
 
 	if (metric) {
 	    if (path_ip && *path_ip) {
-		sprintf(buf,"%s route del %s dev %s%d scope link%s%s metric 0 %s",
-		    path_ip, rip, iftype, ifunit,
+		sprintf(buf,"%s route del %s dev %s scope link%s%s metric 0 %s",
+		    path_ip, rip, iface,
 		    lip ? " src " : "",
 		    lip ? lip : "",
 		    win); 
 	    } else {
-		sprintf(buf,"%s del %s metric 0 %s dev %s%d",
-		    path_route, rip, win, iftype, ifunit); 
+		sprintf(buf,"%s del %s metric 0 %s dev %s",
+		    path_route, rip, win, iface); 
 	    }
-	    run_shell(SHELL_WAIT, "del route", buf, -1);
+	    run_shell(SHELL_WAIT, desc, buf, -1);
 	}
 #endif
     }
@@ -67,24 +67,24 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
     /* Add in a default route for the link if required. */
     if (default_route) {
 	if (path_ip && *path_ip) {
-	    sprintf(buf, "%s route add default dev %s%d scope link%s%s metric %d %s",
-		path_ip, iftype, ifunit,
+	    sprintf(buf, "%s route add default dev %s scope link%s%s metric %d %s",
+		path_ip, iface,
 		lip ? " src " : "",
 		lip ? lip : "",
 		metric, win); 
 	} else {
-	    sprintf(buf,"%s add default metric %d %s netmask 0.0.0.0 dev %s%d",
-		path_route, metric, win, iftype, ifunit);
+	    sprintf(buf,"%s add default metric %d %s netmask 0.0.0.0 dev %s",
+		path_route, metric, win, iface);
 	}
-        run_shell(SHELL_WAIT, "add default route", buf, -1);
+        run_shell(SHELL_WAIT, desc, buf, -1);
     }
 
     /* call addroute script */
     if (addroute) {
-        sprintf(buf,"%s %s%d %s \"%s\" \"%s\" %d %d",
-	    addroute, iftype, ifunit, (netmask)?netmask:"default",
+        sprintf(buf,"%s %s %s \"%s\" \"%s\" %d %d",
+	    addroute, iface, (netmask)?netmask:"default",
 	    lip, rip, metric, window);
-	run_shell(SHELL_WAIT, "addroute", buf, -1);
+	run_shell(SHELL_WAIT, desc, buf, -1);
     }
 
     if (proxyarp && rip) set_proxyarp(inet_addr(rip));
@@ -92,36 +92,36 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 
 
 static void
-del_routes(char *iftype, int ifunit, char *lip, char *rip)
+del_routes(char *desc, char *iface, char *lip, char *rip)
 {
     char buf[1024];
 
     if (debug&DEBUG_VERBOSE)
-	mon_syslog(LOG_DEBUG, "Removing routes for %s%d", iftype, ifunit);
+	mon_syslog(LOG_DEBUG, "%s: Removing routes for %s", desc, iface);
 
     if (proxyarp && rip) clear_proxyarp(inet_addr(rip));
 
     if (delroute) {
 	/* call delroute <iface> <netmask> <local> <remote> */
-        sprintf(buf, "%s %s%d %s \"%s\" \"%s\" %d",
-	    delroute, iftype, ifunit,
+        sprintf(buf, "%s %s %s \"%s\" \"%s\" %d",
+	    delroute, iface,
 	    (netmask) ? netmask : "default",
 	    lip, rip, metric);
-        run_shell(SHELL_WAIT, "delroute", buf, -1);
+        run_shell(SHELL_WAIT, desc, buf, -1);
     }
 
     if (default_route) {
 	if (path_ip && *path_ip) {
-	    sprintf(buf, "%s route del default dev %s%d scope link%s%s metric %d",
-		path_ip, iftype, ifunit,
+	    sprintf(buf, "%s route del default dev %s scope link%s%s metric %d",
+		path_ip, iface,
 		lip ? " src " : "",
 		lip ? lip : "",
 		metric); 
 	} else {
-	    sprintf(buf, "%s del default metric %d netmask 0.0.0.0 dev %s%d",
-		path_route, metric, iftype, ifunit);
+	    sprintf(buf, "%s del default metric %d netmask 0.0.0.0 dev %s",
+		path_route, metric, iface);
 	}
-        run_shell(SHELL_WAIT, "del default route", buf, -1);
+        run_shell(SHELL_WAIT, desc, buf, -1);
     }
 }
 
@@ -129,33 +129,37 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 void
 iface_start(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 {
-    char buf[1024];
+    char *iface, desc[32], buf[1024];
+
+    strcpy(desc, "start ");
+    snprintf(desc+6, sizeof(desc)-6-1, "%s%d", iftype, ifunit);
+    iface = desc+6;
 
     /* mark the interface as up */
     if (ifsetup) {
-	sprintf(buf, "%s start %s %s%d",
-	    ifsetup, mode, iftype, ifunit);
-	run_shell(SHELL_WAIT, "iface start", buf, -1);
+	sprintf(buf, "%s start %s %s",
+	    ifsetup, mode, iface);
+	run_shell(SHELL_WAIT, desc, buf, -1);
 	return;
     }
 
     /* With no ifsetup script we have to do it all ourselves. */
     if (lip) {
-	sprintf(buf,"%s %s%d %s%s%s%s%s netmask %s metric %d mtu %d up",
-	    path_ifconfig, iftype, ifunit, lip,
+	sprintf(buf,"%s %s %s%s%s%s%s netmask %s metric %d mtu %d up",
+	    path_ifconfig, iface, lip,
 	    rip ? " pointopoint " : "",
 	    rip ? rip : "",
 	    rip ? " broadcast " : "",
 	    rip ? rip : "",
 	    netmask ? netmask : "255.255.255.255",
 	    metric, mtu);
-	run_shell(SHELL_WAIT, "iface start", buf, -1);
+	run_shell(SHELL_WAIT, desc, buf, -1);
     }
 
-    add_routes(iftype, ifunit, lip, rip);
+    add_routes(desc, iface, lip, rip);
 
     if (monitors) {
-	sprintf(buf, "INTERFACE\n%s%d\n%s\n%s\n", iftype, ifunit, lip, rip);
+	sprintf(buf, "INTERFACE\n%s\n%s\n%s\n", desc+6, lip, rip);
 	mon_write(MONITOR_INTERFACE, buf, strlen(buf));
     }
 }
@@ -164,12 +168,16 @@ iface_start(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 void
 iface_stop(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 {
-    char buf[128];
+    char *iface, desc[32], buf[128];
+
+    strcpy(desc, "stop ");
+    snprintf(desc+5, sizeof(desc)-5-1, "%s%d", iftype, ifunit);
+    iface = desc+5;
 
     if (ifsetup) {
-	sprintf(buf, "%s stop %s %s%d",
-	    ifsetup, mode, iftype, ifunit);
-	run_shell(SHELL_WAIT, "iface stop", buf, -1);
+	sprintf(buf, "%s stop %s %s",
+	    ifsetup, mode, iface);
+	run_shell(SHELL_WAIT, desc, buf, -1);
 	return;
     }
 
@@ -183,9 +191,9 @@ iface_stop(char *mode, char *iftype, int ifunit, char *lip, char *rip)
      * but we still call del_routes first because the user delroutes
      * scripts may have been abused to do something "special".
      */
-    del_routes(iftype, ifunit, lip, rip);
+    del_routes(desc, iface, lip, rip);
 
-    sprintf(buf, "%s %s%d 0.0.0.0",
-	path_ifconfig, iftype, ifunit);
-    run_shell(SHELL_WAIT, "iface stop", buf, -1);
+    sprintf(buf, "%s %s 0.0.0.0",
+	path_ifconfig, iface);
+    run_shell(SHELL_WAIT, desc, buf, -1);
 }
