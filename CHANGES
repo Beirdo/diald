@@ -1,5 +1,10 @@
 Major changes between version 0.98.2 and 0.98.4.
 ------------------------------------------------
+  - If the lock option is specified we create a device lock
+    for incoming devices if one does not already exist. This is
+    because newer versions of the kernel ISDN code appear to bounce
+    an existing connection if we attempt to dial an in-use ipppd
+    device whereas previously it returned an error.
   - Use -defaultroute rather than nodefaultroute since pppd 2.2
     does not understand nodefaultroute.
   - Fix for compilation on Linux 2.0.x.

@@ -333,6 +333,7 @@ int open_modem()
 	    dial_status = -1;
 	    return 1;
 	}
+	if (lock_dev) lock_file = lock(current_dev);
     } else {
 	for (i = 0; i < device_count; i++) {
 	    current_dev = devices[(i+rotate_offset)%device_count];
@@ -532,5 +533,9 @@ void close_modem()
 	    kill(req_pid, SIGKILL);
 	    req_pid = 0;
 	}
-    } else if (lock_dev) unlock(lock_file);
+    }
+    if (lock_file) {
+	unlock(lock_file);
+	lock_file = NULL;
+    }
 }
