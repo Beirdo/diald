@@ -194,6 +194,7 @@ char *initializer;
 char *deinitializer;
 char *connector;
 char *disconnector;
+char *proxyif;
 char *orig_local_ip;
 char *orig_remote_ip;
 char *local_ip;

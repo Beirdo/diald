@@ -27,6 +27,7 @@ char *initializer = 0;
 char *deinitializer = 0;
 char *connector = 0;
 char *disconnector = 0;
+char *proxyif = 0;
 char *local_ip = 0;
 unsigned long local_addr = 0;
 char *orig_local_ip = 0;
@@ -137,6 +138,7 @@ struct {
     {"authsimple","<file>",1,&authsimple,set_str},
     {"initializer","<script>",1,&initializer,set_str},
     {"deinitializer","<script>",1,&deinitializer,set_str},
+    {"proxy","<interface>",1,&proxyif,set_str},
 /* scheduling */
     {"scheduler","[fifo|rr|other]",1,0,set_scheduler},
     {"priority","<n>",1,&priority,set_int},
@@ -259,6 +261,8 @@ void init_vars()
     connector = 0;
     if (disconnector) free(disconnector);
     disconnector = 0;
+    if (proxyif) free(proxyif);
+    proxyif = 0;
     if (local_ip) free(local_ip);
     local_ip = 0;
     local_addr = 0;

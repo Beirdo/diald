@@ -161,7 +161,7 @@ main(int argc, char *argv[])
     open_fifo();
     filter_setup();
 
-    proxy_init(&proxy, NULL);
+    proxy_init(&proxy, proxyif);
     if (proxy.start) proxy.start(&proxy);
     idle_filter_proxy();
 

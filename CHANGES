@@ -1,5 +1,13 @@
 Major changes between version 0.98.2 and 0.98.4.
 ------------------------------------------------
+  - Added a proxy option which may be used to specify a particular
+    interface to snoop as a proxy. One possible use for this would
+    be to set up an ISDN interface "by the book", leave it in
+    manual dial mode, and run diald with proxy isdn0 and device isdn0
+    using the connect/disconnect scripts to trigger dialling and
+    hangup. Then the kernel bloat used to do half the job diald
+    can do would be redundant. (I haven't tried this yet. I don't
+    have ISDN at home. Sponsorship is welcome :-) )
   - Ethertap/SLIP proxy is no longer a compile time option. Diald
     will search first for a usable ethertap interface and then
     fall back on using a pseudo terminalled SLIP interface if
