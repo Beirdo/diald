@@ -67,8 +67,8 @@ install: diald
 	$(INSTALL) $(CHOWN) -m 0644 config/diald.defs $(DESTDIR)$(libdir)/diald.defs
 	$(INSTALL) $(CHOWN) -m 0644 config/standard.filter $(DESTDIR)$(libdir)/standard.filter
 	$(INSTALL) $(CHOWN) -m 0644 config/dynamic.filter $(DESTDIR)$(libdir)/dynamic.filter
-	$(INSTALL) -d -m 0755 $(DESTDIR)/etc/pam.d
-	$(INSTALL) $(CHOWN) -m 0644 config/diald.pam $(DESTDIR)/etc/pam.d/diald
+	$(INSTALL) -d -m 0755 $(DESTDIR)$(sysconfdir)/pam.d
+	$(INSTALL) $(CHOWN) -m 0644 config/diald.pam $(DESTDIR)$(sysconfdir)/pam.d/diald
 	$(INSTALL) $(CHOWN) bin/connect $(DESTDIR)$(libdir)/connect
 
 clean:
