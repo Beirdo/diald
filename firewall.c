@@ -865,13 +865,6 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 				  [FW_OFFSET(term->offset)],
 			sizeof(int));
 	        v = (ntohl(n) >> term->shift) & term->mask;
-#if 1
-n = (ntohl(*(int *)(&(FW_IN_DATA(term->offset)?data:pkt)
-		  [FW_OFFSET(term->offset)]))
-    >> term->shift) & term->mask;
-if (n != v)
-mon_syslog(LOG_NOTICE, "Bogged up: v=0x%08x should be 0x%08x", v, n);
-#endif
 	    }
 #if 0
 	    mon_syslog(LOG_DEBUG,"testing ip %x:%x data %x:%x mask %x shift %x test %x v %x",
