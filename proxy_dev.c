@@ -81,7 +81,7 @@ proxy_dev_recv(proxy_t *proxy, unsigned char *p, size_t len)
      * sockets?
      */
 #ifdef HAVE_AF_PACKET
-    if ((af_packet && from.sl.sll_pkttype == PACKET_OUTGOING))
+    if ((af_packet && from.sl.sll_pkttype != PACKET_OUTGOING))
 	return 0;
 #endif
 
