@@ -211,3 +211,20 @@ iface_stop(char *mode, char *iftype, int ifunit,
     );
     run_shell(SHELL_WAIT, desc, buf, -1);
 }
+
+
+void
+iface_down(char *mode, char *iftype, int ifunit,
+    char *lip, char *rip, char *bip)
+{
+    char *iface, desc[32], buf[128];
+
+    strcpy(desc, "down ");
+    snprintf(desc+5, sizeof(desc)-5-1, "%s%d", iftype, ifunit);
+    iface = desc+5;
+
+    sprintf(buf, "%s %s down",
+	path_ifconfig, iface
+    );
+    run_shell(SHELL_WAIT, desc, buf, -1);
+}

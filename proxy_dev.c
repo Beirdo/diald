@@ -136,6 +136,9 @@ static void
 proxy_dev_release(proxy_t *proxy)
 {
     proxy_dev_stop(proxy);
+    if (!(current_dev && !strcmp(current_proxy, current_dev)))
+	iface_down("proxy", proxy->iftype, proxy->ifunit,
+	    orig_local_ip, orig_remote_ip, orig_broadcast_ip);
     proxy_dev_close(proxy);
 }
 

@@ -413,6 +413,7 @@ void parse_prule(void *var, char **argv);
 void parse_var(void *var, char **argv);
 void iface_start(char *, char *, int, char *, char *, char *);
 void iface_stop(char *, char *, int, char *, char *, char *);
+void iface_down(char *, char *, int, char *, char *, char *);
 void close_modem(void);
 int open_modem (void);
 void reopen_modem (void);

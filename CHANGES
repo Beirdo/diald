@@ -1,5 +1,7 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - Make sure we down the proxy interface on exit (unless it is
+    a specified proxy interface that matches the real interface).
   - Removed spurious calls to {ppp,slip,dev}_reroute(). These
     were unnecessary (I think) and perhaps the reason why the
     idle filter socket sometimes seemed to stop receiving data.

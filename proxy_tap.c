@@ -106,6 +106,8 @@ static void
 proxy_tap_release(proxy_t *proxy)
 {
     proxy_tap_stop(proxy);
+    iface_down("proxy", proxy->iftype, proxy->ifunit,
+	orig_local_ip, orig_remote_ip, orig_broadcast_ip);
     proxy_tap_close(proxy);
     unlock(proxy_lock);
 }

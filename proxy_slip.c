@@ -194,6 +194,8 @@ static void
 proxy_slip_release(proxy_t *proxy)
 {
     proxy_slip_stop(proxy);
+    iface_down("proxy", proxy->iftype, proxy->ifunit,
+	orig_local_ip, orig_remote_ip, orig_broadcast_ip);
 
     /* clear the line discipline */
     if (ioctl(proxy_sfd, TIOCSETD, &orig_disc) < 0)
