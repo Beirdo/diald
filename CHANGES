@@ -1,5 +1,7 @@
 Major changes between version 0.16 and 0.98.3.
 ----------------------------------------------
+  - Fixed a typo in modem.c that prevented non-/dev devices
+    from working.
   - If we are in dynamic mode the buffered packets are sent back to
     the kernel via the proxy so that they will go back through the
     firewall/masquerading before being sent out again. Masquerading
