@@ -337,14 +337,16 @@ void set_scheduler(char **var, char **argv)
 	scheduler = SCHED_RR;
     else
 #endif
-#ifdef SCHED_OTHER
     if (strcmp(argv[0],"other") == 0)
+#ifdef SCHED_OTHER
 	scheduler = SCHED_OTHER;
-    else
+#else
+	scheduler = DEFAULT_SCHEDULER;
 #endif
+    else
     {
 	mon_syslog(LOG_ERR, "Unknown scheduling class %s", argv[0]);
-	mon_syslog(LOG_ERR, "Valid classes are: fifo, rr, or other.", argv[0]);
+	mon_syslog(LOG_ERR, "Valid classes may be: fifo, rr, or other.", argv[0]);
     }
 }
 

@@ -1,3 +1,8 @@
+Major changes between version 0.16 and 0.98.2.
+----------------------------------------------
+  - Fix typo that disabled the scheduling class option.
+
+
 Major changes between version 0.16 and 0.98.1.
 ----------------------------------------------
   - Added the ip-goingdown script patch.

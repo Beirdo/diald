@@ -18,7 +18,7 @@
 #include <syslog.h>
 #include <signal.h>
 #include <time.h>
-#ifdef _POSIX_PRIORITY_SCHEDULER
+#ifdef _POSIX_PRIORITY_SCHEDULING
 #  include <sched.h>
 #endif
 #include <sys/time.h>
