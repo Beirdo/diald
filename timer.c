@@ -14,6 +14,7 @@
 #if HAVE_SYS_TIME_H
 #  include <sys/time.h>
 #endif
+#include <sys/times.h>
 #if HAVE_UNISTD_H
 #  include <unistd.h>
 #endif
