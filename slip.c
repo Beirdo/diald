@@ -151,7 +151,7 @@ void slip_start(void)
 	   mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
     }
 
-    if (ioctl(modem_fd, SIOCSIFENCAP, &slip_encap) < 0)
+    if (ioctl(modem_fd, SIOCSIFENCAP, &current_slip_encap) < 0)
 	mon_syslog(LOG_ERR,"Can't set encapsulation: %m"), die(1);
 
 #ifdef SIOCSKEEPALIVE
@@ -170,7 +170,7 @@ void slip_start(void)
     if (ioctl(modem_fd, SIOCGIFENCAP, &sencap) < 0)
 	mon_syslog(LOG_ERR,"Can't get encapsulation: %m"), die(1);
 
-    if (disc != N_SLIP || sencap != slip_encap)
+    if (disc != N_SLIP || sencap != current_slip_encap)
         mon_syslog(LOG_ERR,"Couldn't set up the slip link correctly!"), die(1);
 
     if (debug&DEBUG_VERBOSE)

@@ -35,8 +35,8 @@ struct {
 
 void validate_mode()
 {
-	if (mode < 0 || mode > 2) {
-		mon_syslog(LOG_ERR, "Mode value strayed to %d. Tell Eric.\n",mode);
+	if (current_mode < 0 || current_mode > 2) {
+		mon_syslog(LOG_ERR, "Mode value strayed to %d. Tell Eric.\n",current_mode);
 		die(1);
 	}
 	if (pcontrol[0].start != slip_start
@@ -65,13 +65,13 @@ void validate_mode()
 	}
 }
 
-void control_start() { validate_mode(); (*pcontrol[mode].start)(); }
-int control_set_addrs() { validate_mode(); return (*pcontrol[mode].set_addrs)(); }
-int control_dead() { validate_mode(); return (*pcontrol[mode].dead)(); }
-void control_stop() { validate_mode(); (*pcontrol[mode].stop)(); }
-void control_reroute() { validate_mode(); (*pcontrol[mode].reroute)(); }
-void control_kill() { validate_mode(); (*pcontrol[mode].kill)(); }
-void control_zombie() { validate_mode(); (*pcontrol[mode].zombie)(); }
+void control_start() { validate_mode(); (*pcontrol[current_mode].start)(); }
+int control_set_addrs() { validate_mode(); return (*pcontrol[current_mode].set_addrs)(); }
+int control_dead() { validate_mode(); return (*pcontrol[current_mode].dead)(); }
+void control_stop() { validate_mode(); (*pcontrol[current_mode].stop)(); }
+void control_reroute() { validate_mode(); (*pcontrol[current_mode].reroute)(); }
+void control_kill() { validate_mode(); (*pcontrol[current_mode].kill)(); }
+void control_zombie() { validate_mode(); (*pcontrol[current_mode].zombie)(); }
 
 int state = STATE_DOWN;		/* DFA state */
 int current_retry_count = 0;	/* current retry count */

@@ -345,26 +345,32 @@ void set_scheduler(char **var, char **argv)
     }
 }
 
+void parse_mode(char *s, int *mode, int *slip_encap)
+{
+    if (strcmp(s, "ppp") == 0)
+	*mode = MODE_PPP;
+    else if (strcmp(s, "dev") == 0)
+	*mode = MODE_DEV;
+    else if (strcmp(s, "slip") == 0)
+	*mode = MODE_SLIP, *slip_encap = 0;
+    else if (strcmp(s, "cslip") == 0)
+	*mode = MODE_SLIP, *slip_encap = 1;
+    else if (strcmp(s, "slip6") == 0)
+	*mode = MODE_SLIP, *slip_encap = 2;
+    else if (strcmp(s, "cslip6") == 0)
+	*mode = MODE_SLIP, *slip_encap = 3;
+    else if (strcmp(s, "aslip") == 0)
+	*mode = MODE_SLIP, *slip_encap = 8;
+    else {
+	mon_syslog(LOG_ERR, "Unknown mode %s", s);
+	mon_syslog(LOG_INFO,
+	    "Valid modes are: dev, ppp, slip, cslip, slip6, cslip6, or aslip");
+    }
+}
+
 void set_mode(char **var, char **argv)
 {
-    if (strcmp(argv[0],"ppp") == 0)
-	mode = MODE_PPP;
-    else if (strcmp(argv[0],"dev") == 0)
-	mode = MODE_DEV;
-    else if (strcmp(argv[0],"slip") == 0)
-	mode = MODE_SLIP, slip_encap = 0;
-    else if (strcmp(argv[0],"cslip") == 0)
-	mode = MODE_SLIP, slip_encap = 1;
-    else if (strcmp(argv[0],"slip6") == 0)
-	mode = MODE_SLIP, slip_encap = 2;
-    else if (strcmp(argv[0],"cslip6") == 0)
-	mode = MODE_SLIP, slip_encap = 3;
-    else if (strcmp(argv[0],"aslip") == 0)
-	mode = MODE_SLIP, slip_encap = 8;
-    else {
-	mon_syslog(LOG_ERR, "Unknown mode %s", argv[0]);
-	mon_syslog(LOG_ERR, "Valid modes are: dev, ppp, slip, cslip, slip6, cslip6, or aslip", argv[0]);
-    }
+    parse_mode(argv[0], &mode, &slip_encap);
 }
 
 void set_dslip_mode(char **var, char **argv)

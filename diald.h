@@ -261,6 +261,7 @@ int strict_forwarding;
 int dynamic_addrs;
 int dynamic_mode;
 int slip_encap;
+int current_slip_encap;
 int lock_dev;
 int default_route;
 int pppd_argc;
@@ -328,6 +329,7 @@ int snoopfd;			/* snooping socket fd */
 int fwunit;			/* firewall unit for firewall control */
 int req_pid;			/* pid of process that made "request" */
 char *current_dev;		/* name of the current device */
+int current_mode;		/* mode of the current link */
 char *req_dev;			/* name of the device file requested to open */
 int use_req;			/* are we actually using the FIFO link-up request device? */
 char snoop_dev[10];		/* The interface name we are listening on */

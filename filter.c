@@ -51,11 +51,11 @@ void idle_filter_init()
         die(1);
     }
 
-    if (mode == MODE_SLIP) {
+    if (current_mode == MODE_SLIP) {
 	sprintf(snoop_dev,"sl%d",link_iface);
-     } else if (mode == MODE_PPP) {
+     } else if (current_mode == MODE_PPP) {
        sprintf(snoop_dev,"ppp%d",link_iface);
-     } else if (mode == MODE_DEV) {
+     } else if (current_mode == MODE_DEV) {
        sprintf(snoop_dev,"%s",current_dev);
       }
     if (debug) mon_syslog(LOG_DEBUG,"Changed snoop device to %s",snoop_dev);

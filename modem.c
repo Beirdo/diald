@@ -30,6 +30,8 @@
 static int rotate_offset = 0;
 
 char *current_dev = 0;
+int current_mode;
+int current_slip_encap;
 
 /* local variables */
 
@@ -297,104 +299,79 @@ int open_modem()
     modem_fd = -1;
     dial_status = 0;
 
-    if (mode == MODE_DEV) {
-	/* If this is a request for diald to take over management of an
-	 * interface that we didn't bring up ourselves there is little
-	 * to do here except note what we are taking on.
-	 */
-	if (req_pid) {
-		/* Hmmm... We could fork here then I think we could
-		 * get away with having just one diald to manage a
-		 * pool of incoming ISDN lines.
-		 * N.B. We would also need to open a different monitor
-		 * fifo and advise any listeners that they might want
-		 * switch allegiance, clone themselves or something.
-		 */
-		current_dev = req_dev;
-		use_req=1;
-		req_pid=0;
-		modem_fd = open("/dev/null", O_RDWR);
-	} else {
-#if 1
-		for (i = 0; i < device_count; i++) {
-	    		current_dev = devices[(i+rotate_offset)%device_count];
-
-			if (!lock_dev || !lock(current_dev))
-				break;
-
-			current_dev = 0;
-		}
-
-		if (i == device_count) {
-			mon_syslog(LOG_WARNING,
-				"Couldn't find a free device to call out on.");
-			current_dev = 0;
-			dial_status = -1;
-			return 2;
-		}
-
-		if (rotate_devices)
-			rotate_offset = (rotate_offset+1)%device_count;
-#else
-		current_dev = devices[rotate_offset];
-		if (rotate_devices)
-			rotate_offset = (rotate_offset+1)%device_count;
-#endif
-
-		modem_fd = open("/dev/null", O_RDWR);
-
-		/* If we have a connector we may need to run it to set up the
-		 * real interface.
-		 */
-		if (connector)
-			fork_dialer("connector", connector, modem_fd);
-	}
-	return 0;
-    }
-
+    /* If this is a request for diald to take over management of an
+     * interface that we didn't bring up ourselves there is little
+     * to do here except note what we are taking on.
+     */
     if (req_pid) {
-	/* The user has specified a device. Use it, no search or lock needed. */
-	if ((modem_fd = open(req_dev, O_RDWR | O_NDELAY)) < 0) {
-	    mon_syslog(LOG_ERR,"Can't open requested device '%s'",req_dev);
-	    killpg(req_pid,SIGKILL);
-	    kill(req_pid,SIGKILL);
-	    req_pid = 0;
+	current_dev = req_dev;
+	use_req=1;
+
+	/* FIXME: If we are locking devices and the requested device
+	 * is not already locked we should probably lock it to prevent
+	 * anyone else trying it. This is a particular problem with
+	 * non-modem devices such as isdn? and ippp?.
+	 *   Possibly we should also inherit existing locks?
+	 */
+
+	modem_fd = open(current_dev[0] != '/' ? current_dev : "/dev/null",
+			O_RDWR | O_NDELAY);
+	if (modem_fd < 0) {
+	    mon_syslog(LOG_ERR, "Can't open requested device '%s'", req_dev);
+	    if (current_dev[0] != '/')
+		req_pid = 0;
+	    else {
+	    	killpg(req_pid, SIGKILL);
+	    	kill(req_pid, SIGKILL);
+	    }
 	    dial_status = -1;
 	    return 1;
 	}
-	current_dev = req_dev;
-	use_req=1;
     } else {
 	for (i = 0; i < device_count; i++) {
 	    current_dev = devices[(i+rotate_offset)%device_count];
-	    /*
-	     * March down the device list till we manage to open one up or
-	     * we run out of devices to try.
-	     */
 
-	    if (lock_dev && lock(current_dev) < 0)
+	    if (lock_dev && lock(current_dev))
 		continue;
 
 	    /* OK. Locked one, try to open it */
-	    if ((modem_fd = open(current_dev, O_RDWR | O_NDELAY)) >= 0)
+	    modem_fd = open(current_dev[0] == '/' ? current_dev : "/dev/null",
+			    O_RDWR | O_NDELAY);
+	    if (modem_fd >= 0)
 		break;
-	    else {
-	       mon_syslog(LOG_ERR,"Error opening device %s: %m",current_dev);
-	    }
-	    current_dev = 0;
 
 	    /* That didn't work, get rid of the lock */
+	    mon_syslog(LOG_ERR,"Error opening device %s: %m",current_dev);
 	    if (lock_dev) unlock();
 	}
 	if (modem_fd < 0) {
-	    mon_syslog(LOG_WARNING,"Couldn't find a free device to call out on.");
+	    mon_syslog(LOG_WARNING,"No devices free to call out on.");
+	    current_dev = 0;
 	    dial_status = -1;
 	    return 2;
 	}
+
+	if (rotate_devices)
+	    rotate_offset = (rotate_offset+1)%device_count;
     }
 
-    if (rotate_devices)
-    	rotate_offset = (rotate_offset+1)%device_count;
+    if (current_dev[0] != '/')
+	current_mode = MODE_DEV;
+    else {
+	current_mode = mode;
+	current_slip_encap = slip_encap;
+    }
+
+    if (current_mode == MODE_DEV) {
+	/* If we have a connector we may need to run it to set up the
+	 * real interface.
+	 */
+	if (!req_pid && connector)
+		fork_dialer("connector", connector, modem_fd);
+	req_pid = 0;
+	return 0;
+    }
+
 
     /* set device to be controlling tty */
     /* FIXME: we should not die here. If we go round again we may
@@ -456,7 +433,7 @@ int open_modem()
  */
 void reopen_modem()
 {
-    if (mode == MODE_DEV)
+    if (current_mode == MODE_DEV)
 	return;
 
     if(debug&DEBUG_VERBOSE)
@@ -487,7 +464,7 @@ void reopen_modem()
 
 void finish_dial()
 {
-    if (mode == MODE_DEV)
+    if (current_mode == MODE_DEV)
 	return;
 
     if (!req_pid) {
@@ -509,7 +486,7 @@ void close_modem()
     if (modem_fd < 0)
  	return;
 
-    if (mode != MODE_DEV) {
+    if (current_mode != MODE_DEV) {
 	tcsetpgrp(modem_fd, getpgrp());
 
 	/* Get rid of what ever might be waiting to go out still */

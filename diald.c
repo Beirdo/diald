@@ -814,7 +814,7 @@ void proxy_read()
 	size_t to_len;
 
 	/* Make sure we try to restore the link to working condition now... */
-	if (do_reroute && mode == MODE_PPP) {
+	if (do_reroute && current_mode == MODE_PPP) {
 	    /* Check if a route exists at this point through the ppp device. */
 	    /* If not then we must be half dead. */
 	    if (!ppp_route_exists()) {
