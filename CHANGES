@@ -1,5 +1,5 @@
-Major changes between version 0.98.3 and 0.98.4.
-------------------------------------------------
+Major changes between version 0.98.3 and 0.99.
+----------------------------------------------
   - Added a "sticky" option. This is like "dynamic" but the IP
     addresses determined from an actual connection will continue
     to be used for the proxy in the future in preference to the

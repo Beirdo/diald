@@ -1,10 +1,10 @@
-.\" manual page [] for diald 0.15
+.\" manual page [] for diald 0.99
 .\" SH section heading
 .\" SS subsection heading
 .\" LP paragraph
 .\" IP indented paragraph
 .\" TP hanging label
-.TH DIALD-EXAMPLES 5 "DIALD 0.16 - 1997.01.28"
+.TH DIALD-EXAMPLES 5 "DIALD 0.99 - 1999.04.06"
 .SH NAME
 diald-examples \- examples of how to configure diald
 .SH SYNOPSIS
@@ -265,7 +265,7 @@ set aside for use as private IP numbers. It is usually also
 convenient to choose a fake number for the remote IP address
 in this case. If you do not have a local IP network that
 is using one of these private addresses, then you can just
-use the IP addresses 192.168.0.1 and 192.16.0.2.
+use the IP addresses 192.168.0.1 and 192.168.0.2.
 If you are already using these addresses in your local network,
 then you should pick IP addresses that you have not assigned to
 a machine on your local network.

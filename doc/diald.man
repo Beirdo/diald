@@ -1,10 +1,10 @@
-.\" manual page [] for diald 0.15
+.\" manual page [] for diald 0.99
 .\" SH section heading
 .\" SS subsection heading
 .\" LP paragraph
 .\" IP indented paragraph
 .\" TP hanging label
-.TH DIALD 8 "DIALD 0.16 - 1997.01.28"
+.TH DIALD 8 "DIALD 0.99 - 1999.04.06"
 .SH NAME
 diald \- demand dialing daemon for IP links over phone lines
 .SH SYNOPSIS

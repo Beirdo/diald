@@ -1,10 +1,10 @@
-.\" manual page [] for diald 0.16
+.\" manual page [] for diald 0.99
 .\" SH section heading
 .\" SS subsection heading
 .\" LP paragraph
 .\" IP indented paragraph
 .\" TP hanging label
-.TH DCTRL 1 "DIALD 0.16 - 1997.01.28"
+.TH DCTRL 1 "DIALD 0.99 - 1999.04.06"
 .SH NAME
 dctrl \- graphical diald control utility
 .SH SYNOPSIS
