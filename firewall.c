@@ -270,6 +270,7 @@ static void init_units(void)
 	units[i].filters = NULL;
 	units[i].last = NULL;
 	units[i].connections = malloc(sizeof(FW_Connection));
+	units[i].live = 0;
 	units[i].nrules = 0;
 	units[i].nfilters = 0;
 	if (!units[i].connections) {
@@ -542,6 +543,7 @@ void zombie_connection(FW_Connection *c)
     if (debug&DEBUG_CONNECTION_QUEUE)
 	mon_syslog(LOG_DEBUG,"Connection zombie %p @ %ld",c,time(0));
 
+    c->unit->live--;
     if (!c->conn_hold) {
 	del_connection(c);
 	goto out;
