@@ -1,5 +1,9 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - Added PAM authentication method on TCP monitor connections.
+    (From Daniel P. Berrange <daniel@berrange.freeserve.co.uk>)
+  - Set SO_REUSEADDR on the TCP socket used to listen for
+    monitor connections.
   - Avoid using an extra socket unecessarily.
   - Use close on exec flag rather than trying (and failing) to
     figure out what to close every time we fork and exec.

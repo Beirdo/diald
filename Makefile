@@ -14,6 +14,8 @@ SBINDIR=/usr/sbin
 MANDIR=/usr/man
 # the configuration files go here
 LIBDIR=/usr/lib/diald
+# the pam service files go here
+PAMDIR=/etc/pam.d
 
 # Compiler flags. Note that with gcc 2.5.8 using -g without -O
 # will cause it to miscompile the filter parsing code.
@@ -21,8 +23,13 @@ LIBDIR=/usr/lib/diald
 # with the -fomit-frame-pointer option.
 
 # Linux, libc.so.6, TCP access control via /etc/hosts.allow (tcp_wrappers)
-CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS
-LIBS = -lwrap -lnsl
+# and PAM authentication protocol
+CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS -DAUTH_PAM
+LIBS = -lwrap -lnsl -lpam -ldl
+
+# Linux, libc.so.6, TCP access control via /etc/hosts.allow (tcp_wrappers)
+#CFLAGS = -O2 -Wall -pipe -DTCP_WRAPPERS
+#LIBS = -lwrap -lnsl
 
 # Linux, libc.so.6, no TCP access control
 #CFLAGS = -O2 -Wall -pipe
@@ -91,6 +98,7 @@ install: diald
 	install -o root -g bin lib/*.gif ${DESTDIR}${LIBDIR}
 	install -o root -g bin -m 0644 config/diald.defs ${DESTDIR}${LIBDIR}/diald.defs
 	install -o root -g bin -m 0644 config/standard.filter ${DESTDIR}${LIBDIR}/standard.filter
+	install -o root -g root -m 0644 config/diald.pam ${PAMDIR}/diald
 	install -o root -g bin bin/connect ${DESTDIR}${LIBDIR}/connect
 
 clean:

@@ -196,6 +196,9 @@ int metric;
 char *link_name;
 char *link_desc;
 char *authsimple;
+#ifdef AUTH_PAM
+char *authpam;
+#endif
 char *initializer;
 char *deinitializer;
 char *connector;

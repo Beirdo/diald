@@ -10,8 +10,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <grp.h>
 
 #include "diald.h"
+
+#ifdef AUTH_PAM
+#include <security/pam_appl.h>
+#endif
 
 
 static struct {
@@ -103,6 +108,138 @@ acc_simple(char *buf)
 }
 
 
+#ifdef AUTH_PAM
+
+static char *acc_pam_user;
+static char *acc_pam_pass;
+
+static int acc_pam_conv(int num_msg,
+		const struct pam_message **msg,
+		struct pam_response **resp,
+		void *appdata_ptr)
+{
+	struct pam_response *reply = malloc(sizeof(struct pam_response)*num_msg);
+	int i;
+	
+	if (!reply)
+		return PAM_CONV_ERR;
+	
+	for (i = 0 ; i < num_msg ; i++)
+	{
+		switch (msg[i]->msg_style)
+		{
+			case PAM_PROMPT_ECHO_ON:
+				reply[i].resp_retcode = PAM_SUCCESS;
+				reply[i].resp = (acc_pam_user ? strdup(acc_pam_user) : NULL);
+				break;
+				
+			case PAM_PROMPT_ECHO_OFF:
+				reply[i].resp_retcode = PAM_SUCCESS;
+				reply[i].resp = (acc_pam_pass ? strdup(acc_pam_pass) : NULL);
+				break;			
+			
+			case PAM_TEXT_INFO:
+			case PAM_ERROR_MSG:
+				reply[i].resp_retcode = PAM_SUCCESS;
+				reply[i].resp = NULL;
+				break;
+			
+			default:
+				free(reply);
+				return PAM_CONV_ERR;
+		}
+	}
+	*resp = reply;
+	return PAM_SUCCESS;
+}
+
+
+static int acc_pam_auth(char *user, char *pass)
+{
+	pam_handle_t *pamh;
+	struct pam_conv acc_pam_conv_d = { acc_pam_conv, NULL};
+	int ret;
+	
+	acc_pam_user = user;
+	acc_pam_pass = pass;
+
+	if ((ret = pam_start("diald", user, &acc_pam_conv_d,&pamh))			!= PAM_SUCCESS)
+		mon_syslog(LOG_WARNING, "PAM initialisation for user %s (error %d)", user, ret);
+
+	if (ret == PAM_SUCCESS &&
+	    (ret = pam_authenticate(pamh, PAM_SILENT)) != PAM_SUCCESS)
+		mon_syslog(LOG_WARNING, "Failed to authenticate user %s (error %d)", user, ret);
+
+	if (pam_end(pamh, ret != PAM_SUCCESS))
+		mon_syslog(LOG_WARNING, "PAM cleanup failed (error %d)", ret);
+
+	if (ret != PAM_SUCCESS)
+		return 1;
+	else
+		return 0;
+}
+
+
+static int
+acc_pam(char *buf)
+{
+	FILE *fd;
+	char line[1024];
+
+	char *pass;
+	for (pass=buf+strlen(buf)-1; pass >= buf && (*pass == '\n' ||
+	*pass == ' ' || *pass == '\t'); pass--)
+		*pass = '\0';
+	for (pass=buf; *pass && *pass != ' ' && *pass != '\t'; pass++);
+	if (*pass) *(pass++) = '\0';
+	while (*pass == ' ' || *pass == '\t') pass++;
+
+	if (acc_pam_auth(buf, pass))
+		return CONFIG_DEFAULT_ACCESS;
+
+
+	if (!(fd = fopen(authpam, "r")))
+		return CONFIG_DEFAULT_ACCESS;
+
+	while (fgets(line, sizeof(line), fd)) {
+		char *p;
+		struct group *grp = NULL;
+		/* Comments have a '#' in the first column. */
+		if (line[0] == '#') continue;
+
+		for (p=line+strlen(line)-1; p >= line && *p == '\n'; p--)
+			*p = '\0';
+		for (p=line; *p && *p != ' ' && *p != '\t'; p++);
+		if (*p) *(p++) = '\0';
+		while (*p == ' ' || *p == '\t') p++;
+
+                {
+                	if (!strcmp(line, "*"))
+                	{
+                		fclose(fd);
+                		return acc_strtovec(p);
+                	}
+			else if ((grp = getgrnam(line)))
+			{
+				while (*(grp->gr_mem))
+				{
+					if (!strcmp(*grp->gr_mem, buf))
+					{
+						fclose(fd);
+						return acc_strtovec(p);
+					}
+					grp->gr_mem++;
+				}
+			}
+		}
+	}
+	fclose(fd);
+
+	return CONFIG_DEFAULT_ACCESS;
+}
+#endif
+
+
 int
 ctrl_access(char *buf)
 {
@@ -112,6 +249,11 @@ ctrl_access(char *buf)
 		if (!strncmp(buf, "simple ", 7)) {
 			new_access = acc_simple(buf+7);
 		}
+#ifdef AUTH_PAM
+		else if (!strncmp(buf, "pam ", 4)) {
+			new_access = acc_pam(buf+4);
+		}
+#endif
 	}
 
 	return new_access;

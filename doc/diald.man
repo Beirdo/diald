@@ -184,6 +184,11 @@ Specifies the name of a file to be used for simple authentication
 (very simple...) for TCP monitor connections.
 
 .TP
+.B authpam \fI<file>\fR
+Specifies the name of a file to be used for PAM authentication
+(not so simple...) for TCP monitor connections.
+
+.TP
 .B scheduler \fI<class>\fR
 Set diald's scheduling class. Valid choices for systems that
 support POSIX scheduling classes are:
