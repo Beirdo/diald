@@ -1,5 +1,9 @@
 Major changes between version 0.16 and 0.98.2.
 ----------------------------------------------
+  - External programs such as route, ifconfig etc. are now searched
+    for automatically in /sbin and then /usr/sbin. If you wish you
+    can specify paths either at compile time in config.h or run time
+    using the path-* config options.
   - Fixed most (all?) of the memory leaks when reconfiguring at
     run time.
   - Allow the use of the "ip" program rather than "route".

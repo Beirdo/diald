@@ -331,15 +331,60 @@ void init_vars()
     if (run_prefix) free(run_prefix);
     run_prefix = strdup(RUN_PREFIX);
     if (path_ip) free(path_ip);
+#ifdef PATH_IP
     path_ip = strdup(PATH_IP);
+#else
+    if (!access("/sbin/ip", X_OK))
+	path_ip = strdup("/sbin/ip");
+    else if (!access("/usr/sbin/ip", X_OK))
+	path_ip = strdup("/usr/sbin/ip");
+    else
+	path_ip = NULL;
+#endif
     if (path_route) free(path_route);
+#ifdef PATH_ROUTE
     path_route = strdup(PATH_ROUTE);
+#else
+    if (!access("/sbin/route", X_OK))
+	path_route = strdup("/sbin/route");
+    else if (!access("/usr/sbin/route", X_OK))
+	path_route = strdup("/usr/sbin/route");
+    else
+	path_route = NULL;
+#endif
     if (path_ifconfig) free(path_ifconfig);
+#ifdef PATH_IFCONFIG
     path_ifconfig = strdup(PATH_IFCONFIG);
+#else
+    if (!access("/sbin/ifconfig", X_OK))
+	path_ifconfig = strdup("/sbin/ifconfig");
+    else if (!access("/usr/sbin/ifconfig", X_OK))
+	path_ifconfig = strdup("/usr/sbin/ifconfig");
+    else
+	path_ifconfig = NULL;
+#endif
     if (path_bootpc) free(path_bootpc);
+#ifdef PATH_BOOTPC
     path_bootpc = strdup(PATH_BOOTPC);
+#else
+    if (!access("/sbin/bootpc", X_OK))
+	path_bootpc = strdup("/sbin/bootpc");
+    else if (!access("/usr/sbin/bootpc", X_OK))
+	path_bootpc = strdup("/usr/sbin/bootpc");
+    else
+	path_bootpc = NULL;
+#endif
     if (path_pppd) free(path_pppd);
+#ifdef PATH_PPPD
     path_pppd = strdup(PATH_PPPD);
+#else
+    if (!access("/sbin/pppd", X_OK))
+	path_pppd = strdup("/sbin/pppd");
+    else if (!access("/usr/sbin/pppd", X_OK))
+	path_pppd = strdup("/usr/sbin/pppd");
+    else
+	path_pppd = NULL;
+#endif
     buffer_packets = BUFFER_PACKETS;
     buffer_size = BUFFER_SIZE;
     buffer_fifo_dispose = BUFFER_FIFO_DISPOSE;

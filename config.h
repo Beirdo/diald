@@ -84,30 +84,36 @@
 #define RUN_PREFIX	"/var/run"
 
 /*
- * Diald needs to use the route and ifconfig binaries to set up
- * routing tables and to bring up the proxy device. Check where
- * these executables are on your system and set these paths to match.
+ * Diald needs to use some external binaries to set up
+ * routing tables and to bring up the proxy device. If
+ * you do not define the paths here diald will look for
+ * each program first in /sbin and then in /usr/sbin.
+ * If you wish to use a specific binary instead of the
+ * defined or search located binary you may use the path-*
+ * config options to override them.
  */
-#define PATH_ROUTE	"/sbin/route"
-#define PATH_IFCONFIG	"/sbin/ifconfig"
+#undef PATH_ROUTE	"/sbin/route"
+#undef PATH_IFCONFIG	"/sbin/ifconfig"
 
 /*
  * The "ip" program is the preferred way to set routes on Linux 2.2
  * and beyond. Either specify the path here or use the "path-ip"
- * config option.
+ * config option. The "ip" program you use needs to understand
+ * the "metric" keyword - some older ones do not. You can find
+ * "ip" on: ftp://ftp.inr.ac.ru/ip-routing/
  */
-#define PATH_IP		NULL
+#undef PATH_IP		"/usr/sbin/ip"
 
 /*
  * Diald needs to know where to find the bootpc binary in order to
  * use the bootp protocol for dynamic slip address determination.
  */
 
-#define PATH_BOOTPC	"/usr/sbin/bootpc"
+#undef PATH_BOOTPC	"/usr/sbin/bootpc"
 
 /*
  * If you're never going to use pppd don't worry if this is wrong.
  * Otherwise, find your pppd executable and set this path to match its
  * location.
  */
-#define PATH_PPPD	"/usr/sbin/pppd"
+#undef PATH_PPPD	"/usr/sbin/pppd"
