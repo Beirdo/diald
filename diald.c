@@ -167,6 +167,7 @@ main(int argc, char *argv[])
     /* We are a session manager and currently have no controlling
      * terminal (this will be the modem tty when open).
      */
+    setpgid(0, getppid());
     setsid();
 
     if (debug&DEBUG_VERBOSE)

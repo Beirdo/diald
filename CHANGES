@@ -1,5 +1,6 @@
 Major changes between version 0.98.2 and 0.98.3.
 ------------------------------------------------
+  - Fixed the bug that prevented -daemon mode from working.
   - "diald -V", "diald -v" or "diald --version" simply prints the
     version number and exits. (I've even remembered to change the
     number in version.h finally!)
