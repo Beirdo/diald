@@ -73,10 +73,10 @@ Log the pid of the ip-up script, put it in its own process group.
 If it is still around when we are about to take the link down
 kill it off first.
 
-The program paths (ifconfig, route, ip etc.) should be verified as
-part of the config checks. If we don't have enough to make things
-work we should not try to do anything.
-
 Diald sends data to monitors without caring if they receive it
 or not. This is a job for UDP not TCP. In fact diald sends the
 same data to all monitors. This is a job for multicasting surely?
+
+We should make the modem access routine more generic (a la proxy)
+and add a "device ssh" mode that sets up a pty with ssh to a remote
+system running on it so that we can then start pppd through it.

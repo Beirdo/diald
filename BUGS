@@ -35,10 +35,6 @@ The next bug report will receive number: 89.
     [FIXED? I rewrote some stuff and applied some patches. Let's
      see what the testers say.]
 
-70. Debug flags doesn't take hex values as input. The manual page
-    can be read as suggesting it does. Might as well change it to allow
-    this.
-
 71. Using scanf to do parsing is just begging for trouble. I should
     rewrite the parsing so it doesn't use scanf at all.
     I should also go over the diald code to make sure that it
