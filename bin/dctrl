@@ -16,7 +16,8 @@ set fifofd ""
 set fifo_counter 0
 
 # Initial values
-set monlevel "0x0700017f"
+set monloglevel 6
+set monlevel 0x0000017f
 set monstate 0.0
 set queue_list [list]
 set max_info_lines 500
@@ -316,6 +317,12 @@ proc closeMonitor {} {
     }
 }
 
+proc setMonitor {} {
+    global monloglevel monlevel monfifo
+    fifoCmd [format "monitor 0x%x $monfifo" \
+	[expr $monlevel + ($monloglevel << 24)]]
+}
+
 proc openMonitor {} {
     global monstate monlevel
     global fifofd monfifo monfd fifo_counter
@@ -347,7 +354,9 @@ proc openMonitor {} {
 	# Apparently some systems need this to avoid a hang???
 	after 500
     }
-    fifoCmd "monitor $monlevel $monfifo"
+
+    setMonitor
+
     if { $diald_TITLE == "" } {
 	wm title . "Diald: No link"
 	wm iconname . "Diald"
@@ -944,8 +953,27 @@ pack .queue.vis -side top -fill both -expand 1 -pady 0
 frame .message -relief groove -bd 2
 frame .message.menu -relief raised -bd 2
 pack .message.menu -side top -anchor nw -fill x -expand 0
-label .message.menu.label -text "Information"
-pack .message.menu.label -side left
+  label .message.menu.label -text "Information"
+  menubutton .message.menu.loglevel -text "Log Level" -menu .message.menu.loglevel.m -underline 0
+  menu .message.menu.loglevel.m
+  .message.menu.loglevel.m add radiobutton -label {Emergency} \
+	-variable monloglevel -value 0 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Alert} \
+	-variable monloglevel -value 1 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Critical} \
+	-variable monloglevel -value 2 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Error} \
+	-variable monloglevel -value 3 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Warning} \
+	-variable monloglevel -value 4 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Notice} \
+	-variable monloglevel -value 5 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Info} \
+	-variable monloglevel -value 6 -command { setMonitor }
+  .message.menu.loglevel.m add radiobutton -label {Debug} \
+	-variable monloglevel -value 7 -command { setMonitor }
+  pack .message.menu.label -side left
+  pack .message.menu.loglevel -side right
 frame .message.vis
 text .message.vis.text -bor 0 \
 	-height 8 -width 60 -highlightthickness 0 -insertontime 0 \
