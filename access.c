@@ -1,9 +1,9 @@
+#include <syslog.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "access.h"
-#include "config.h"
+#include "diald.h"
 
 
 /* FIXME: this should be a config option... */
@@ -82,6 +82,8 @@ acc_simple(char *buf)
 		/* Comments have a '#' in the first column. */
 		if (line[0] == '#') continue;
 
+		for (p=line+strlen(line)-1; p >= line && *p == '\n'; p--)
+			*p = '\0';
 		for (p=line; *p && *p != ' ' && *p != '\t'; p++);
 		if (*p) *(p++) = '\0';
 		while (*p == ' ' || *p == '\t') p++;
