@@ -153,7 +153,6 @@ static unsigned int slot_end_timeout(FW_Timeslot *slot, time_t *clock)
     	return maxtime;
 }
 
-#if 0
 #ifdef __linux__
 /* Demasquerade an address. */
 static void
@@ -236,7 +235,6 @@ demasquerade(int proto,
     fclose(fd);
 }
 #endif
-#endif
 
 /* Generate a connection description */
 static char *
@@ -263,11 +261,9 @@ desc_connection(FW_Connection *c)
 			+ (c->id.id[8]));
     dport = c->id.id[12]+(c->id.id[11]<<8);
 
-#if 0
-#if defined(__linux__)
+#ifdef __linux__
     if (demasq)
 	demasquerade(c->id.id[0], &saddr, &sport, &daddr, &dport);
-#endif
 #endif
 
     strcpy(sad_text, inet_ntoa(saddr));

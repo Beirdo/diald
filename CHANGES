@@ -1,5 +1,6 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - Enabled the demasq code.
   - Use a local netlink.h so we can compile with, hopefully, any
     kernel/libc combination.
 

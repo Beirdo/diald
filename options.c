@@ -79,7 +79,7 @@ int rotate_devices = 0;
 int two_way = 0;
 int give_way = 0;
 int proxyarp = 0;
-#if 0
+#ifdef __linux__
 int demasq = 0;
 #endif
 int route_wait = 0;
@@ -163,7 +163,7 @@ struct {
     {"addroute","<script>",1,&addroute,set_str},
     {"delroute","<script>",1,&delroute,set_str},
     {"proxyarp","",0,&proxyarp,set_flag},
-#if 0
+#ifdef __linux__
     {"demasq","",0,&demasq,set_flag},
     {"-demasq","",0,&demasq,clear_flag},
 #endif
@@ -319,7 +319,7 @@ void init_vars()
     rotate_devices = 0;
     two_way = 0;
     proxyarp = 0;
-#if 0
+#ifdef __linux__
     demasq = 0;
 #endif
     route_wait = 0;

@@ -740,7 +740,7 @@ Tell diald to add an entry to this system's ARP [Address Resolution Protocol]
 table with the IP address of the remote system, and the Ethernet address
 of this system.
 .TP
-.B demasq
+.B demasq (Linux only)
 Tell diald that packets across this link may be being masqueraded
 by the kernel. If diald sees a packet whose port is in the range
 normally used by the kernel masquerading (61000 - 61000+4096)

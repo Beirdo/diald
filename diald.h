@@ -272,7 +272,7 @@ int dial_fail_limit;
 int two_way;
 int give_way;
 int proxyarp;
-#if 0
+#ifdef __linux__
 int demasq;
 #endif
 int route_wait;
