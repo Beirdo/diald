@@ -960,9 +960,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    c != unit->connections; c = cn) {
 		cn = c->next;
 		del_timer(&c->timer);
-		c->next->prev = c->prev;
-		c->prev->next = c->next;
-		free((void *)c);
+		del_connection(c);
 	    }
 	    return 0;
 	}
