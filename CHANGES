@@ -1,5 +1,7 @@
 Major changes between version 1.0 and 1.0.1
 ------------------------------------------------
+  - When opening a TUN device look in both the traditional path
+    and the devfs path.
   - Use getprotoent() and getservent() to read protocol and service
     name <-> number mappings rather than home grown parsing. This
     finally notes the aliases as well.

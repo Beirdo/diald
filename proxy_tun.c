@@ -118,7 +118,8 @@ proxy_tun_init(proxy_t *proxy, char *proxydev)
     int d;
     struct ifreq ifr;
 
-    if ((d = open("/dev/net/tun", O_RDWR)) < 0)
+    if ((d = open("/dev/net/tun", O_RDWR)) < 0
+    && (d = open("/dev/misc/net/tun", O_RDWR)) < 0)
 	goto fail;
 
     memset(&ifr, 0, sizeof(ifr));
