@@ -836,12 +836,10 @@ static int in_die = 0;
 void die(int i)
 {
     int count;
-    char tmp[128];
 
     if (!in_die) {
-        sprintf(tmp,"Diald is dieing with code %d",i);
-        mon_syslog(LOG_NOTICE, tmp);
 	in_die = 1;
+        mon_syslog(LOG_NOTICE, "Diald is dieing with code %d", i);
 	/* We're killing without a care here. Uhggg. */
 	if (link_pid) kill(link_pid,SIGINT);
 	if (dial_pid)
@@ -1053,8 +1051,7 @@ int system(const char *buf)
     if (p[0] >= 0 && (fd = fdopen(p[0], "r"))) {
 	char buf[1024];
 
-	while (fgets(buf, sizeof(buf)-2, fd)) {
-	    buf[sizeof(buf)-2] = '\n';
+	while (fgets(buf, sizeof(buf)-1, fd)) {
 	    buf[sizeof(buf)-1] = '\0';
 	    mon_syslog(LOG_DEBUG, "%s", buf);
 	}
