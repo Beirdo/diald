@@ -432,7 +432,7 @@ void trans_CLOSE(void)
 	GOTO(STATE_DOWN); /* STATE_DOWN handles the link-up-request */
     if (no_redial_delay == 1) {
 	no_redial_delay = 0;
-	GOTO(STATE_RETRY);
+	if (two_way) GOTO(STATE_DOWN);
     }
 }
 

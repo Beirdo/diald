@@ -1,5 +1,10 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - If the remote end drops the link and we are in two-way mode
+    we just go DOWN and wait for outgoing traffic. If we are not
+    in two-way mode we have to do an immediate retry because we
+    have no way of knowing why the link went down or whether the
+    remote now has traffic piling up that should be reaching us.
   - Try and make sure the kernel setting of ip_dynaddr is non-zero
     if we are running in "dynamic" or "sticky" mode.
   - fixwrappers now checks exit status of ar to see if it succeeded
