@@ -213,3 +213,7 @@ buffered before the link came up have ot been masqueraded. If we
 send them back to the kernel via the proxy the kernel will pass
 them through the routing/firewalling/masquerading again and should
 do the right thing?
+
+Diald sends data to monitors without caring if they receive it
+or not. This is a job for UDP not TCP. In fact diald sends the
+same data to all monitors. This is a job for multicasting surely?
