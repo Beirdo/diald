@@ -186,9 +186,9 @@ demasquerade(int proto,
 
     if (!addr
 #ifdef HAVE_AF_PACKET
-    && !af_packet &&
+    && !af_packet
 #endif
-    (daddr->s_addr == local_addr
+    && (daddr->s_addr == local_addr
 #ifdef PORT_MASQ_BEGIN
     && *dport >= PORT_MASQ_BEGIN
 #endif
