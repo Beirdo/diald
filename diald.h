@@ -484,6 +484,3 @@ int getsn(FILE *fp,char *buf,int len);
 void del_impulse(FW_unit *unit);
 void del_connection(FW_Connection *c);
 void slip_start_fail(void * data);
-
-#undef inet_ntoa
-#undef inet_addr
