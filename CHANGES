@@ -10,6 +10,9 @@ Major changes between version 2.0 and 2.0.1
   - Use ip to set and remove addresses if we have it and specify the
     netmask.
 
+  CHANGES FROM DIALD 1.0 BRANCH
+  - Fixed installation of PAM module.
+
 
 Major changes between version 1.0 and 2.0
 ------------------------------------------------

@@ -63,8 +63,8 @@ install: diald
 	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/dctrl
 	$(INSTALL) -o root -g bin lib/*.gif $(DESTDIR)$(datadir)/diald/dctrl
 	$(INSTALL) -o root -g bin -m 0644 config/diald.defs $(DESTDIR)$(datadir)/diald/diald.defs
-	$(INSTALL) -d -m 0755 $(DESTDIR)$(sysconfdir)/pam.d
-	$(INSTALL) -o root -g root -m 0644 config/diald.pam $(DESTDIR)$(sysconfdir)/pam.d/diald
+	$(INSTALL) -d -m 0755 $(DESTDIR)/etc/pam.d
+	$(INSTALL) -o root -g root -m 0644 config/diald.pam $(DESTDIR)/etc/pam.d/diald
 	$(INSTALL) -o root -g bin -m 0644 config/standard.filter $(DESTDIR)$(datadir)/diald/standard.filter
 	$(INSTALL) -o root -g bin -m 0644 config/dynamic.filter $(DESTDIR)$(datadir)/diald/dynamic.filter
 	$(INSTALL) -o root -g bin config/connect $(DESTDIR)$(datadir)/diald/connect
