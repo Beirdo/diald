@@ -499,8 +499,6 @@ mon_syslog(LOG_INFO, "desc: len=%d, \"%s\"", c->desc_len, c->description);
 
 	    c->packets[direction]++;
 	    c->bytes[direction] += len;
-	    c->timer.expires = timeout;
-	    add_timer(&c->timer);
 
 	    if (debug&DEBUG_CONNECTION_QUEUE)
     		mon_syslog(LOG_DEBUG,
