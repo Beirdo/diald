@@ -70,18 +70,18 @@ install: diald
 	$(INSTALL) $(CHOWN) -m 0644 config/diald.pam $(DESTDIR)/etc/pam.d/diald
 	$(INSTALL) $(CHOWN) -m 0644 config/standard.filter $(DESTDIR)$(datadir)/diald/standard.filter
 	$(INSTALL) $(CHOWN) -m 0644 config/dynamic.filter $(DESTDIR)$(datadir)/diald/dynamic.filter
-	$(INSTALL) $(CHOWN) config/connect $(DESTDIR)$(datadir)/diald/connect
-	$(INSTALL) $(CHOWN) config/disconnect $(DESTDIR)$(datadir)/diald/disconnect
+	$(INSTALL) $(CHOWN) -m 0755 config/connect $(DESTDIR)$(datadir)/diald/connect
+	$(INSTALL) $(CHOWN) -m 0755 config/disconnect $(DESTDIR)$(datadir)/diald/disconnect
 	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/device
-	$(INSTALL) $(CHOWN) config/device/dhcp $(DESTDIR)$(datadir)/diald/device/dhcp
-	$(INSTALL) $(CHOWN) config/device/dhcp.hangup $(DESTDIR)$(datadir)/diald/device/dhcp.hangup
-	$(INSTALL) $(CHOWN) config/device/isdn $(DESTDIR)$(datadir)/diald/device/isdn
-	$(INSTALL) $(CHOWN) config/device/isdn.hangup $(DESTDIR)$(datadir)/diald/device/isdn.hangup
-	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/modem
-	$(INSTALL) $(CHOWN) -m 0644 config/modem/generic $(DESTDIR)$(datadir)/diald/modem/generic
+	$(INSTALL) $(CHOWN) -m 0755 config/device/dhcp $(DESTDIR)$(datadir)/diald/device/dhcp
+	$(INSTALL) $(CHOWN) -m 0755 config/device/dhcp.hangup $(DESTDIR)$(datadir)/diald/device/dhcp.hangup
+	$(INSTALL) $(CHOWN) -m 0755 config/device/isdn $(DESTDIR)$(datadir)/diald/device/isdn
+	$(INSTALL) $(CHOWN) -m 0755 config/device/isdn.hangup $(DESTDIR)$(datadir)/diald/device/isdn.hangup
+	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/device/modem
+	$(INSTALL) $(CHOWN) -m 0755 config/device/modem/generic $(DESTDIR)$(datadir)/diald/device/modem/generic
 	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/login
-	$(INSTALL) $(CHOWN) -m 0644 config/login/demon $(DESTDIR)$(datadir)/diald/login/demon
-	$(INSTALL) $(CHOWN) -m 0644 config/login/shell-generic $(DESTDIR)$(datadir)/diald/login/shell-generic
+	$(INSTALL) $(CHOWN) -m 0755 config/login/demon $(DESTDIR)$(datadir)/diald/login/demon
+	$(INSTALL) $(CHOWN) -m 0755 config/login/shell-generic $(DESTDIR)$(datadir)/diald/login/shell-generic
 
 clean:
 	rm -f *.o diald
