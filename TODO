@@ -187,3 +187,12 @@ Have some way of reading config files through cpp or m4 or ??? so
 that they can be parameterized.
 
 Impulse timing should start from START_LINK not UP.
+
+Currently you can only add devices to the list to be used while
+diald is running (with the "config ..." control command), you should
+be able to delete them as well. Actually you can but only by doing
+a full "reset" which is overkill and not always something you want.
+
+Log the pid of the ip-up script, put it in its own process group.
+If it is still around when we are about to take the link down
+kill it off first.

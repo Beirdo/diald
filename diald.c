@@ -28,10 +28,6 @@
 #include "diald.h"
 #include "version.h"
 
-#if !defined(__GLIBC__) && defined(CONFIG_FATAL_EIP)
-#  include <asm/sigcontext.h>
-#endif
-
 #ifdef TCP_WRAPPERS
 #  include <tcpd.h>
 
@@ -385,24 +381,6 @@ void open_fifo()
  */
 static sigset_t sig_mask;
 
-void stray_signal(int sig)
-{
-	mon_syslog(LOG_ERR, "Stray signal %d ignored", sig);
-}
-
-#ifdef CONFIG_FATAL_EIP
-void fatal_signal(int sig, struct sigcontext_struct sc)
-{
-	mon_syslog(LOG_ALERT, "Fatal signal %d, eip=0x%08lx",
-		sig, sc.eip);
-	die(1);
-}
-#else
-void fatal_signal(int sig)
-{
-	die(1);
-}
-#endif
 
 void signal_setup()
 {
@@ -428,38 +406,15 @@ void signal_setup()
 
     memset(&sa, 0, sizeof(sa));
     sa.sa_mask = sig_mask;
-
-    sa.sa_flags = SA_RESETHAND | SA_NODEFER;
-
-    SIGNAL(SIGIOT, fatal_signal);
-    SIGNAL(SIGBUS, fatal_signal);
-    SIGNAL(SIGSEGV, fatal_signal);
-#ifdef SIGSTKFLT
-    SIGNAL(SIGSTKFLT, fatal_signal);
-#endif
-
     sa.sa_flags = 0;
 
     SIGNAL(SIGHUP, sig_hup);            /* Hangup: modem went down. */
     SIGNAL(SIGINT, sig_intr);           /* Interrupt: take demand dialer down */
-    SIGNAL(SIGQUIT, stray_signal);
-    SIGNAL(SIGILL, stray_signal);
-    SIGNAL(SIGABRT, stray_signal);
-    SIGNAL(SIGFPE, stray_signal);
     SIGNAL(SIGUSR1, linkup);            /* User requests the link to go up */
     SIGNAL(SIGUSR2, print_filter_queue); /* dump the packet queue to the log */
     SIGNAL(SIGPIPE, SIG_IGN);
     SIGNAL(SIGTERM, sig_term);          /* Terminate: user take link down */
     SIGNAL(SIGCHLD, sig_chld);		/* reap dead kids */
-    SIGNAL(SIGURG, stray_signal);
-    SIGNAL(SIGXCPU, stray_signal);
-    SIGNAL(SIGXFSZ, stray_signal);
-    SIGNAL(SIGVTALRM, stray_signal);
-    SIGNAL(SIGPROF, stray_signal);
-    SIGNAL(SIGWINCH, stray_signal);
-    SIGNAL(SIGIO, stray_signal);
-    SIGNAL(SIGPOLL, stray_signal);
-    SIGNAL(SIGPWR, stray_signal);
     SIGNAL(SIGTTOU, SIG_IGN);
 }
 
@@ -490,7 +445,6 @@ void default_sigacts()
     SIGNAL(SIGUSR1, SIG_DFL);
     SIGNAL(SIGUSR2, SIG_DFL);
     SIGNAL(SIGCHLD, SIG_DFL);
-    SIGNAL(SIGALRM, SIG_DFL);
     SIGNAL(SIGPIPE, SIG_DFL);
     SIGNAL(SIGTTOU, SIG_DFL);
 }

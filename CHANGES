@@ -1,7 +1,7 @@
 Major changes between version 0.16 and 0.98.1.
 ----------------------------------------------
-  - The "print eip on a fatal signal" code is controlled by a
-    flag in config.h.
+  - Removed the fatal and stray signal trapping completely. It just
+    doesn't seem worth it.
   - Hybrid mode support. If the device used starts with '/' the
     configured mode (usually either ppp or a slip variant) is
     used. Otherwise device mode is used. This should allow a
