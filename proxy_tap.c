@@ -15,7 +15,6 @@
 #ifdef AF_NETLINK
 
 #include <sys/uio.h>
-#include <netinet/if_ether.h>
 #include <linux/types.h>
 #include <linux/netlink.h>
 
