@@ -1,3 +1,8 @@
+Major changes between version 0.99.4 and 0.99.6.
+------------------------------------------------
+  - Only compile TCP_CORK code if TCP_CORK is defined.
+
+
 Major changes between version 0.99.4 and 0.99.5.
 ------------------------------------------------
   - Use TCP_CORK on monitor output (if available) to make sure we

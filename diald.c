@@ -985,6 +985,7 @@ void mon_cork(int onoff)
 #    define TCP_CORK 3
 #  endif
 #endif
+#ifdef TCP_CORK
     MONITORS *mon = monitors;
     while (mon) {
 	if (!mon->is_pipe) {
@@ -993,7 +994,7 @@ void mon_cork(int onoff)
 	}
 	mon = mon->next;
     }
-    unblock_signals();	/* don't let anything mess up the data */
+#endif
 }
 
 
