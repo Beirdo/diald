@@ -12,7 +12,7 @@ struct proxy {
 	char iftype[12];
 	int ifunit;
 	int fd;
-	void (*send)(proxy_t *, unsigned short, unsigned char *, size_t);
+	int (*send)(proxy_t *, unsigned short, unsigned char *, size_t);
 	int (*recv)(proxy_t *, unsigned char *, size_t);
 	int (*init)(proxy_t *, char *);
 	void (*start)(proxy_t *);

@@ -22,7 +22,7 @@ static char *proxy_lock;
 static char hdr[ETH_HLEN + 2 - sizeof(unsigned short)];
 
 
-static void proxy_tap_send(proxy_t *proxy,
+static int proxy_tap_send(proxy_t *proxy,
 	unsigned short wprot, unsigned char *p, size_t len);
 static int proxy_tap_recv(proxy_t *proxy, unsigned char *p, size_t len);
 static void proxy_tap_start(proxy_t *proxy);
@@ -32,7 +32,7 @@ static void proxy_tap_release(proxy_t *proxy);
 int proxy_tap_init(proxy_t *proxy, char *proxydev);
 
 
-static void
+static int
 proxy_tap_send(proxy_t *proxy,
 	unsigned short wprot, unsigned char *p, size_t len)
 {
@@ -52,7 +52,7 @@ proxy_tap_send(proxy_t *proxy,
     msg.msg_iov = msg_iov;
     msg.msg_iovlen = 3;
 
-    sendmsg(proxy->fd, &msg, 0);
+    return sendmsg(proxy->fd, &msg, 0);
 }
 
 

@@ -11,11 +11,13 @@
 #include "diald.h"
 
 
-void
+int
 send_packet(unsigned short wprot, unsigned char *p, size_t len)
 {
 	if (proxy.send)
-		proxy.send(&proxy, wprot, p, len);
+		return proxy.send(&proxy, wprot, p, len);
+	errno = -ENOSYS;
+	return -1;
 }
 
 

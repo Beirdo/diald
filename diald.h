@@ -360,7 +360,7 @@ void modem_read(void);
 void advance_filter_queue(void);
 void fire_timers(void);
 int recv_packet(unsigned char *, size_t);
-void send_packet(unsigned short, unsigned char *, size_t);
+int send_packet(unsigned short, unsigned char *, size_t);
 void sig_hup(int);
 void sig_intr(int);
 void sig_term(int);

@@ -17,7 +17,7 @@ static int current_proxy_index;
 #endif
 
 
-static void proxy_dev_send(proxy_t *proxy,
+static int proxy_dev_send(proxy_t *proxy,
 	unsigned short wprot, unsigned char *p, size_t len);
 static int proxy_dev_recv(proxy_t *proxy, unsigned char *p, size_t len);
 static void proxy_dev_start(proxy_t *proxy);
@@ -27,7 +27,7 @@ static void proxy_dev_release(proxy_t *proxy);
 int proxy_dev_init(proxy_t *proxy, char *proxydev);
 
 
-static void
+static int
 proxy_dev_send(proxy_t *proxy,
 	unsigned short wprot, unsigned char *p, size_t len)
 {
@@ -55,7 +55,7 @@ proxy_dev_send(proxy_t *proxy,
 	to_len = sizeof(sp);
     }
 
-    sendto(proxy->fd, p, len, 0, to, to_len);
+    return sendto(proxy->fd, p, len, 0, to, to_len);
 }
 
 

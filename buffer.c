@@ -143,7 +143,8 @@ void forward_buffer()
 	     * to start with will never work :-).
 	     */
 	    if (dynamic_addrs) {
-		send_packet(wprot, dpkt, dlen);
+		if (send_packet(wprot, dpkt, dlen) < 0)
+		    mon_syslog(LOG_ERR,"Error bouncing packet to kernel from buffer: %m");
 	    } else {
 #ifdef HAVE_AF_PACKET
 		if (af_packet)

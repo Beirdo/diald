@@ -12,7 +12,7 @@
 #include "diald.h"
 
 
-static void proxy_slip_send(proxy_t *proxy,
+static int proxy_slip_send(proxy_t *proxy,
 	unsigned short wprot, unsigned char *p, size_t len);
 static int proxy_slip_recv(proxy_t *proxy, unsigned char *p, size_t len);
 static void proxy_slip_start(proxy_t *proxy);
@@ -39,7 +39,7 @@ static int proxy_sfd;		/* slave pty fd */
 /* SEND_PACKET: sends a packet of length "len", starting at
  * location "p".
  */
-static void
+static int
 proxy_slip_send(proxy_t *proxy,
 	unsigned short wprot, unsigned char *p, size_t len)
 {
@@ -82,6 +82,8 @@ proxy_slip_send(proxy_t *proxy,
     /* tell the receiver that we're done sending the packet
      */
     putc(END,proxy_mfp);
+
+    return 0;
 }
 
 
