@@ -20,6 +20,7 @@ int window = 0;
 int mtu = DEFAULT_MTU;
 int mru = DEFAULT_MTU;
 char *link_name = 0;
+char *link_desc = 0;
 char *initializer = 0;
 char *deinitializer = 0;
 char *connector = 0;
@@ -129,6 +130,7 @@ struct {
     {"blocked-route","",0,&blocked_route,set_blocked_route},
     {"-blocked-route","",0,&blocked_route,clear_blocked_route},
     {"linkname","<name>",1,&link_name,set_str},
+    {"linkdesc","<description>",1,&link_desc,set_str},
     {"initializer","<script>",1,&initializer,set_str},
     {"deinitializer","<script>",1,&deinitializer,set_str},
 /* scheduling */
@@ -234,6 +236,7 @@ void init_vars()
     mtu = DEFAULT_MTU;
     mru = DEFAULT_MTU;
     link_name = 0;
+    link_desc = 0;
     initializer = 0;
     deinitializer = 0;
     connector = 0;

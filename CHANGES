@@ -24,11 +24,10 @@ Major changes between version 0.16 and 0.98.
   - Added a protocol version to monitors. Default is original diald
     information so old monitors (e.g. diald-top) still work. New
     monitors can ask (e.g. our dctrl) can ask for the new stuff.
-  - Added a title config option that is passed to monitors for
+  - Added a linkname config option that is passed to connect scripts
+    for identification purposes.
+  - Added a linkdesc config option that is passed to monitors for
     identification purposes.
-  - If no title is specified on the command line to dctrl we use a
-    string representing the connection to the diald being monitored
-    until (and unless) it gives us a title via the monitor connection.
   - Capture dialler stderr and send to monitors.
   - New dev device open loop that allows for use of lock.
   - Documentation update.
@@ -62,6 +61,9 @@ Major changes between version 0.16 and 0.98.
   - Add options to start in blocked or unblocked (default) mode.
 
 * Dctrl changes:
+  - If no title is specified on the command line to dctrl we use a
+    string representing the connection to the diald being monitored
+    until (and unless) it gives us a title via the monitor connection.
   - Add a menu to allow the log level of the information window to
     be changed.
   - Always do the load calculations and graph updates. When we do

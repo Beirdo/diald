@@ -718,7 +718,8 @@ proc ctrlAccess {} {
     frame .ctrlAccess.input
     pack .ctrlAccess.input -side top -fill x -pady 2m
     label .ctrlAccess.input.l -text "Name:"
-    entry .ctrlAccess.input.e -width 40 -relief sunken -bd 2 -textvariable my_name
+    entry .ctrlAccess.input.e -show -width 40 \
+	-relief sunken -bd 2 -textvariable my_name
     bind .ctrlAccess.input.e <Return> {
 	fifoCmd "auth simple $my_name"
 	destroy .ctrlAccess

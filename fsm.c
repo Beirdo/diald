@@ -500,9 +500,9 @@ struct {
 void output_state()
 {
     if (monitors) {
-	if (link_name) {
+	if (link_desc) {
 	    mon_write(MONITOR_VER2|MONITOR_STATE, "TITLE\n", 6);
-	    mon_write(MONITOR_VER2|MONITOR_STATE, link_name, strlen(link_name));
+	    mon_write(MONITOR_VER2|MONITOR_STATE, link_desc, strlen(link_desc));
 	    mon_write(MONITOR_VER2|MONITOR_STATE, "\n", 1);
 	}
 	mon_write(MONITOR_STATE,"STATE\n",6);

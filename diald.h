@@ -212,6 +212,7 @@ int window;
 int mtu;
 int mru;
 char *link_name;
+char *link_desc;
 char *initializer;
 char *deinitializer;
 char *connector;

@@ -255,9 +255,13 @@ void fork_dialer(char *prog_type, char *program, int fd)
 	dup2(p[1] >= 0 ? p[1] : 0, 2);
 	if (p[0] >= 0) close(p[0]);
 
-	setenv("MODEM",current_dev,1);	/* set the current device */
+	setenv("MODEM",current_dev,1);	/* set the current device (compat) */
 	if (fifoname)		/* set the current command FIFO (if any) */
 	    setenv("FIFO",fifoname,1);
+
+	setenv("DIALD_DEVICE", current_dev, 1);
+	setenv("DIALD_LINK", link_name, 1);
+
         execl("/bin/sh", "sh", "-c", program, (char *)0);
         mon_syslog(LOG_ERR, "could not exec /bin/sh: %m");
         _exit(127);

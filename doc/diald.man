@@ -170,7 +170,11 @@ include another file.
 
 .TP
 .B linkname \fI<name>\fR
-Specifies a name or description to be used for this link. The name
+Specifies a name to be used for this link.
+
+.TP
+.B linkdesc \fI<description>\fR
+Specifies a description to be used for this link. The description
 will be sent to monitors that connect as an aid in identifying the
 link in question.
 
