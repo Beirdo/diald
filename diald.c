@@ -226,12 +226,13 @@ main(int argc, char *argv[])
 			} else
 #endif
 			if ((p = malloc(sizeof(PIPE)))) {
+			    char def[] = "default";
 			    char buf[1024];
 			    int n;
 			    n = snprintf(buf, sizeof(buf)-2, "TCP %s:%d",
 					inet_ntoa(sa.sin_addr), sa.sin_port);
 			    buf[n] = '\0';
-			    pipe_init(strdup(buf), CONFIG_DEFAULT_ACCESS,
+			    pipe_init(strdup(buf), ctrl_access(def),
 					fd, p, 0);
 			    FD_SET(fd, &ctrl_fds);
 			    mon_syslog(LOG_NOTICE, "Connection from %s", buf);
@@ -338,7 +339,7 @@ void open_fifo()
             if (fifo_pipe) {
 	        if (debug&DEBUG_VERBOSE)
 	   	    syslog(LOG_INFO,"Using fifo %s",fifoname);
-	        pipe_init("FIFO", -1, fifo_fd, fifo_pipe, 1);
+	        pipe_init("FIFO", 0x7fffffff, fifo_fd, fifo_pipe, 1);
 		FD_SET(fifo_fd, &ctrl_fds);
             } else {
 	        syslog(LOG_ERR,"Could not open fifo pipe %m");
@@ -573,6 +574,15 @@ void ctrl_read(PIPE *pipe)
 	    } else if (!(pipe->access & ACCESS_CONTROL)) {
 		/* Not a control pipe - just messages from a script */
 		mon_syslog(LOG_INFO, "%s: %s", pipe->name, buf);
+	    } else if (strncmp(buf, "auth ", 5) == 0) {
+	    	if (!(pipe->access & ACCESS_AUTH)) {
+		    mon_syslog(LOG_NOTICE, "%s: ignored auth request",
+			pipe->name);
+		} else {
+		    pipe->access = ctrl_access(buf+5);
+		    mon_syslog(LOG_NOTICE, "%s: new access 0x%08x",
+			pipe->name, pipe->access);
+		}
 	    } else if ((pipe->access & ACCESS_CONFIG)
 	    && strncmp(buf, "config ", 7) == 0) {
 		mon_syslog(LOG_NOTICE, "%s: %s", pipe->name, buf);

@@ -58,6 +58,12 @@ Diald may be configured to listen on a fifo and a TCP port simultaneously.
 .LP
 The following commands may be sent to diald via the fifo or TCP port:
 .TP
+.B auth \fI<method> <string>\fR
+Authenticate this connection using the giving method and the
+given string. This changes the set of commands which will be
+allowed on the connection. This command is only available on
+TCP connections.
+.TP
 .B block
 Block diald from making outgoing calls until a unblock command is issued.
 If the link is up it will be taken down immediately.

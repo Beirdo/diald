@@ -5,9 +5,8 @@ sll address struct.
    always ordered with those beyond the managed link on the right
    which is better than the previous numerical ordering.
 
-Use a dummy interface rather than slip. It will give us access to
-arbitrary protocols and doesn't have to muck around passing packets
-as byte streams through a pseudo-terminal.
+Use a dummy interface rather than slip. It doesn't have to muck
+around passing packets as byte streams through a pseudo-terminal.
 
 Add mechanisms for manual start/stop of other links when bandwidth
 thresholds are crossed. (e.g. slave ISDN links or equal-cost routes).
@@ -38,6 +37,9 @@ fly reconfiguration? Security?
 -- Done. Use "config <option>". No security yet...
    Some security now but it's compile time configured and only
    per connection type so far.
+     Now we have the "auth" command and a simple auth method.
+   The location of the file used for simple auth should be
+   a config option though.
 
 Add authentication on control connections with user/password login,
 maybe SSL?

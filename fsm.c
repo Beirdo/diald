@@ -389,13 +389,13 @@ void trans_DISCONNECT(void)
 
 void act_CLOSE(void)
 {
-    if (acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
-	int duration = call_timer_running ? -call_start_time : 0;
+    if (call_timer_running
+    && acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
+	int duration = -call_start_time;
 	char *tm = cdate(time(&call_start_time));
-	if (call_timer_running) {
-	    duration += call_start_time;
-	    call_timer_running = 0;
-	}
+	duration += call_start_time;
+	call_timer_running = 0;
+
 	mon_syslog(LOG_NOTICE,
 	    "Disconnected. Call duration %d seconds.\n",
 	    duration);

@@ -26,3 +26,7 @@
 #define ACCESS_CONNECT	0x00010000
 #define ACCESS_DEMAND	0x00020000
 #define ACCESS_NODEMAND	0x00040000
+#define ACCESS_AUTH	0x80000000
+
+
+extern int ctrl_access(char *buf);

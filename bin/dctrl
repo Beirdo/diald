@@ -704,6 +704,47 @@ proc dctrlQuit {} {
 #    destroy .
 }
 
+proc ctrlAccess {} {
+    set my_name ""
+    catch { destroy .ctrlAccess }
+    toplevel .ctrlAccess
+    wm group .ctrlAccess .
+    wm transient .ctrlAccess .
+    wm geometry .ctrlAccess \
+	+[expr [winfo pointerx .]-100]+[expr [winfo pointery .]-50]
+    wm resizable .ctrlAccess 0 0
+    wm title .ctrlAccess "Access Name"
+
+    frame .ctrlAccess.input
+    pack .ctrlAccess.input -side top -fill x -pady 2m
+    label .ctrlAccess.input.l -text "Name:"
+    entry .ctrlAccess.input.e -width 40 -relief sunken -bd 2 -textvariable my_name
+    bind .ctrlAccess.input.e <Return> {
+	fifoCmd "auth simple $my_name"
+	destroy .ctrlAccess
+    }
+    bind .ctrlAccess.input.e <Escape> \
+	"destroy .ctrlAccess"
+    focus .ctrlAccess.input.e
+    pack .ctrlAccess.input.l .ctrlAccess.input.e -side left -padx 1m -pady 2m
+
+    frame .ctrlAccess.buttons
+    pack .ctrlAccess.buttons -side bottom -fill x -pady 2m
+    button .ctrlAccess.buttons.ok \
+	-default active \
+	-text "  Ok  " \
+	-command {
+	    fifoCmd "auth simple $my_name"
+	    destroy .ctrlAccess
+	}
+    button .ctrlAccess.buttons.dismiss \
+	-text "Cancel" \
+	-command {
+	    destroy .ctrlAccess
+	}
+    pack .ctrlAccess.buttons.ok .ctrlAccess.buttons.dismiss -side left -expand 1
+}
+
 # Create menu bar.
 
 
@@ -732,6 +773,9 @@ menu .menu.file.m.open
 
 menubutton .menu.control -text "Control" -menu .menu.control.m -underline 0
 menu .menu.control.m
+.menu.control.m add command -label "Access Name" \
+    -command ctrlAccess -underline 0
+.menu.control.m add sep
 .menu.control.m add check -label "Demand Dialling" -underline 0 \
     -variable demand -command {
    	 if {$demand} {fifoCmd "demand"} {fifoCmd "nodemand"}
