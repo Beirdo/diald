@@ -178,11 +178,6 @@ void dev_stop()
 
 void dev_reroute()
 {
-    /* Kill the alternate routing */
-    if (do_reroute && link_iface != -1)
-        del_routes(device_node,link_iface,local_ip,remote_ip,0);
-    link_iface = -1;
-
     /* Restore the original proxy routing */
     proxy_config(orig_local_ip,orig_remote_ip);
     if (blocked && !blocked_route)
@@ -192,6 +187,11 @@ void dev_reroute()
 	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
     }
     local_addr = inet_addr(orig_local_ip);
+
+    /* Kill the alternate routing */
+    if (do_reroute && link_iface != -1)
+        del_routes(device_node,link_iface,local_ip,remote_ip,0);
+    link_iface = -1;
 }
 
 /* Dummy proc. This should never get called */
