@@ -1,0 +1,15 @@
+#!/bin/sh
+
+chatscript=/tmp/chat$$
+trap 'rm -f ${chatscript}' 0
+> ${chatscript}
+chmod 600 ${chatscript}
+cat << __SEND__MONEY__NOW__ > ${chatscript}
+	ABORT 'NO CARRIER' ABORT 'NO DIALTONE' ABORT 'NO DIAL TONE'
+	ABORT 'BUSY' ABORT 'VOICE' ABORT 'RING\r'
+	TIMEOUT 5 "" "" ""
+	AT OK ATZ OK ATM${VOLUME:-0} OK
+	"ATDT$PHONE" TIMEOUT 60 CONNECT
+__SEND__MONEY__NOW__
+
+/usr/sbin/chat -v -s -S -f ${chatscript}

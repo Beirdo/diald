@@ -1,5 +1,6 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - Added my setup scripts under the "setup" directory.
   - Added PAM authentication method on TCP monitor connections.
     (From Daniel P. Berrange <daniel@berrange.freeserve.co.uk>)
   - Set SO_REUSEADDR on the TCP socket used to listen for

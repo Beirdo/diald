@@ -1,0 +1,5 @@
+# Set the generic options for what follows...
+=	LOGIN=shell-generic USERNAME=mike PASSWORD=XXXXXXXX
+
+# Only one modem number.
+modem	PHONE=0118xxxxxxx VOLUME=1

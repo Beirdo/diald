@@ -1,0 +1,18 @@
+# Connection attempts via isdn try two numbers and let the kernel
+# ISDN layer make the attempts.
+# 08453535667	COLT ROMP
+# 08450798667	Energis ROMP
+isdn	PHONE='08453535667 08450798667' \
+		REMOTEIP='158.152.1.222' WAITTIME=10 \
+		EAZ_OUT=0 EAZ_IN=''
+
+
+# Set the generic options for what follows...
+=	LOGIN=demon USERNAME=purplet PASSWORD=XXXXXXXX
+
+# First connection attempt via modem goes to my local PoP.
+modem	PHONE=9289666 VOLUME=1
+
+# Second connection attempt via modem goes to a more central PoP and
+# makes more noise.
+modem	PHONE=08453535666 VOLUME=3

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+chatscript=/tmp/chat$$
+trap 'rm -f $chatscript' 0
+> $chatscript
+chmod 600 $chatscript
+cat << __SEND__MONEY__NOW__ > $chatscript
+	ABORT 'NO CARRIER' ABORT 'NO DIALTONE' ABORT 'NO DIAL TONE'
+	ABORT 'BUSY' ABORT 'VOICE' ABORT 'RING\r'
+	ogin:--ogin: "$USERNAME"
+	assword: "\\q$PASSWORD"
+	otocol: nolqm
+	HELLO
+__SEND__MONEY__NOW__
+
+/usr/sbin/chat -v -s -S -f $chatscript

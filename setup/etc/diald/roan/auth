@@ -1,0 +1,24 @@
+# Example diald config file for "auth simple <name>" commands.
+
+# A nobody cannot do anything. All further lines received on
+# this connection will be treated as messages. Once you are a
+# nobody you can never change it.
+nobody		0
+
+# A deity can do anything and everything.
+deity		0xffffffff
+
+# The initial access flags when a connection is opened allow you
+# to send commands, request monitor data and authenticate as
+# someone other than "default".
+default		control,auth,monitor
+
+# A plain user is allowed to request the link go up or down as well.
+user		control,auth,monitor,up,down
+
+# An admin can block or force the link and enable/disable demand dialling.
+admin		control,auth,monitor,up,down,block,unblock,demand,nodemand,force,unforce
+
+# Anything not matched above causes the access flags to be set back
+# to a minimum.
+*		control,auth,monitor
