@@ -1,5 +1,6 @@
 Major changes between version 1.0 and 1.0.1
 ------------------------------------------------
+  - Compile TUN support if configure can find linux/if_tun.h
   - TUN fixes from Jonathan Briggs <zlynx@acm.org>
   - When opening a TUN device look in both the traditional path
     and the devfs path.

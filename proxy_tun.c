@@ -10,10 +10,9 @@
 
 #include <config.h>
 
+#if HAVE_LINUX_IF_TUN_H
+
 #include <diald.h>
-
-
-#ifdef TUNTAP
 
 #include <sys/uio.h>
 #include <linux/if_tun.h>
@@ -145,4 +144,4 @@ fail:
     return -1;
 }
 
-#endif /* TUNTAP */
+#endif /* HAVE_LINUX_IF_TUN_H */
