@@ -15,6 +15,9 @@ set fifofd ""
 set fifo_counter 0
 
 # Initial values
+set monlevel "0x0700011f"
+set monstate 0.0
+set queue_list [list]
 set max_info_lines 500
 set out_usage bps
 set in_usage bps
@@ -274,7 +277,7 @@ if {"$fancy_icon"==1} { wm iconwindow . .dctrlIcon }
 proc closeMonitor {} {
     global fifofd monfifo monfd diald_HOST
     if { $monfd != "" } {
-	close $monfd
+	catch { close $monfd }
 	set monfd ""
     }
     if { $diald_HOST == "" } {
@@ -284,7 +287,7 @@ proc closeMonitor {} {
 	set monfifo ""
     }
     if { $fifofd != "" } {
-	close $fifofd
+	catch { close $fifofd }
 	set fifofd ""
     }
     .toolbar.up configure -state disabled
@@ -292,19 +295,19 @@ proc closeMonitor {} {
 }
 
 proc openMonitor {} {
+    global monstate monlevel
     global fifofd monfifo monfd diald_FIFO diald_HOST diald_PORT fifo_counter
 
     # Turn off any previous monitoring
     closeMonitor
 
     # get new monitoring fifo
+    set monstate 0.0
     if { $diald_HOST != "" } {
 	# FIXME: should do a catch here?
         set fifofd [socket $diald_HOST $diald_PORT]
         set monfd $fifofd
         set monfifo "TCP [fconfigure $fifofd -sockname]"
-	fifoCmd "monitor $monfifo"
-	fileevent $monfd readable {stateChange}
     } elseif { $diald_FIFO != "" } {
         set fifofd [open $diald_FIFO w]
         #
@@ -317,9 +320,9 @@ proc openMonitor {} {
         # before we ask diald to deal with it.
         catch {exec mkfifo -m 0600 $monfifo}
         set monfd [open $monfifo r+]
-	fifoCmd "monitor $monfifo"
-	fileevent $monfd readable {stateChange}
     }
+    fifoCmd "monitor $monlevel $monfifo"
+    fileevent $monfd readable {readMonitor}
     .toolbar.up configure -state active
     .toolbar.down configure -state active
 }
@@ -488,106 +491,152 @@ proc user_number { n } {
     }
 }
 
-proc stateChange {} {
-    global monfd status trans colors gload tload
+proc readMonitor {} {
+    global monstate monfd
+    global queue_list status trans colors gload tload
     global in_usage out_usage in_bandwidth out_bandwidth
     global blocked forced max_info_lines
+
     set foo [gets $monfd]
-    if {$foo=="STATE"} {
-	set status(fsm) [gets $monfd]
-        if {$status(fsm)=="UP"} { load_init }
+
+    switch " $foo" {
+	{ STATE}		{ set monstate 1.0; return 0 }
+	{ STATUS}	{ set monstate 2.0; return 0 }
+	{ STATUS2}	{ set monstate 3.0; return 0 }
+	{ QUEUE}		{ set monstate 4.0
+			set queue_list [list]
+			return 0
+			}
+	{ MESSAGE}	{ set monstate 5.0; return 0 }
+	{ INTERFACE}	{ set monstate 6.0; return 0 }
+	{ LOAD}		{ set monstate 7.0; return 0 }
+	{ END QUEUE}	{ set monstate 0.0
+#			We insert then delete to avoid the creeping
+#			scrollbar problem but then, to avoid lines
+#			dropping off the end, we have to pad with
+#			and extra line before inserting.
+			set i 1
+			foreach foo $queue_list {
+			    .queue.vis.text insert end "\n"
+			    .queue.vis.text insert $i.0 $foo
+			    incr i
+			    .queue.vis.text delete $i.0 $i.0+1l
+			}
+			.queue.vis.text delete $i.0 end
+			set queue_list [list]
+			return 0
+			}
+    }
+
+    if {$monstate < 1.0} {
+#	Monitor idle
+    } elseif {$monstate < 2.0} {
+	set status(fsm) $foo
+        if {$foo == "UP"} { load_init }
 	updateIcon
-    }
-    if {$foo=="STATUS"} {
-	set status(up) [gets $monfd]
-	set status(force) [gets $monfd]
-	set status(impmode) [gets $monfd]
-	set status(imp_itime) [gets $monfd]
-	set status(imp_time) [gets $monfd]
-	set status(imp_fuzz) [gets $monfd]
-	set status(imp_timeout) [gets $monfd]
-	set status(force_timeout) [gets $monfd]
-	set status(timeout) [gets $monfd]
-    }
-    if {$foo=="STATUS2"} {
-	set blocked [gets $monfd]
-	set forced [gets $monfd]
-    }
-    if {$foo=="QUEUE"} {
+	set monstate 0.0
+    } elseif {$monstate < 3.0} {
+	switch $monstate {
+	    2.0	{ set status(up) $foo; set monstate 2.1 }
+	    2.1	{ set status(force) $foo; set monstate 2.2 }
+	    2.2	{ set status(impmode) $foo; set monstate 2.3 }
+	    2.3	{ set status(imp_itime) $foo; set monstate 2.4 }
+	    2.4	{ set status(imp_time) $foo; set monstate 2.5 }
+	    2.5	{ set status(imp_fuzz) $foo; set monstate 2.6 }
+	    2.6	{ set status(imp_timeout) $foo; set monstate 2.7 }
+	    2.7	{ set status(force_timeout) $foo; set monstate 2.8 }
+	    2.8	{ set status(timeout) $foo; set monstate 0.0 }
+	}
+    } elseif {$monstate < 4.0} {
+	switch $monstate {
+	    3.0	{ set blocked $foo; set monstate 3.1 }
+	    3.1	{ set forced $foo; set monstate 0.0 }
+	}
+    } elseif {$monstate < 5.0} {
 	set outp 0
 	set outb 0
 	set outtot 0
 	set inp 0
 	set inb 0
 	set intot 0
-    	set foo [gets $monfd]
-	set lst [list]
-	while {$foo!="END QUEUE"} {
-	    set desc [string range $foo 0 59]
-	    scan [string range $foo 61 end] \
-		"%f %f %f %f %f %f" \
-		outp outb outtot inp inb intot
-	    set foo ""
-	    lappend lst [append foo $desc \
-		[switch $in_usage {
-			pps { user_number $inp }
-			bps { user_number $inb }
-			lbp { format " %4.0f%%" [expr $inb*100/$in_bandwidth] }
-			tot { user_number $intot }
-		}] \
-		[switch $out_usage {
-			pps { user_number $outp }
-			bps { user_number $outb }
-			lbp { format " %4.0f%%" [expr $outb*100/$out_bandwidth] }
-			tot { user_number $outtot }
-		}] \
-	    "\n" ]
-	    set foo [gets $monfd]
-	}
-	set j 1
-	foreach i $lst {
-	    set k $j
-	    incr j
-	    .queue.vis.text insert $k.0 $i
-	    .queue.vis.text delete $j.0 [expr $j+1].0
-	}
-	.queue.vis.text delete $j.0 end
-    }
-    if {$foo=="MESSAGE"} {
-	if {[.message.vis.text index end] > $max_info_lines} {
+	set desc [string range $foo 0 59]
+	scan [string range $foo 61 end] \
+	    "%f %f %f %f %f %f" \
+	    outp outb outtot inp inb intot
+	set foo ""
+	lappend queue_list [append foo $desc \
+	    [switch $in_usage {
+		pps { user_number $inp }
+		bps { user_number $inb }
+		lbp { format " %4.0f%%" [expr $inb*100/$in_bandwidth] }
+		tot { user_number $intot }
+	    }] \
+	    [switch $out_usage {
+		pps { user_number $outp }
+		bps { user_number $outb }
+		lbp { format " %4.0f%%" [expr $outb*100/$out_bandwidth] }
+		tot { user_number $outtot }
+	    }] \
+	"\n" ]
+    } elseif {$monstate < 6.0} {
+	set monstate 0.0
+	if {[.message.vis.text index end] >= $max_info_lines} {
 	    .message.vis.text delete 1.0 2.0
 	}
-	set message [gets $monfd]
-	.message.vis.text insert end $message
-	.message.vis.text insert end "\n"
-    }
-    if {$foo=="INTERFACE"} {
-	set status(iface) [gets $monfd]
-	set status(lip) [gets $monfd]
-	set status(rip) [gets $monfd]
-    }
-    if {$foo=="LOAD"} {
+	set do_tail 0
+	if {[.message.vis.text index "end-1c"] > 1.0} {
+	    if {[lindex [.message.vis.scroll get] 1] == 1} {
+		set do_tail 1
+	    }
+	    .message.vis.text insert end "\n"
+	}
+	.message.vis.text insert end $foo
+	if {$do_tail == 1} {
+	    .message.vis.text see end
+	}
+    } elseif {$monstate < 7.0} {
+	switch $monstate {
+	    6.0	{ set status(iface) $foo; set monstate 6.1 }
+	    6.1	{ set status(lip) $foo; set monstate 6.2 }
+	    6.2	{ set status(rip) $foo; set monstate 0.0 }
+	}
+    } elseif {$monstate < 8.0} {
 	if {$status(fsm)=="UP"} {
-	    set txtotal [gets $monfd]
-	    set rxtotal [gets $monfd]
-	    set e5 ".81873075307798185867"
-	    set e150 ".99335550625503441537"
-	    set fp "1"
-	    set status(rx_load5) [expr {$status(rx_load5)*$e5+$rxtotal*($fp-$e5)}]
-	    set status(tx_load5) [expr {$status(tx_load5)*$e5+$txtotal*($fp-$e5)}]
-	    if {$tload} {
-	    set status(rx_load150) [expr {$status(rx_load150)*$e150+$rxtotal*($fp-$e150)}]
-	    set status(tx_load150) [expr {$status(tx_load150)*$e150+$txtotal*($fp-$e150)}]
-	    set status(rx_load) [format "%.3f %.3f" [expr {$status(rx_load5)/1000}] [expr {$status(rx_load150)/1000}]]
-	    set status(tx_load) [format "%.3f %.3f" [expr {$status(tx_load5)/1000}] [expr {$status(tx_load150)/1000}]]
+	    switch $monstate {
+		7.0	{ set txtotal $foo; set $monstate 7.1 }
+		7.1	{
+			set rxtotal $foo
+			set monstate 0.0
+			set e5 ".81873075307798185867"
+			set e150 ".99335550625503441537"
+			set fp "1"
+			set status(rx_load5) \
+			    [expr {$status(rx_load5)*$e5+$rxtotal*($fp-$e5)}]
+			set status(tx_load5) \
+			    [expr {$status(tx_load5)*$e5+$txtotal*($fp-$e5)}]
+			if {$tload} {
+			    set status(rx_load150) \
+				[expr {$status(rx_load150)*$e150+$rxtotal*($fp-$e150)}]
+			    set status(tx_load150) \
+				[expr {$status(tx_load150)*$e150+$txtotal*($fp-$e150)}]
+			    set status(rx_load) \
+				[format "%.3f %.3f" \
+				    [expr {$status(rx_load5)/1000}] \
+				    [expr {$status(rx_load150)/1000}]]
+			    set status(tx_load) \
+				[format "%.3f %.3f" \
+				    [expr {$status(tx_load5)/1000}] \
+				    [expr {$status(tx_load150)/1000}]]
+			}
+			if {$gload} {
+			    update
+			    addtick .lm.tx [expr {$status(tx_load5)/1000}]
+			    addtick .lm.rx [expr {$status(rx_load5)/1000}]
+			}
+			set status(tx_total) [expr {$status(tx_total)+$txtotal}]
+			set status(rx_total) [expr {$status(rx_total)+$rxtotal}]
+		}
 	    }
-	    if {$gload} {
-		    update
-		    addtick .lm.tx [expr {$status(tx_load5)/1000}]
-		    addtick .lm.rx [expr {$status(rx_load5)/1000}]
-	    }
-	    set status(tx_total) [expr {$status(tx_total)+$txtotal}]
-	    set status(rx_total) [expr {$status(rx_total)+$rxtotal}]
 	}
     }
     update
@@ -866,10 +915,18 @@ pack .message.menu -side top -anchor nw -fill x -expand 0
 label .message.menu.label -text "Information"
 pack .message.menu.label -side left
 frame .message.vis
-text .message.vis.text -bor 0 -yscrollcommand ".message.vis.scroll set" -height 8 -width 60 -highlightthickness 0 -wrap none -insertontime 0
-scrollbar .message.vis.scroll -relief sunken -command ".message.vis.text yview" -highlightthickness 0
+text .message.vis.text -bor 0 \
+	-height 8 -width 60 -highlightthickness 0 -wrap none -insertontime 0 \
+	-yscrollcommand ".message.vis.yscroll set" \
+	-xscrollcommand ".message.vis.xscroll set"
+scrollbar .message.vis.yscroll -relief sunken -highlightthickness 0 \
+	-command ".message.vis.text yview"
+scrollbar .message.vis.xscroll -relief sunken -highlightthickness 0 \
+	-orient horizontal \
+	-command ".message.vis.text xview"
 pack .message.vis.text -side left -fill both -padx 2 -pady 2 -expand 1
-pack .message.vis.scroll -side right -fill y
+pack .message.vis.yscroll -side right -fill y
+pack .message.vis.xscroll -side bottom -fill x -expand 1
 pack .message.vis -side top -fill both -expand 1 -pady 0
 
 proc repack {} {

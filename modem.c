@@ -138,7 +138,7 @@ int translate_speed(int bps)
     for (speedp = speeds; speedp->speed_int; speedp++)
 	if (bps == speedp->speed_int)
 	    return speedp->speed_val;
-    syslog(LOG_WARNING, "speed %d not supported", bps);
+    mon_syslog(LOG_WARNING, "speed %d not supported", bps);
     return 0;
 }
 #endif
@@ -154,7 +154,7 @@ void set_up_tty(int fd, int local, int spd)
     struct termios tios;
 
     if (tcgetattr(fd, &tios) < 0) {
-	syslog(LOG_ERR, "could not get initial terminal attributes: %m");
+	mon_syslog(LOG_ERR, "could not get initial terminal attributes: %m");
     }
 
     tios.c_cflag = CS8 | CREAD | HUPCL;
@@ -177,7 +177,7 @@ void set_up_tty(int fd, int local, int spd)
     }
 
     if (tcsetattr(fd, TCSAFLUSH, &tios) < 0) {
-	syslog(LOG_ERR, "failed to set terminal attributes: %m");
+	mon_syslog(LOG_ERR, "failed to set terminal attributes: %m");
     }
 }
 
@@ -204,7 +204,7 @@ void fork_dialer(char *prog_type, char *program, int fd)
 
     if (dial_pid < 0) {
 	unblock_signals();
-        syslog(LOG_ERR, "failed to fork %s: %m", prog_type);
+        mon_syslog(LOG_ERR, "failed to fork %s: %m", prog_type);
 	/* FIXME: Probably this should not be fatal */
         die(1);
     }
@@ -244,13 +244,13 @@ void fork_dialer(char *prog_type, char *program, int fd)
 	if (fifoname)		/* set the current command FIFO (if any) */
 	    setenv("FIFO",fifoname,1);
         execl("/bin/sh", "sh", "-c", program, (char *)0);
-        syslog(LOG_ERR, "could not exec /bin/sh: %m");
+        mon_syslog(LOG_ERR, "could not exec /bin/sh: %m");
         _exit(127);
         /* NOTREACHED */
     }
 
     unblock_signals();
-    syslog(LOG_INFO,"Running %s (pid = %d).", prog_type, dial_pid);
+    mon_syslog(LOG_INFO,"Running %s (pid = %d).", prog_type, dial_pid);
 }
 
 /*
@@ -285,22 +285,23 @@ int open_modem()
 		use_req=1;
 		req_pid=0;
 	} else {
-		current_dev = devices[0];
-	}
+		current_dev = devices[rotate_offset];
+		if (rotate_devices)
+			rotate_offset = (rotate_offset+1)%device_count;
 
-	/* If we have a connector we may need to run it to set up the
-	 * real interface.
-	 * FIXME: Should we be doing this for a requested up?
-	 */
-	if (connector)
-		fork_dialer("connector", connector, modem_fd);
+		/* If we have a connector we may need to run it to set up the
+		 * real interface.
+		 */
+		if (connector)
+			fork_dialer("connector", connector, modem_fd);
+	}
 	return 0;
     }
 
     if (req_pid) {
 	/* The user has specified a device. Use it, no search or lock needed. */
 	if ((modem_fd = open(req_dev, O_RDWR | O_NDELAY)) < 0) {
-	    syslog(LOG_ERR,"Can't open requested device '%s'",req_dev);
+	    mon_syslog(LOG_ERR,"Can't open requested device '%s'",req_dev);
 	    killpg(req_pid,SIGKILL);
 	    kill(req_pid,SIGKILL);
 	    req_pid = 0;
@@ -324,7 +325,7 @@ int open_modem()
 	    if ((modem_fd = open(current_dev, O_RDWR | O_NDELAY)) >= 0)
 		break;
 	    else {
-	       syslog(LOG_ERR,"Error opening device %s: %m",current_dev);
+	       mon_syslog(LOG_ERR,"Error opening device %s: %m",current_dev);
 	    }
 	    current_dev = 0;
 
@@ -332,7 +333,7 @@ int open_modem()
 	    if (lock_dev) unlock();
 	}
 	if (modem_fd < 0) {
-	    syslog(LOG_INFO,"Couldn't find a free device to call out on.");
+	    mon_syslog(LOG_INFO,"Couldn't find a free device to call out on.");
 	    dial_status = -1;
 	    return 2;
 	}
@@ -349,12 +350,12 @@ int open_modem()
     /* This should only happen in SLIP mode */
     if (mode == MODE_SLIP) {
 	if (ioctl(modem_fd, TIOCSCTTY, 1) < 0) {
-	    syslog(LOG_ERR, "failed to set modem to controlling tty: %m");
+	    mon_syslog(LOG_ERR, "failed to set modem to controlling tty: %m");
 	    die(1);
 	}
 
         if (tcsetpgrp(modem_fd, pgrpid) < 0) {
-	    syslog(LOG_ERR, "failed to set process group: %m");
+	    mon_syslog(LOG_ERR, "failed to set process group: %m");
 	    die(1);
 	}
     }
@@ -363,7 +364,7 @@ int open_modem()
     tcflush(modem_fd, TCIOFLUSH);
 
     if (tcgetattr(modem_fd, &inittermios) < 0) {
-	syslog(LOG_ERR, "failed to get initial modem terminal attributes: %m");
+	mon_syslog(LOG_ERR, "failed to get initial modem terminal attributes: %m");
     }
 
     /* So we don't try to restore if we die before this */
@@ -371,7 +372,7 @@ int open_modem()
 
     /* Clear the NDELAY flag now */
     if (fcntl(modem_fd,F_SETFL,fcntl(modem_fd,F_GETFL)&~(O_NDELAY)) < 0)
-	syslog(LOG_ERR, "failed to clear O_NDELAY flag: %m"), die(1);
+	mon_syslog(LOG_ERR, "failed to clear O_NDELAY flag: %m"), die(1);
 
     if (!req_pid) {
 	int line_disc;
@@ -404,12 +405,12 @@ void reopen_modem()
     int npgrpid;
 
     if(debug&DEBUG_VERBOSE)
-	syslog(LOG_INFO,"Reopening modem device");
+	mon_syslog(LOG_INFO,"Reopening modem device");
 
     close(modem_fd);
     sleep(1);
     if ((modem_fd = open(current_dev, O_RDWR | O_NDELAY)) < 0) {
-	syslog(LOG_ERR,"Can't reopen device '%s'",current_dev);
+	mon_syslog(LOG_ERR,"Can't reopen device '%s'",current_dev);
     } else {
 	/* Make sure we are the session leader */
 	if ((npgrpid = setsid()) >= 0)
@@ -419,12 +420,12 @@ void reopen_modem()
 	/* This should only happen in SLIP mode */
 	if (mode == MODE_SLIP) {
 	    if (ioctl(modem_fd, TIOCSCTTY, 1) < 0) {
-		syslog(LOG_ERR, "failed to set modem to controlling tty: %m");
+		mon_syslog(LOG_ERR, "failed to set modem to controlling tty: %m");
 		die(1);
 	    }
 
 	    if (tcsetpgrp(modem_fd, pgrpid) < 0) {
-		syslog(LOG_ERR, "failed to set process group: %m");
+		mon_syslog(LOG_ERR, "failed to set process group: %m");
 		die(1);
 	    }
 	}
@@ -432,7 +433,7 @@ void reopen_modem()
 	set_up_tty(modem_fd, 1, inspeed);
 	/* Clear the NDELAY flag now */
 	if (fcntl(modem_fd,F_SETFL,fcntl(modem_fd,F_GETFL)&~(O_NDELAY)) < 0)
-	    syslog(LOG_ERR, "failed to clear O_NDELAY flag: %m"), die(1);
+	    mon_syslog(LOG_ERR, "failed to clear O_NDELAY flag: %m"), die(1);
     }
 }
 
@@ -447,6 +448,8 @@ void finish_dial()
  */
 void close_modem()
 {
+    current_dev = 0;
+
     if (mode == MODE_DEV) {
 	req_pid = 0;
 	modem_fd = -1 ;
@@ -454,7 +457,7 @@ void close_modem()
     }
 
     if (debug&DEBUG_VERBOSE)
-        syslog(LOG_INFO,"Closing modem line.");
+        mon_syslog(LOG_INFO,"Closing modem line.");
 
     if (modem_fd < 0) {
  	return;
@@ -484,7 +487,7 @@ void close_modem()
     close(modem_fd);
     if (use_req) {
 	if (debug&DEBUG_VERBOSE)
-	    syslog(LOG_INFO, "Killing requesting shell pid %d",req_pid);
+	    mon_syslog(LOG_INFO, "Killing requesting shell pid %d",req_pid);
 	killpg(req_pid, SIGKILL);
 	kill(req_pid, SIGKILL);
 	req_pid = 0;

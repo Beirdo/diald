@@ -311,7 +311,7 @@ void set_scheduler(char **var, char **argv)
 	scheduler = SCHED_OTHER;
     else
 #endif
-	syslog(LOG_ERR,"Unknown scheduling class %s.\nValid classes are: fifo, rr, or other.",argv[0]);
+	mon_syslog(LOG_ERR,"Unknown scheduling class %s.\nValid classes are: fifo, rr, or other.",argv[0]);
 }
 
 void set_mode(char **var, char **argv)
@@ -331,7 +331,7 @@ void set_mode(char **var, char **argv)
     else if (strcmp(argv[0],"aslip") == 0)
 	mode = MODE_SLIP, slip_encap = 8;
     else
-	syslog(LOG_ERR,"Unknown mode %s.\nValid modes are: dev, ppp, slip, cslip, slip6, cslip6, or aslip.",argv[0]);
+	mon_syslog(LOG_ERR,"Unknown mode %s.\nValid modes are: dev, ppp, slip, cslip, slip6, cslip6, or aslip.",argv[0]);
 }
 
 void set_dslip_mode(char **var, char **argv)
@@ -347,7 +347,7 @@ void set_dslip_mode(char **var, char **argv)
     else if (strcmp(argv[0],"bootp") == 0)
 	dynamic_mode = DMODE_BOOTP;
     else
-	syslog(LOG_ERR,"Unknown dynamic slip mode %s.\nValid modes are: remote, local, remote-local, local-remote or bootp.",argv[0]);
+	mon_syslog(LOG_ERR,"Unknown dynamic slip mode %s.\nValid modes are: remote, local, remote-local, local-remote or bootp.",argv[0]);
 }
 
 void set_flag(int *var, char **argv)
@@ -368,10 +368,10 @@ void read_config_file(int *var, char **argv)
 void usage(void)
 {
     int i;
-    syslog(LOG_ERR,"usage: diald [modem-device1] [modem-device2 ...] [options...] [-- [pppd options...]]\n");
-    syslog(LOG_ERR,"where valid options are:");
+    mon_syslog(LOG_ERR,"usage: diald [modem-device1] [modem-device2 ...] [options...] [-- [pppd options...]]\n");
+    mon_syslog(LOG_ERR,"where valid options are:");
     for (i = 0; commands[i].str; i++)
-        syslog(LOG_ERR,"    %s %s",commands[i].str,commands[i].uargs);
+        mon_syslog(LOG_ERR,"    %s %s",commands[i].str,commands[i].uargs);
     exit(1);
 }
 
@@ -431,13 +431,13 @@ void parse_args(int argc, char *argv[])
 	if (commands[i].parser) {
 	    argc -= commands[i].args;
 	    if (argc < 0) {
-		syslog(LOG_ERR,"Insufficient arguments to option '%s'",*argv);
+		mon_syslog(LOG_ERR,"Insufficient arguments to option '%s'",*argv);
 		usage();
 	    }
 	    (commands[i].parser)(commands[i].var,++argv);
 	    argv += commands[i].args;
 	} else {
-	    syslog(LOG_ERR,"Unknown option '%s'",*argv);
+	    mon_syslog(LOG_ERR,"Unknown option '%s'",*argv);
 	    usage();
 	}
     }
@@ -468,7 +468,7 @@ void parse_options_file(char *file)
     FILE *fp = fopen(file,"r");
 
     if (fp == NULL) {
-	syslog(LOG_ERR,"Unable to open options file %s: %m",file);
+	mon_syslog(LOG_ERR,"Unable to open options file %s: %m",file);
 	return;	/* no options file */
     }
     while (getsn(fp,line,1024) != EOF) {
@@ -554,14 +554,14 @@ void parse_options_file(char *file)
 	if (commands[i].parser) {
 	    argc -= commands[i].args;
 	    if (argc < 0) {
-		syslog(LOG_ERR,"Insufficient arguments to option '%s'",argv[0]);
+		mon_syslog(LOG_ERR,"Insufficient arguments to option '%s'",argv[0]);
 	    } else {
 	        (commands[i].parser)(commands[i].var,&argv[1]);
 	    }
 	} else if (strcmp("pppd-options",argv[0]) == 0) {
 		copy_pppd_args(argc-1,&argv[1]);
 	} else {
-	    syslog(LOG_ERR,"Unknown option '%s'",*argv);
+	    mon_syslog(LOG_ERR,"Unknown option '%s'",*argv);
 	}
 comment:;
     }
@@ -576,7 +576,7 @@ void check_setup()
 
     if (device_count == 0) {
 	flag = 1,
-	syslog(LOG_ERR,
+	mon_syslog(LOG_ERR,
 	    "No device specified. You must have at least one device!");
     }
 
@@ -584,31 +584,31 @@ void check_setup()
 	for (i = 0; i < device_count; i++)
 	    if (stat(devices[i],&st) < 0 || !S_ISCHR(st.st_mode))
 		flag = 1,
-		syslog(LOG_ERR,
+		mon_syslog(LOG_ERR,
 		    "Specified device '%s' not a character device.",devices[0]);
 
     if (!connector)
 	flag = 1,
-	syslog(LOG_ERR,
+	mon_syslog(LOG_ERR,
 	    "You must define a connector script (option 'connect').");
     if (!remote_ip)
-	flag = 1, syslog(LOG_ERR,"You must define the remote ip address.");
+	flag = 1, mon_syslog(LOG_ERR,"You must define the remote ip address.");
     else if (inet_addr(remote_ip) == -1)
-	flag = 1, syslog(LOG_ERR,"Bad remote ip address specification.");
+	flag = 1, mon_syslog(LOG_ERR,"Bad remote ip address specification.");
     if (!local_ip)
-	flag = 1, syslog(LOG_ERR,"You must define the local ip address.");
+	flag = 1, mon_syslog(LOG_ERR,"You must define the local ip address.");
     else if (inet_addr(local_ip) == -1)
-	flag = 1, syslog(LOG_ERR,"Bad local ip address specification.");
+	flag = 1, mon_syslog(LOG_ERR,"Bad local ip address specification.");
     else
     	local_addr = inet_addr(local_ip);
 
     if (acctlog && (acctfp = fopen(acctlog,"a")) == NULL)
-	syslog(LOG_ERR,"Can't open accounting log file %s: %m",acctlog);
+	mon_syslog(LOG_ERR,"Can't open accounting log file %s: %m",acctlog);
     else
         if (acctfp) fclose(acctfp);
     
     if (flag) {
-	syslog(LOG_ERR,"Terminating due to damaged reconfigure.");
+	mon_syslog(LOG_ERR,"Terminating due to damaged reconfigure.");
 	exit(1);
     }
 }

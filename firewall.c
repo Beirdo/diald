@@ -38,7 +38,7 @@ static void init_units(void)
 	units[i].nrules = 0;
 	units[i].nfilters = 0;
 	if (!units[i].connections) {
-	    syslog(LOG_ERR,"Out of memory! AIIEEE!");
+	    mon_syslog(LOG_ERR,"Out of memory! AIIEEE!");
 	    die(1);
 	}
 	units[i].connections->next = units[i].connections->prev
@@ -55,14 +55,14 @@ static unsigned int in_slot(FW_Timeslot *slot, time_t *clock)
     int ctime = ltime->tm_hour*60*60+ltime->tm_min*60+ltime->tm_sec; 
 
 #if 0
-    syslog(LOG_INFO,"slot check: %d %d %d %d",
+    mon_syslog(LOG_INFO,"slot check: %d %d %d %d",
 	ltime->tm_sec+ltime->tm_min*60+ltime->tm_hour*60*60, ltime->tm_wday,
 	ltime->tm_mday, ltime->tm_mon);
 #endif
 
     while (slot) {
 #if 0
-    syslog(LOG_INFO,"slot def: %d %d %x %x %x",
+    mon_syslog(LOG_INFO,"slot def: %d %d %x %x %x",
 	slot->start, slot->end, slot->wday, slot->mday, slot->month);
 #endif 0
 	if ((slot->start <= ctime)
@@ -221,7 +221,7 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    /* no matching connection, add one */
 	    c = malloc(sizeof(FW_Connection));
 	    if (c == 0) {
-	       syslog(LOG_ERR,"Out of memory! AIIEEE!");
+	       mon_syslog(LOG_ERR,"Out of memory! AIIEEE!");
 	       die(1);
 	    }
 	    c->id = *id;
@@ -239,11 +239,8 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    if (unit->connections->next == unit->connections && monitors
 	    && state != STATE_UP && !blocked) {
 		c->description = desc_connection(c);
-		if (c->description) {
-		    char buf[1024];
-		    sprintf(buf, "MESSAGE\ndiald: %s\n", c->description);
-		    mon_write(MONITOR_MESSAGE, buf, strlen(buf));
-		}
+		if (c->description)
+		    mon_syslog(LOG_INFO, "Trigger: %s", c->description);
 	    }
 	    c->next = unit->connections->next;
 	    c->prev = unit->connections;
@@ -252,7 +249,7 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    c->timer.expires = timeout;
 	    add_timer(&c->timer);
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-    		syslog(LOG_INFO,"Adding connection %p @ %ld - timeout %d",c,
+    		mon_syslog(LOG_INFO,"Adding connection %p @ %ld - timeout %d",c,
 			time(0),timeout);
 	}
     } else {
@@ -265,7 +262,7 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 	    c->timer.expires = timeout;
 	    add_timer(&c->timer);
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-    		syslog(LOG_INFO,"Adding connection %p @ %ld - timeout %d",c,
+    		mon_syslog(LOG_INFO,"Adding connection %p @ %ld - timeout %d",c,
 			time(0),timeout);
 	} else {
 	    /* timeout = 0, so toss the connection */
@@ -282,7 +279,7 @@ static void add_connection(FW_unit *unit, FW_Connection *c, FW_ID *id,
 void del_connection(FW_Connection *c)
 {
     if (debug&DEBUG_CONNECTION_QUEUE)
-	syslog(LOG_INFO,"Deleting connection %p @ %ld",c,time(0));
+	mon_syslog(LOG_INFO,"Deleting connection %p @ %ld",c,time(0));
 
     c->next->prev = c->prev;
     c->prev->next = c->next;
@@ -300,7 +297,7 @@ void del_impulse(FW_unit *unit)
 	    unit->impulse.function = (void *)(void *)del_impulse;
 	    unit->impulse.expires = impulse_time;
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-		syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
+		mon_syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
 	    add_timer(&unit->impulse);
 	}
     } else {
@@ -311,7 +308,7 @@ void del_impulse(FW_unit *unit)
 	    unit->impulse.function = (void *)(void *)del_impulse;
 	    unit->impulse.expires = impulse_fuzz;
 	    if (debug&DEBUG_CONNECTION_QUEUE)
-		syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
+		mon_syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
 	    add_timer(&unit->impulse);
 	}
     }
@@ -428,7 +425,7 @@ next_rule: /* try the next filter */
     	unit->impulse.expires = (force)?ftimeout:itimeout;
     	add_timer(&unit->impulse);
 	if (debug&DEBUG_CONNECTION_QUEUE)
-	    syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
+	    mon_syslog(LOG_INFO,"Refreshing impulse generator: mode %d, time %ld @ %ld",unit->impulse_mode,unit->impulse.expires,time(0));
     } else {
 	/* set these so that the monitor output is sane */
 	unit->impulse_mode = 1;
@@ -453,7 +450,7 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
 	sport = ntohs(udp->source), dport = ntohs(udp->dest);
 
     if (pkt->protocol == IPPROTO_TCP) {
-	syslog(LOG_INFO,
+	mon_syslog(LOG_INFO,
 	    "filter %s rule %d proto %d len %d seq %lx ack %lx flags %s%s%s%s%s%s packet %s,%d => %s,%d",
 	    (accept)?"accepted":"ignored",rule,
 	    pkt->protocol,
@@ -467,7 +464,7 @@ static void log_packet(int accept, struct iphdr *pkt, int len,  int rule)
 	    (tcp->urg) ? " URG" : "",
 	    saddr, sport, daddr, dport);
     } else {
-	syslog(LOG_INFO,
+	mon_syslog(LOG_INFO,
 	    "filter %s rule %d proto %d len %d packet %s,%d => %s,%d",
 	    (accept)?"accepted":"ignored",rule,
 	    pkt->protocol,
@@ -507,11 +504,11 @@ static void ip_swap_addrs(struct iphdr *pkt)
 void print_filter(FW_Filter *filter)
 {
     int i;
-    syslog(LOG_INFO,"filter: prl %d log %d type %d cnt %d tm %d",
+    mon_syslog(LOG_INFO,"filter: prl %d log %d type %d cnt %d tm %d",
 	filter->prule,filter->log,filter->type,
 	filter->count,filter->timeout);
     for (i = 0; i < filter->count; i++) {
-	syslog(LOG_INFO,"    term: shift %d op %d off %d%c msk %x tst %x",
+	mon_syslog(LOG_INFO,"    term: shift %d op %d off %d%c msk %x tst %x",
 	    filter->terms[i].shift, filter->terms[i].op,
 	    filter->terms[i].offset&0x7f,
 	    (filter->terms[i].offset&0x80)?'d':'h',
@@ -614,8 +611,7 @@ void forge_tcp_reset(struct iphdr *iph, int len)
 }
 
 /* Check if a packet passes the filters */
-int check_firewall(int unitnum,
-		struct sockaddr_ll *sll, unsigned char *pkt, int len)
+int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 {
     FW_unit *unit;
     FW_Filters *fw;
@@ -670,13 +666,16 @@ int check_firewall(int unitnum,
     }
 
     /* Build the connection ID, and set the direction flag */
+#ifdef HAVE_AF_PACKET
     if (af_packet) {
 	direction = 1;
 	if (sll->sll_pkttype != PACKET_OUTGOING) {
 	    direction = 2;
 	    ip_swap_addrs(ip_pkt);
 	}
-    } else {
+    } else
+#endif
+    {
 	direction = ip_direction(ip_pkt);
 	if (direction == 2) ip_swap_addrs(ip_pkt);
     }
@@ -763,7 +762,7 @@ int check_firewall(int unitnum,
 				  [FW_OFFSET(term->offset)]))
 		    >> term->shift) & term->mask;
 #if 0
-	    syslog(LOG_INFO,"testing ip %x:%x data %x:%x mask %x shift %x test %x v %x",
+	    mon_syslog(LOG_INFO,"testing ip %x:%x data %x:%x mask %x shift %x test %x v %x",
 		ntohl(*(int *)(&pkt[FW_OFFSET(term->offset)])),
 		*(int *)(&pkt[FW_OFFSET(term->offset)]),
 		ntohl(*(int *)(&data[FW_OFFSET(term->offset)])),
@@ -891,7 +890,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 	{
 	    FW_Filters *filters = malloc(sizeof(FW_Filters));
 	    if (filters == 0) {
-		syslog(LOG_ERR,"Out of memory! AIIEEE!");
+		mon_syslog(LOG_ERR,"Out of memory! AIIEEE!");
 		return -1; /* ERRNO */
 	    }
 	    filters->next = 0;
@@ -916,7 +915,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    FW_Connection *c;
 	    char saddr[20], daddr[20];
     	    struct in_addr addr;
-	    syslog(LOG_INFO,"up = %d, forcing = %d, impulse = %d, iitime = %d, itime = %d, ifuzz = %d, itimeout = %ld, timeout = %ld, next alarm = %d",
+	    mon_syslog(LOG_INFO,"up = %d, forcing = %d, impulse = %d, iitime = %d, itime = %d, ifuzz = %d, itimeout = %ld, timeout = %ld, next alarm = %d",
 		unit->up,unit->force, unit->impulse_mode, impulse_init_time, impulse_time,
 		impulse_fuzz,
 		unit->impulse.expected-tstamp,unit->force_etime-atime,
@@ -929,7 +928,7 @@ int ctl_firewall(int op, struct firewall_req *req)
                 addr.s_addr = c->id.id[5] + (c->id.id[6]<<8)
                         + (c->id.id[7]<<16) + (c->id.id[8]<<24);
                 strcpy(daddr,inet_ntoa(addr));
-                syslog(LOG_INFO,
+                mon_syslog(LOG_INFO,
                         "ttl %ld, %d - %s/%d => %s/%d (tcp state ([%lx,%lx] %d,%d))",
                         c->timer.expected-tstamp, c->id.id[0],
                         saddr, c->id.id[10]+(c->id.id[9]<<8),
@@ -980,7 +979,7 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    );
 	    mon_write(MONITOR_STATUS, buf, 12);
 
-	    mon_write(MONITOR_QUEUE,"QUEUE\n",6);
+	    mon_write(MONITOR_QUEUE|MONITOR_QUEUE2,"QUEUE\n",6);
 	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
 		if (c->timer.next == 0) continue;
 		if (!c->description) c->description = desc_connection(c);
@@ -993,9 +992,12 @@ int ctl_firewall(int op, struct firewall_req *req)
 		c->bytes_total[0] += c->bytes[0];
 		c->bytes_total[1] += c->bytes[1];
 		c->packets[0] = c->packets[1] = c->bytes[0] = c->bytes[1] = 0;
-                mon_write(MONITOR_QUEUE,buf,strlen(buf));
+                mon_write(MONITOR_QUEUE2, buf, strlen(buf));
+		buf[60] = '\n';
+		buf[61] = '\0';
+                mon_write(MONITOR_QUEUE, buf, strlen(buf));
 	    }
-	    mon_write(MONITOR_QUEUE,"END QUEUE\n",10);
+	    mon_write(MONITOR_QUEUE|MONITOR_QUEUE2,"END QUEUE\n",10);
 	    return 0;
 	}
 	return 0;

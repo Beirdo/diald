@@ -186,4 +186,4 @@ typedef struct fw_unit {
 } FW_unit;
 
 int ctl_firewall(int, struct firewall_req *);
-int check_firewall(int, struct sockaddr_ll *, unsigned char *, int);
+int check_firewall(int, sockaddr_ll_t *, unsigned char *, int);

@@ -63,6 +63,13 @@
 #  include <net/if_packet.h>
 #endif
 
+#if defined(AF_PACKET) && defined(PACKET_OUTGOING)
+#  define HAVE_AF_PACKET
+   typedef struct sockaddr_ll sockaddr_ll_t;
+#else
+   typedef void sockaddr_ll_t;
+#endif
+
 #include "config.h"
 #include "fsm.h"
 #include "timer.h"
@@ -98,13 +105,18 @@
 #define DEBUG_TICK		0x0020
 #define DEBUG_CONNECTION_QUEUE	0x0040
 
-/* Define MONITOR flags */
-#define MONITOR_STATE		0x0001
-#define MONITOR_INTERFACE	0x0002
-#define MONITOR_STATUS		0x0004
-#define MONITOR_LOAD		0x0008
-#define MONITOR_MESSAGE		0x0010
-#define MONITOR_QUEUE		0x0020
+/* Define MONITOR flags
+ * 0x??????nn - status request flags, default on
+ * 0x??nnnn?? - status request flags, default off
+ * 0xnn?????? - syslog level
+ */
+#define MONITOR_STATE		0x00000001
+#define MONITOR_INTERFACE	0x00000002
+#define MONITOR_STATUS		0x00000004
+#define MONITOR_LOAD		0x00000008
+#define MONITOR_MESSAGE		0x00000010
+#define MONITOR_QUEUE		0x00000020
+#define MONITOR_QUEUE2		0x00000100
 
 /*
  * If you choose UNSAFE_ROUTING=0, then by default diald will route all
@@ -185,7 +197,7 @@
 typedef struct monitors {
     struct monitors *next;
     int fd;			/* monitor output fp. */
-    int level;			/* Information level requested */
+    unsigned int level;		/* Information level requested */
     char *name;
 } MONITORS;
 
@@ -308,6 +320,7 @@ int fwdfd;			/* control socket for packet forwarding */
 int snoopfd;			/* snooping socket fd */
 int fwunit;			/* firewall unit for firewall control */
 int req_pid;			/* pid of process that made "request" */
+char *current_dev;		/* name of the current device */
 char *req_dev;			/* name of the device file requested to open */
 int use_req;			/* are we actually using the FIFO link-up request device? */
 char snoop_dev[10];		/* The interface name we are listening on */
@@ -441,16 +454,18 @@ void set_ptp(char *, int, char *, int);
 void del_ptp(char *, int, char *);
 void add_routes(char *, int, char *, char *, int);
 void del_routes(char *, int, char *, char *, int);
-void pipe_init(int, PIPE *, int);
+void pipe_init(char *, int, PIPE *, int);
 int pipe_read(PIPE *);
 void pipe_flush(PIPE *, int);
 int set_proxyarp (unsigned int);
 int clear_proxyarp (unsigned int);
 int report_system_result(int,char *);
-void mon_write(int,char *,int);
+void mon_syslog(int pri, char *fmt, ...);
+void mon_write(unsigned int,char *,int);
 void background_system(const char *);
 void block_timer();
 void unblock_timer();
+char *cdate();
 int getservice(const char *name, const char *proto);
 int getprotocol(const char *name);
 char *getprotonumber(int proto);
@@ -458,3 +473,6 @@ int getsn(FILE *fp,char *buf,int len);
 void del_impulse(FW_unit *unit);
 void del_connection(FW_Connection *c);
 void slip_start_fail(void * data);
+
+#undef inet_ntoa
+#undef inet_addr

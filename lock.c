@@ -38,26 +38,26 @@ int lock(char *dev)
 		n = read(fd, &pid, sizeof(pid));
 	    }
 	    if (n <= 0) {
-		syslog(LOG_ERR, "Can't read pid from lock file %s", lock_file);
+		mon_syslog(LOG_ERR, "Can't read pid from lock file %s", lock_file);
 		close(fd);
 	    } else {
 		if (kill(pid, 0) == -1 && errno == ESRCH) {
 		    /* pid no longer exists - remove the lock file */
 		    if (unlink(lock_file) == 0) {
 			close(fd);
-			syslog(LOG_NOTICE, "Removed stale lock on %s (pid %d)",
+			mon_syslog(LOG_NOTICE, "Removed stale lock on %s (pid %d)",
 			       dev, pid);
 			continue;
 		    } else
-			syslog(LOG_WARNING, "Couldn't remove stale lock on %s",
+			mon_syslog(LOG_WARNING, "Couldn't remove stale lock on %s",
 			       dev);
 		} else
-		    syslog(LOG_NOTICE, "Device %s is locked by pid %d",
+		    mon_syslog(LOG_NOTICE, "Device %s is locked by pid %d",
 			   dev, pid);
 	    }
 	    close(fd);
 	} else
-	    syslog(LOG_ERR, "Can't create lock file %s: %m", lock_file);
+	    mon_syslog(LOG_ERR, "Can't create lock file %s: %m", lock_file);
 	free(lock_file);
 	lock_file = NULL;
 	return -1;

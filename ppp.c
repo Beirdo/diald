@@ -37,7 +37,7 @@ void ppp_start()
 
     if (link_pid < 0) {
         unblock_signals();
-	syslog(LOG_ERR, "failed to fork pppd: %m");
+	mon_syslog(LOG_ERR, "failed to fork pppd: %m");
 	die(1);
     }
 
@@ -78,7 +78,7 @@ void ppp_start()
 	    strcat(argv_buf, argv[i]);
 	    strcat(argv_buf, " ");
 	  }
-	  syslog(LOG_DEBUG, "Running pppd: %s", argv_buf);
+	  mon_syslog(LOG_DEBUG, "Running pppd: %s", argv_buf);
 	}
 
 	/* make sure pppd is the session leader and has the controlling
@@ -96,12 +96,12 @@ void ppp_start()
 
 	execv(path_pppd,argv);
 
-	syslog(LOG_ERR, "could not exec %s: %m",path_pppd);
+	mon_syslog(LOG_ERR, "could not exec %s: %m",path_pppd);
 	_exit(99);
 	/* NOTREACHED */
     }
     unblock_signals();
-    syslog(LOG_INFO,"Running pppd (pid = %d).",link_pid);
+    mon_syslog(LOG_INFO,"Running pppd (pid = %d).",link_pid);
 }
 
 /*
@@ -141,7 +141,7 @@ int ppp_set_addrs()
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
 	sprintf(ifr.ifr_name,"ppp%d",link_iface);
 	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
-	   syslog(LOG_ERR,"failed to read ppp interface status");
+	   mon_syslog(LOG_ERR,"failed to read ppp interface status");
 	   return 0;
 	}
 	if (!(ifr.ifr_flags & IFF_UP))
@@ -157,12 +157,12 @@ int ppp_set_addrs()
 
 	/* Ok, the interface is up, grab the addresses. */
 	if (ioctl(snoopfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
-		syslog(LOG_ERR,"failed to get ppp local address: %m");
+		mon_syslog(LOG_ERR,"failed to get ppp local address: %m");
 	else
        	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
 	if (ioctl(snoopfd, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
-	   syslog(LOG_ERR,"failed to get ppp remote address: %m");
+	   mon_syslog(LOG_ERR,"failed to get ppp remote address: %m");
 	else
 	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
@@ -171,12 +171,12 @@ int ppp_set_addrs()
 	 * (NOTE: Adjusting the MTU setting may cause kernel nastyness...)
 	 */
 	if (ioctl(snoopfd, SIOCGIFMTU, (caddr_t) &ifr) == -1) {
-	    syslog(LOG_ERR,"failed to get ppp mtu setting: %m");
+	    mon_syslog(LOG_ERR,"failed to get ppp mtu setting: %m");
 	} else {
 	    if (ifr.ifr_mtu != mtu) {
-	        syslog(LOG_ERR,"PPP negotiated mtu of %d does not match requested setting %d.",ifr.ifr_mtu,mtu);
-		syslog(LOG_ERR,"Attempting to auto adjust mtu.");
-		syslog(LOG_ERR,"Restart diald with mtu set to %d to avoid errors.",ifr.ifr_mtu);
+	        mon_syslog(LOG_ERR,"PPP negotiated mtu of %d does not match requested setting %d.",ifr.ifr_mtu,mtu);
+		mon_syslog(LOG_ERR,"Attempting to auto adjust mtu.");
+		mon_syslog(LOG_ERR,"Restart diald with mtu set to %d to avoid errors.",ifr.ifr_mtu);
 		mtu = ifr.ifr_mtu;
 	        proxy_config(orig_local_ip,orig_remote_ip);
 	    }
@@ -190,7 +190,7 @@ int ppp_set_addrs()
 	    addr.s_addr = laddr;
 	    local_ip = strdup(inet_ntoa(addr));
 	    local_addr = laddr;
-	    syslog(LOG_INFO,"New addresses: local %s, remote %s.",
+	    mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 		local_ip,remote_ip);
 	}
 
@@ -202,6 +202,7 @@ int ppp_set_addrs()
 	     * clobbers all the routes.
 	     */
 	    proxy_config(local_ip,remote_ip);
+	    set_ptp("sl",proxy_iface,remote_ip,1);
 	    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
 	    add_routes("sl",proxy_iface,local_ip,remote_ip,1); 
 	}
@@ -241,7 +242,7 @@ int ppp_route_exists()
     FILE *fp;
     sprintf(buf,"%s -n",path_route);
     if ((fp = popen(buf,"r"))==NULL) {
-        syslog(LOG_ERR,"Could not run command '%s': %m",buf);
+        mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	return 0;	/* assume half dead in this case... */
     }
 
@@ -261,7 +262,7 @@ int ppp_rx_count()
     FILE *fp;
     sprintf(buf,"%s ppp%d",path_ifconfig,link_iface);
     if ((fp = popen(buf,"r"))==NULL) {
-        syslog(LOG_ERR,"Could not run command '%s': %m",buf);
+        mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
 	return 0;	/* assume half dead in this case... */
     }
 
@@ -293,8 +294,10 @@ void ppp_reroute()
     proxy_config(orig_local_ip,orig_remote_ip);
     if (blocked && !blocked_route)
 	del_ptp("sl",proxy_iface,orig_remote_ip);
-    else
+    else {
+	set_ptp("sl",proxy_iface,orig_remote_ip,1);
 	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
     local_addr = inet_addr(orig_local_ip);
     /* If we did routing on the ppp link, remove it */
     if (do_reroute && link_iface != -1)

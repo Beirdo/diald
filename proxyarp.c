@@ -86,12 +86,12 @@ static int get_ether_addr (unsigned int ipaddr, struct sockaddr *hwaddr)
     ifc.ifc_req = ifs;
     if (ioctl(sockfd, SIOCGIFCONF, &ifc) < 0)
       {
-	syslog(LOG_ERR, "ioctl(SIOCGIFCONF): %m");
+	mon_syslog(LOG_ERR, "ioctl(SIOCGIFCONF): %m");
 	return 0;
       }
 
     if (debug&DEBUG_PROXYARP)
-    	syslog(LOG_INFO, "proxy arp: scanning %d interfaces for IP %s",
+    	mon_syslog(LOG_INFO, "proxy arp: scanning %d interfaces for IP %s",
 		ifc.ifc_len / sizeof(struct ifreq), ip_ntoa(ipaddr));
 /*
  * Scan through looking for an interface with an Internet
@@ -105,7 +105,7 @@ static int get_ether_addr (unsigned int ipaddr, struct sockaddr *hwaddr)
 	    ina = ((struct sockaddr_in *) &ifr->ifr_addr)->sin_addr.s_addr;
 	    strncpy(ifreq.ifr_name, ifr->ifr_name, sizeof(ifreq.ifr_name));
 	    if (debug&DEBUG_PROXYARP)
-            	syslog(LOG_INFO, "proxy arp: examining interface %s",
+            	mon_syslog(LOG_INFO, "proxy arp: examining interface %s",
 			ifreq.ifr_name);
 /*
  * Check that the interface is up, and not point-to-point
@@ -130,7 +130,7 @@ static int get_ether_addr (unsigned int ipaddr, struct sockaddr *hwaddr)
 
 	    mask = ((struct sockaddr_in *) &ifreq.ifr_addr)->sin_addr.s_addr;
 	    if (debug&DEBUG_PROXYARP)
-	    	syslog(LOG_INFO, "proxy arp: interface addr %s mask %lx",
+	    	mon_syslog(LOG_INFO, "proxy arp: interface addr %s mask %lx",
 			ip_ntoa(ina), ntohl(mask));
 
 	    if (((ipaddr ^ ina) & mask) != 0)
@@ -146,14 +146,14 @@ static int get_ether_addr (unsigned int ipaddr, struct sockaddr *hwaddr)
         return 0;
       }
 
-    syslog(LOG_INFO, "found interface %s for proxy arp", ifreq.ifr_name);
+    mon_syslog(LOG_INFO, "found interface %s for proxy arp", ifreq.ifr_name);
 /*
  * Now get the hardware address.
  */
     memset (&ifreq.ifr_hwaddr, 0, sizeof (struct sockaddr));
     if (ioctl (sockfd, SIOCGIFHWADDR, &ifreq) < 0)
       {
-        syslog(LOG_ERR, "SIOCGIFHWADDR(%s): %m", ifreq.ifr_name);
+        mon_syslog(LOG_ERR, "SIOCGIFHWADDR(%s): %m", ifreq.ifr_name);
         return 0;
       }
 
@@ -162,7 +162,7 @@ static int get_ether_addr (unsigned int ipaddr, struct sockaddr *hwaddr)
 	    sizeof (struct sockaddr));
 
     if (debug&DEBUG_PROXYARP)
-    	syslog(LOG_INFO,
+    	mon_syslog(LOG_INFO,
 	   "proxy arp: found hwaddr %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
 		(int) ((unsigned char *) &hwaddr->sa_data)[0],
 		(int) ((unsigned char *) &hwaddr->sa_data)[1],
@@ -189,7 +189,7 @@ int set_proxyarp (unsigned int his_adr)
  * as our local address.
  */
     if (!get_ether_addr(his_adr, &arpreq.arp_ha)) {
-	syslog(LOG_ERR, "Cannot determine ethernet address for proxy ARP");
+	mon_syslog(LOG_ERR, "Cannot determine ethernet address for proxy ARP");
 	return 0;
     }
     
@@ -198,7 +198,7 @@ int set_proxyarp (unsigned int his_adr)
     arpreq.arp_flags = ATF_PERM | ATF_PUBL;
     
     if (ioctl(sockfd, SIOCSARP, (caddr_t)&arpreq) < 0) {
-	syslog(LOG_ERR, "ioctl(SIOCSARP): %m");
+	mon_syslog(LOG_ERR, "ioctl(SIOCSARP): %m");
 	return 0;
     }
 
@@ -219,7 +219,7 @@ int clear_proxyarp (unsigned int his_adr)
 
     ((struct sockaddr_in *) &arpreq.arp_pa)->sin_addr.s_addr = his_adr;
     if (ioctl(sockfd, SIOCDARP, (caddr_t)&arpreq) < 0) {
-	syslog(LOG_WARNING, "ioctl(SIOCDARP): %m");
+	mon_syslog(LOG_WARNING, "ioctl(SIOCDARP): %m");
 	return 0;
     }
     return 1;

@@ -16,8 +16,6 @@
 
 #include "diald.h"
 
-extern char *current_dev;	/* From modem.c */
-
 static char device_node[9];
 
 static int dead = 1;
@@ -29,7 +27,7 @@ void dev_start()
 {
     link_iface = -1 ;
     rx_count = -1;
-    syslog(LOG_INFO, "Open device %s", current_dev);
+    mon_syslog(LOG_INFO, "Open device %s", current_dev);
     dead = 0;
 }
 
@@ -71,7 +69,7 @@ int dev_set_addrs()
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
 	sprintf(ifr.ifr_name, current_dev);
 	if (ioctl(snoopfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
-	   syslog(LOG_ERR,"failed to read interface status from device %s",current_dev);
+	   mon_syslog(LOG_ERR,"failed to read interface status from device %s",current_dev);
 	   return 0;
 	}
 	if (!(ifr.ifr_flags & IFF_UP))
@@ -87,17 +85,20 @@ int dev_set_addrs()
 
 	/* Ok, the interface is up, grab the addresses. */
 	if (ioctl(snoopfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
-		syslog(LOG_ERR,"failed to get local address from device %s: %m",current_dev);
+		mon_syslog(LOG_ERR,"failed to get local address from device %s: %m",current_dev);
 	else
        	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
 	if (ioctl(snoopfd, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
-	   syslog(LOG_ERR,"failed to get remote address: %m");
+	   mon_syslog(LOG_ERR,"failed to get remote address: %m");
 	else
 	   raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
-	/* If we do not have a valid remote address yet the interface
-	 * is not really up.
+	/* KLUDGE 1:
+	 * If we do not have a valid remote address yet the interface
+	 * is not really up. We assume that a non-blocking connect
+	 * method was used (e.g. isdnctrl dial ...) and that something
+	 * like ippp will reconfigure the interface when it comes up.
 	 */
 	if (raddr == INADDR_ANY || raddr == INADDR_LOOPBACK)
 	    return 0;
@@ -110,13 +111,14 @@ int dev_set_addrs()
 	    addr.s_addr = laddr;
 	    strcpy(local_ip,inet_ntoa(addr));
 	    local_addr = laddr;
-	    syslog(LOG_INFO,"New addresses: local %s, remote %s.",
+	    mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 		local_ip,remote_ip);
 	}
 
 	if (!do_reroute
 	&& (dynamic_addrs || (blocked && !blocked_route))) {
 	    proxy_config(local_ip,remote_ip);
+	    set_ptp("sl",proxy_iface,remote_ip,1);
 	    del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
 	    add_routes("sl",proxy_iface,local_ip,remote_ip,1); 
 	} 
@@ -150,7 +152,7 @@ int dev_rx_count()
     FILE *fp;
     sprintf(buf,"%s %s",path_ifconfig, current_dev);
     if ((fp = popen(buf,"r"))==NULL) {
-        syslog(LOG_ERR,"Could not run command '%s': %m",buf);
+        mon_syslog(LOG_ERR,"Could not run command '%s': %m",buf);
         return 0;       /* assume half dead in this case... */
     }
 
@@ -185,8 +187,10 @@ void dev_reroute()
     proxy_config(orig_local_ip,orig_remote_ip);
     if (blocked && !blocked_route)
 	del_ptp("sl",proxy_iface,orig_remote_ip);
-    else
+    else {
+	set_ptp("sl",proxy_iface,orig_remote_ip,1);
 	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
     local_addr = inet_addr(orig_local_ip);
 }
 

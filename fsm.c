@@ -33,7 +33,7 @@ struct {
 void validate_mode()
 {
 	if (mode < 0 || mode > 2) {
-		syslog(LOG_ERR, "Mode value strayed to %d. Tell Eric.\n",mode);
+		mon_syslog(LOG_ERR, "Mode value strayed to %d. Tell Eric.\n",mode);
 		die(1);
 	}
 	if (pcontrol[0].start != slip_start
@@ -57,7 +57,7 @@ void validate_mode()
 	|| pcontrol[2].reroute != dev_reroute
 	|| pcontrol[2].kill != dev_kill
 	|| pcontrol[2].zombie != dev_zombie) {
-		syslog(LOG_ERR, "Corrupt FSM table. Tell Eric.\n");
+		mon_syslog(LOG_ERR, "Corrupt FSM table. Tell Eric.\n");
 		die(1);
 	}
 }
@@ -93,23 +93,9 @@ void trans_DOWN(void)
     }
     else if ((forced || !queue_empty()) && !blocked) GOTO(STATE_CONNECT);
     else if (delayed_quit && queue_empty() && !forced) {
-	syslog(LOG_INFO,"Carrying out delayed termination request.");
+	mon_syslog(LOG_INFO,"Carrying out delayed termination request.");
 	terminate = 1;
     }
-}
-
-/* Grumble. Attempt to generate a nicely formatted ascii date without
- * a built in newline.
- */
-char *cdate(void)
-{
-    static char dt[128];
-    int len;
-
-    time((time_t *)&call_start_time);
-    len = strftime(dt,128,"%c %Z",localtime((time_t *)&call_start_time));
-    if (len == 128) dt[len] = 0;
-    return dt;
 }
 
 void act_CONNECT(void)
@@ -137,7 +123,7 @@ void trans_CONNECT(void)
 	        finish_dial(); /* go into a CLOCAL connection */
 	    GOTO(STATE_START_LINK);
 	} else {
-	    syslog(LOG_INFO,"Connect script failed.");
+	    mon_syslog(LOG_INFO,"Connect script failed.");
 	    dial_failures++;
 	    if (redial_rtimeout == -1) redial_rtimeout = redial_timeout;
 	    if (redial_backoff_start >= 0 && dial_failures > redial_backoff_start) {
@@ -151,15 +137,15 @@ void trans_CONNECT(void)
 		dial_failures = 0;
 		redial_rtimeout = redial_timeout;
 		current_retry_count = 0;
-		syslog(LOG_INFO,"Too many dialing failures in a row. Blocking connection.");
+		mon_syslog(LOG_INFO,"Too many dialing failures in a row. Blocking connection.");
 	    }
 	    GOTO(STATE_CLOSE);
 	}
     } else if (state_timeout == 0) {
-	syslog(LOG_INFO,"Connect script timed out. Killing script.");
+	mon_syslog(LOG_INFO,"Connect script timed out. Killing script.");
     } else if (req_pid && !use_req) {
         /* we never get here on a connect FIFO request anyway */
-        syslog(LOG_INFO,"Cancelling connect script in favour of FIFO request.");
+        mon_syslog(LOG_INFO,"Cancelling connect script in favour of request.");
 	GOTO(STATE_STOP_DIAL);
     }
 }
@@ -168,7 +154,7 @@ void act_STOP_DIAL(void)
 {
     if (dial_pid) {
         if (debug&DEBUG_VERBOSE)
-            syslog(LOG_INFO,"Sending SIGINT to (dis)connect process %d",
+            mon_syslog(LOG_INFO,"Sending SIGINT to (dis)connect process %d",
 		dial_pid);
 	if (kill(dial_pid,SIGINT) == -1 && errno == ESRCH) {
 	    dial_pid = 0;
@@ -186,7 +172,7 @@ void act_KILL_DIAL(void)
 {
     if (dial_pid) {
         if (debug&DEBUG_VERBOSE)
-            syslog(LOG_INFO,"Sending SIGKILL to (dis)connect process %d",
+            mon_syslog(LOG_INFO,"Sending SIGKILL to (dis)connect process %d",
 		dial_pid);
 	if (kill(dial_pid,SIGKILL) == -1 && errno == ESRCH) {
 	    dial_pid = 0;
@@ -228,7 +214,7 @@ void trans_START_LINK(void)
 	/* If we time out, then we're going to stop. We need to reroute
          *  just in case the routes got changed before we timed out.
 	 */
-	syslog(LOG_INFO,"pppd startup timed out. Check your pppd options. Killing pppd.");
+	mon_syslog(LOG_INFO,"pppd startup timed out. Check your pppd options. Killing pppd.");
 	control_reroute();
     }
 }
@@ -270,7 +256,7 @@ void act_UP(void)
         killpg(req_pid, SIGKILL);
         kill(req_pid, SIGKILL);
 	req_pid=0;
-        syslog(LOG_INFO,"Cancelling link up requested denied in favour of existing link.");
+        mon_syslog(LOG_INFO,"Cancelling link up request in favour of existing link.");
     }
 }
 
@@ -283,7 +269,7 @@ void trans_UP(void)
     }
     if (state_timeout == 0) {
 	if (!forced && queue_empty()) {  /* the link may be forced up. */
-	    syslog(LOG_INFO,"%s %d %s",
+	    mon_syslog(LOG_INFO,"%s %d %s",
 	    	"Failed to received first packet within",
 	    	first_packet_timeout,
 	    	"seconds. Closing Link down.");
@@ -292,7 +278,7 @@ void trans_UP(void)
 	state_timeout = -1;
     }
     if (!forced && queue_empty() && state_timeout == -1) {
-	syslog(LOG_INFO,"Closing down idle link.");
+	mon_syslog(LOG_INFO,"Closing down idle link.");
 take_link_down:
 	current_retry_count = 0;
 	flush_timeout_queue();
@@ -304,12 +290,12 @@ take_link_down:
 	return;
     }
     if (ppp_half_dead) {
-	syslog(LOG_ERR,"PPP network layer died, but link did not. Probable configuration error.");
+	mon_syslog(LOG_ERR,"PPP network layer died, but link did not. Probable configuration error.");
 	GOTO(STATE_HALF_DEAD);
 	return;
     }
     if (control_dead() || modem_hup) {
-	syslog(LOG_INFO,"Link died on remote end.");
+	mon_syslog(LOG_INFO,"Link died on remote end.");
     	if (two_way) flush_timeout_queue();
 	no_redial_delay = 1;
 	current_retry_count = died_retry_count;
@@ -344,7 +330,7 @@ void trans_HALF_DEAD(void)
 	/* If we time out, then we're going to stop. We need to reroute
          *  just in case the routes got changed before we timed out.
 	 */
-	syslog(LOG_INFO,"pppd restart timed out. Killing pppd.");
+	mon_syslog(LOG_INFO,"pppd restart timed out. Killing pppd.");
 	control_reroute();
     }
 }
@@ -363,10 +349,10 @@ void trans_DISCONNECT(void)
 {
     if (dial_pid == 0) {
 	if (dial_status != 0)
-	    syslog(LOG_INFO,"Disconnect script failed");
+	    mon_syslog(LOG_INFO,"Disconnect script failed");
 	GOTO(STATE_CLOSE);
     } else if (state_timeout == 0) {
-	syslog(LOG_INFO,"Disconnect script timed out. Killing script.");
+	mon_syslog(LOG_INFO,"Disconnect script timed out. Killing script.");
     }
 }
 
@@ -388,11 +374,11 @@ void act_CLOSE(void)
     if (no_redial_delay == 0) {
 	if (redial_rtimeout == -1)
 	    redial_rtimeout = redial_timeout;
-        syslog(LOG_INFO,"Delaying %d seconds before clear to dial.",
+        mon_syslog(LOG_INFO,"Delaying %d seconds before clear to dial.",
 	    redial_rtimeout);
 	state_timeout = redial_rtimeout;
     } else if (no_redial_delay == 2) {
-        syslog(LOG_INFO,"Delaying %d seconds before clear to dial.",
+        mon_syslog(LOG_INFO,"Delaying %d seconds before clear to dial.",
 	    nodev_retry_timeout);
 	state_timeout = nodev_retry_timeout;
     }
@@ -420,7 +406,7 @@ void trans_RETRY(void)
 
 void act_ERROR(void)
 {
-    syslog(LOG_ERR,"Subprocess sent SIGKILL still alive after %d seconds. Reaping zombie.",kill_timeout);
+    mon_syslog(LOG_ERR,"Subprocess sent SIGKILL still alive after %d seconds. Reaping zombie.",kill_timeout);
     control_zombie();	/* deal with the zombie */
 }
 void trans_ERROR(void) {
@@ -429,7 +415,7 @@ void trans_ERROR(void) {
 
 void act_ZOMBIE(void)
 {
-    syslog(LOG_ERR,"Subprocess sent SIGKILL still alive after %d seconds. Reaping zombie.",kill_timeout);
+    mon_syslog(LOG_ERR,"Subprocess sent SIGKILL still alive after %d seconds. Reaping zombie.",kill_timeout);
 
     sig_chld(SIGKILL);	/* try to reap the zombie */
     if (dial_pid) {
@@ -484,7 +470,7 @@ void GOTO(int new_state)
     state_timeout = (trans[new_state].timeout)
                      ? *trans[new_state].timeout : -1;
     if (debug&DEBUG_STATE_CONTROL)
-    	syslog(LOG_DEBUG,"new state %s action %p timeout %d",
+    	mon_syslog(LOG_DEBUG,"new state %s action %p timeout %d",
 	    trans[new_state].name,trans[new_state].action,state_timeout);
     state = new_state;
     output_state();

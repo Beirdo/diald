@@ -86,7 +86,7 @@ int validate_function(struct timer_lst *c)
 	|| c->function == del_connection
 	|| c->function == slip_start_fail)
 		return 1;
-	syslog(LOG_ERR, "Caught a bad function value %p. Tell Eric.\n",
+	mon_syslog(LOG_ERR, "Caught a bad function value %p. Tell Eric.\n",
 		c->function);
 	return 0;
 }

@@ -1,5 +1,19 @@
 #include "diald.h"
 
+/* Grumble. Attempt to generate a nicely formatted ascii date without
+ * a built in newline.
+ */
+char *cdate(void)
+{
+    static char dt[128];
+    int len;
+
+    time((time_t *)&call_start_time);
+    len = strftime(dt,128,"%c %Z",localtime((time_t *)&call_start_time));
+    if (len == 128) dt[len] = 0;
+    return dt;
+}
+
 int getsn(FILE *fp,char *buf,int len)
 {
     int c;

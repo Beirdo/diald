@@ -158,36 +158,36 @@ void proxy_up(void)
     set_up_tty(proxy_sfd,1, 38400);
 
     if (ioctl(proxy_sfd, TIOCGETD, &orig_disc) < 0)
-	syslog(LOG_ERR,"Can't get line discipline on proxy device: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get line discipline on proxy device: %m"), die(1);
 
     /* change line disciple to SLIP and set the SLIP encapsulation */
     disc = N_SLIP;
     if ((proxy_iface = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
 	if (errno == ENFILE) {
-	   syslog(LOG_ERR,"No free slip device available for proxy."), die(1);
+	   mon_syslog(LOG_ERR,"No free slip device available for proxy."), die(1);
 	} else if (errno == EEXIST) {
-	    syslog(LOG_ERR,"Proxy device already in slip mode!?");
+	    mon_syslog(LOG_ERR,"Proxy device already in slip mode!?");
 	} else if (errno == EINVAL) {
-	    syslog(LOG_ERR,"SLIP not supported by kernel, can't build proxy.");
+	    mon_syslog(LOG_ERR,"SLIP not supported by kernel, can't build proxy.");
 	    die(1);
 	} else
-	   syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
+	   mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
     }
 
     if (ioctl(proxy_sfd, SIOCSIFENCAP, &sencap) < 0)
-	syslog(LOG_ERR,"Can't set encapsulation: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't set encapsulation: %m"), die(1);
 
     /* verify that it worked */
     if (ioctl(proxy_sfd, TIOCGETD, &disc) < 0)
-	syslog(LOG_ERR,"Can't get line discipline: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get line discipline: %m"), die(1);
     if (ioctl(proxy_sfd, SIOCGIFENCAP, &sencap) < 0)
-	syslog(LOG_ERR,"Can't get encapsulation: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't get encapsulation: %m"), die(1);
 
     if (disc != N_SLIP || sencap != 0)
-        syslog(LOG_ERR,"Couldn't set up the proxy link correctly!"), die(1);
+        mon_syslog(LOG_ERR,"Couldn't set up the proxy link correctly!"), die(1);
 
     if (debug&DEBUG_VERBOSE)
-        syslog(LOG_INFO,"Proxy device established on interface sl%d",
+        mon_syslog(LOG_INFO,"Proxy device established on interface sl%d",
 	    proxy_iface);
 
     /* Mark the interface as up */
@@ -195,8 +195,10 @@ void proxy_up(void)
     /* set the routing to the interface */
     if (blocked && !blocked_route)
 	del_ptp("sl",proxy_iface,orig_remote_ip);
-    else
+    else {
+	set_ptp("sl",proxy_iface,orig_remote_ip,1);
 	add_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
+    }
 }
 
 /*
@@ -225,7 +227,7 @@ void proxy_down()
     int res;
 
     if (debug&DEBUG_VERBOSE)
-	syslog(LOG_INFO,"taking proxy device down");
+	mon_syslog(LOG_INFO,"taking proxy device down");
     del_routes("sl",proxy_iface,orig_local_ip,orig_remote_ip,1);
 
     /* mark the interface as down */
@@ -235,7 +237,7 @@ void proxy_down()
 
     /* clear the line discipline */
     if ((proxy_iface = ioctl(proxy_sfd, TIOCSETD, &orig_disc)) < 0)
-	syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
+	mon_syslog(LOG_ERR,"Can't set line discipline: %m"), die(1);
 }
 
 void run_ip_up()
@@ -250,7 +252,7 @@ void run_ip_up()
 	    local_ip,
 	    remote_ip);
 	if (debug&DEBUG_VERBOSE)
-	    syslog(LOG_INFO,"running ip-up script '%s'",buf);
+	    mon_syslog(LOG_INFO,"running ip-up script '%s'",buf);
         background_system(buf);
     }
 }
@@ -267,7 +269,7 @@ void run_ip_down()
 	    local_ip,
 	    remote_ip);
 	if (debug&DEBUG_VERBOSE)
-	    syslog(LOG_INFO,"running ip-down script '%s'",buf);
+	    mon_syslog(LOG_INFO,"running ip-down script '%s'",buf);
         background_system(buf);
     }
 }

@@ -61,8 +61,8 @@ void parse_init()
 
 void parse_error(char *s)
 {
-    syslog(LOG_ERR,"%s parsing error. Got token '%s'. %s",context,token->str,s);
-    syslog(LOG_ERR,"parse string: '%s'",errstr);
+    mon_syslog(LOG_ERR,"%s parsing error. Got token '%s'. %s",context,token->str,s);
+    mon_syslog(LOG_ERR,"parse string: '%s'",errstr);
     longjmp(unwind,1);
 }
 
@@ -78,7 +78,7 @@ void tokenize(char *cntxt, int argc, char **argv)
     for (len = i = 0; i < argc; i++)
 	len += strlen(argv[i])+1;
     t = errstr = malloc(len);
-    if (errstr == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+    if (errstr == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
     strcpy(errstr,argv[0]);
     for (i = 1; i < argc; i++) { strcat(errstr," "); strcat(errstr,argv[i]); }
 
@@ -86,7 +86,7 @@ void tokenize(char *cntxt, int argc, char **argv)
 
     for (s = errstr; *s;) {
 	new = malloc(sizeof(Token));
-	if (new == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+	if (new == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
         if (prev == 0) tlist = new; else prev->next = new;
 	prev = new;
 	new->next = 0;
@@ -136,12 +136,12 @@ tokerr:
 done:
 	len = (s-errstr)-new->offset;
 	new->str = malloc(len+1);
-	if (new->str == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+	if (new->str == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
 	strncpy(new->str,errstr+new->offset,len);
 	new->str[len] = 0;
     }
     new = malloc(sizeof(Token));
-    if (new == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+    if (new == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
     if (prev == 0) tlist = new; else prev->next = new;
     prev = new;
     new->next = 0;
@@ -155,7 +155,7 @@ void free_tokens(void)
 {
     Token *next;
     if (token && token->type != TOK_EOF)
-	syslog(LOG_ERR,
+	mon_syslog(LOG_ERR,
 	    "Parsing error. Got token '%s' when end of parse was expected.",
 	    token->str);
     while (tlist) {
@@ -749,7 +749,7 @@ void parse_impulse(void *var, char **argv)
 void parse_var(void *var, char **argv)
 {
     struct var *variable = malloc(sizeof(struct var));
-    if (variable == 0) { syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
+    if (variable == 0) { mon_syslog(LOG_ERR,"Out of memory! AIIEEE!"); die(1); }
     tokenize("var",2,argv);
     if (setjmp(unwind)) { token = 0; free_tokens(); return; }
     parse_var_name(variable);
