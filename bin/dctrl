@@ -543,15 +543,15 @@ proc readMonitor {} {
     while {[gets $monfd foo] != -1} {
 
     switch " $foo" {
-	{ STATE}	{ set monstate 1.0; return 0 }
-	{ STATUS}	{ set monstate 2.0; return 0 }
+	{ STATE}	{ set monstate 1.0; continue }
+	{ STATUS}	{ set monstate 2.0; continue }
 	{ QUEUE}	{ set monstate 4.0
 			set queue_list [list]
-			return 0
+			continue
 			}
-	{ MESSAGE}	{ set monstate 5.0; return 0 }
-	{ INTERFACE}	{ set monstate 6.0; return 0 }
-	{ LOAD}		{ set monstate 7.0; return 0 }
+	{ MESSAGE}	{ set monstate 5.0; continue }
+	{ INTERFACE}	{ set monstate 6.0; continue }
+	{ LOAD}		{ set monstate 7.0; continue }
 	{ END QUEUE}	{ set monstate 0.0
 #			We insert then delete to avoid the creeping
 #			scrollbar problem but then, to avoid lines
@@ -566,9 +566,9 @@ proc readMonitor {} {
 			}
 			.queue.vis.text delete $i.0 end
 			set queue_list [list]
-			return 0
+			continue
 			}
-	{ TITLE}	{ set monstate 8.0; return 0; }
+	{ TITLE}	{ set monstate 8.0; continue; }
     }
 
     if {$monstate < 1.0} {
