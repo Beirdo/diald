@@ -65,10 +65,10 @@ rm -rf "$RPM_BUILD_ROOT"
 %attr (0644, root, root) /usr/share/diald/dynamic.filter
 %attr (0755, root, root) /usr/share/diald/connect
 %attr (0755, root, root) /usr/share/diald/disconnect
-%attr (0644, root, root) /usr/share/diald/device/dhcp
-%attr (0644, root, root) /usr/share/diald/device/dhcp.hangup
-%attr (0644, root, root) /usr/share/diald/device/isdn
-%attr (0644, root, root) /usr/share/diald/device/isdn.hangup
-%attr (0644, root, root) /usr/share/diald/modem/generic
-%attr (0644, root, root) /usr/share/diald/login/demon
-%attr (0644, root, root) /usr/share/diald/login/shell-generic
+%attr (0755, root, root) /usr/share/diald/device/dhcp
+%attr (0755, root, root) /usr/share/diald/device/dhcp.hangup
+%attr (0755, root, root) /usr/share/diald/device/isdn
+%attr (0755, root, root) /usr/share/diald/device/isdn.hangup
+%attr (0755, root, root) /usr/share/diald/modem/generic
+%attr (0755, root, root) /usr/share/diald/login/demon
+%attr (0755, root, root) /usr/share/diald/login/shell-generic
