@@ -50,15 +50,8 @@ void dev_start()
 
 int dev_set_addrs()
 {
-    static int sock = -1;
     ulong laddr = 0, raddr = 0, baddr = 0;
     struct ifreq   ifr; 
-
-    /* We need a socket. Any socket... */
-    if (sock < 0) {
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
-	fcntl(sock, F_SETFD, FD_CLOEXEC);
-    }
 
     /* Try to get the interface number if we don't know it yet. */
     if (link_iface == -1) {
@@ -77,7 +70,7 @@ int dev_set_addrs()
 	SET_SA_FAMILY (ifr.ifr_netmask, AF_INET); 
 	strncpy(ifr.ifr_name, current_dev, IFNAMSIZ);
 	ifr.ifr_name[IFNAMSIZ-1] = '\0';
-	if (ioctl(sock, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
+	if (ioctl(sockfd, SIOCGIFFLAGS, (caddr_t) &ifr) == -1) {
 	    mon_syslog(LOG_ERR,
 		"failed to read interface status from device %s: %m",
 		current_dev);
@@ -95,21 +88,21 @@ int dev_set_addrs()
 	}
 
 	/* Ok, the interface is up, grab the addresses. */
-	if (ioctl(sock, SIOCGIFADDR, (caddr_t) &ifr) == -1)
+	if (ioctl(sockfd, SIOCGIFADDR, (caddr_t) &ifr) == -1)
 	    mon_syslog(LOG_ERR,
 		"failed to get local address from device %s: %m",
 		current_dev);
 	else
        	    laddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
-	if (ioctl(sock, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
+	if (ioctl(sockfd, SIOCGIFDSTADDR, (caddr_t) &ifr) == -1) 
 	    mon_syslog(LOG_ERR,
 		"failed to get remote address from device %s: %m",
 		current_dev);
 	else
 	    raddr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
 
-	if (ioctl(sock, SIOCGIFBRDADDR, (caddr_t) &ifr) == -1) 
+	if (ioctl(sockfd, SIOCGIFBRDADDR, (caddr_t) &ifr) == -1) 
 	    mon_syslog(LOG_ERR,
 		"failed to get broadcast address from device %s: %m",
 		current_dev);

@@ -35,8 +35,6 @@
 #include <net/if_arp.h>
 /* #include <net/route.h> */
 
-extern int sockfd;		/* socket for doing interface ioctls */
-
 #define MAX_IFS		100
 
 #define FLAGS_GOOD (IFF_UP          | IFF_BROADCAST)

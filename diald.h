@@ -295,6 +295,7 @@ PIPE *pipes;			/* List of control/monitor pipes. */
 MONITORS *monitors;		/* List of monitor pipes. */
 int modem_fd;			/* modem device fp (for slip links) */
 int modem_hup;			/* have we seen a modem HUP? */
+int sockfd;			/* socket for doing interface ioctls */
 int request_down;		/* has the user requested link down? */
 int request_up;			/* has the user requested link up? */
 int forced;			/* has the user requested the link forced up? */
