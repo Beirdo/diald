@@ -185,29 +185,22 @@ iface_stop(char *mode, char *iftype, int ifunit,
 
     /* With no ifsetup script we have to do it all ourselves. */
 
-    /* For modes with transient interfaces (ppp<n> and sl<n>) we do
-     * nothing. For non-transient interfaces we delete the address.
-     * We do not simply down the interface because it may be required
-     * to up (ISDN, for instance, will not answer an incoming call if
-     * the interface is not up).
-     * Deleting the addresses has the effect of deleting routes as well
-     * but we still call del_routes first because the user delroutes
-     * scripts may have been abused to do something "special".
+    /* Deleting the addresses has the effect of deleting routes as well
+     * on 2.1 and later kernels but we still call del_routes first
+     * because the user delroutes scripts may have been abused to do
+     * something "special".
      * 2.0.x kernels have a different behaviour when the address is
-     * set to 0.0.0.0 so we down the interface and hope the user has
-     * set some of the support scripts to do the right thing.
+     * set to 0.0.0.0 so we use 127.0.0.1 as a "safe" local address.
      */
     del_routes(desc, iface, lip, rip);
 
-    sprintf(buf, "%s %s %s%s",
+    sprintf(buf, "%s %s %s",
 	path_ifconfig, iface,
 #ifdef HAVE_AF_PACKET
-	af_packet ? "0.0.0.0" : "127.0.0.2",
+	af_packet ? "0.0.0.0" : "127.0.0.1"
 #else
-	"127.0.0.2",
+	"127.0.0.1"
 #endif
-	(current_mode == MODE_DEV || (strcmp(mode, "proxy") == 0))
-		? "" : " down"
     );
     run_shell(SHELL_WAIT, desc, buf, -1);
 }

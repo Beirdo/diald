@@ -284,10 +284,13 @@ void slip_reroute()
 	proxy.start(&proxy);
     local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
-    if (link_iface != -1)
+    if (link_iface != -1) {
     	iface_stop("link", "sl", link_iface,
 	    local_ip, remote_ip, broadcast_ip);
-    link_iface = -1;
+    	iface_down("link", "sl", link_iface,
+	    local_ip, remote_ip, broadcast_ip);
+	link_iface = -1;
+    }
 }
 
 int slip_rx_count()

@@ -295,10 +295,13 @@ void ppp_reroute()
 	proxy.start(&proxy);
     local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
-    if (link_iface != -1)
+    if (link_iface != -1) {
     	iface_stop("link", "ppp", link_iface,
 	    local_ip, remote_ip, broadcast_ip);
-    link_iface = -1;
+    	iface_down("link", "ppp", link_iface,
+	    local_ip, remote_ip, broadcast_ip);
+	link_iface = -1;
+    }
 }
 
 void ppp_kill()

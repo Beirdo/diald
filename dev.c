@@ -205,10 +205,16 @@ void dev_reroute()
     local_addr = (orig_local_ip ? inet_addr(orig_local_ip) : 0);
 
     /* Kill the alternate routing */
-    if (link_iface != -1)
+    if (link_iface != -1) {
 	iface_stop("link", device_node, link_iface,
 	    local_ip, remote_ip, broadcast_ip);
-    link_iface = -1;
+	/* We do not down dev interfaces here. Things like ISDN
+	 * require the interface to be up to receive incoming calls.
+	 * If this is not what you want you can do it in a disconnect
+	 * script.
+	 */
+	link_iface = -1;
+    }
 }
 
 /* Dummy proc. This should never get called */
