@@ -540,15 +540,13 @@ proc readMonitor {} {
     global demand blocked forced max_info_lines
     global diald_TITLE
 
-    if {[gets $monfd foo] == -1} {
-	closeMonitor
-	return 0
-    }
+    while {[gets $monfd foo] != -1} {
 
     switch " $foo" {
 	{ STATE}	{ set monstate 1.0; return 0 }
 	{ STATUS}	{ set monstate 2.0; return 0 }
-	{ STATUS2}	{ set monstate 3.0; return 0 }
+# STATUS2 is no longer used as of diald 0.98.2
+#	{ STATUS2}	{ set monstate 3.0; return 0 }
 	{ QUEUE}	{ set monstate 4.0
 			set queue_list [list]
 			return 0
@@ -583,23 +581,18 @@ proc readMonitor {} {
 	updateIcon
 	set monstate 0.0
     } elseif {$monstate < 3.0} {
-	switch $monstate {
-	    2.0	{ set status(up) $foo; set monstate 2.1 }
-	    2.1	{ set status(force) $foo; set monstate 2.2 }
-	    2.2	{ set status(impmode) $foo; set monstate 2.3 }
-	    2.3	{ set status(imp_itime) $foo; set monstate 2.4 }
-	    2.4	{ set status(imp_time) $foo; set monstate 2.5 }
-	    2.5	{ set status(imp_fuzz) $foo; set monstate 2.6 }
-	    2.6	{ set status(imp_timeout) $foo; set monstate 2.7 }
-	    2.7	{ set status(force_timeout) $foo; set monstate 2.8 }
-	    2.8	{ set status(timeout) $foo; set monstate 0.0 }
-	}
+	scan $foo "%d %d %d %d %d %d %s %s %s %d %d %d" \
+	    status(up) status(force) status(impmode) \
+	    status(imp_itime) status(imp_time) status(imp_fuzz) \
+	    status(imp_timeout) status(force_timeout) \
+	    status(timeout) demand blocked forced
+	set monstate 0.0
     } elseif {$monstate < 4.0} {
-	switch $monstate {
-	    3.0	{ set demand $foo; set monstate 3.1 }
-	    3.1	{ set blocked $foo; set monstate 3.2 }
-	    3.2	{ set forced $foo; set monstate 0.0 }
-	}
+#	switch $monstate {
+#	    3.0	{ set demand $foo; set monstate 3.1 }
+#	    3.1	{ set blocked $foo; set monstate 3.2 }
+#	    3.2	{ set forced $foo; set monstate 0.0 }
+#	}
     } elseif {$monstate < 5.0} {
 	set outp 0
 	set outb 0
@@ -675,7 +668,7 @@ proc readMonitor {} {
 			    [format "%.3f %.3f" \
 				[expr {$status(tx_load5)/1000}] \
 				[expr {$status(tx_load150)/1000}]]
-			update
+#			update
 			addtick .lm.tx [expr {$status(tx_load5)/1000}]
 			addtick .lm.rx [expr {$status(rx_load5)/1000}]
 			set status(tx_total) [expr {$status(tx_total)+$txtotal}]
@@ -690,6 +683,8 @@ proc readMonitor {} {
 	    wm iconname . "$foo"
 	}
     }
+    }
+    if {[eof $monfd]} { closeMonitor; return 0 }
 }
 
 proc dctrlQuit {} {

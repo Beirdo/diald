@@ -1065,10 +1065,12 @@ int ctl_firewall(int op, struct firewall_req *req)
 	    unsigned long atime = time(0);
             unsigned long tstamp = timestamp();
 	    FW_Connection *c;
+	    int i;
+	    char *p;
 	    char tbuf1[10], tbuf2[10], tbuf3[10];
             char buf[1024];
 
-	    sprintf(buf,"STATUS\n%d\n%d\n%d\n%d\n%d\n%d\n%s\n%s\n%s\n",
+	    sprintf(buf,"STATUS\n%d %d %d %d %d %d %s %s %s %c %c %c\n",
 		unit->up, unit->force, unit->impulse_mode,
 		impulse_init_time, impulse_time,
 		impulse_fuzz,
@@ -1076,16 +1078,20 @@ int ctl_firewall(int op, struct firewall_req *req)
 		    ? pcountdown(tbuf1, unit->impulse.expected-tstamp)
 		    : pcountdown(tbuf1, 0)),
 		pcountdown(tbuf2, unit->force_etime-atime),
-		pcountdown(tbuf3, next_alarm())
-	    );
-	    mon_write(MONITOR_STATUS, buf, strlen(buf));
-
-	    sprintf(buf,"STATUS2\n%c\n%c\n%c\n",
+		pcountdown(tbuf3, next_alarm()),
 		(demand ? '1' : '0'),
 		(blocked ? '1' : '0'),
 		(forced ? '1' : '0')
 	    );
-	    mon_write(MONITOR_VER2|MONITOR_STATUS, buf, 12);
+	    mon_write(MONITOR_VER2|MONITOR_STATUS, buf, strlen(buf));
+
+	    p = buf + 7;
+	    for (i=9; i > 0; i--) {
+		while (*p != ' ') p++;
+		*p = '\n';
+	    }
+	    *(p+1) = '\0';
+	    mon_write(MONITOR_VER1|MONITOR_STATUS, buf, strlen(buf));
 
 	    mon_write(MONITOR_QUEUE,"QUEUE\n",6);
 	    for (c=unit->connections->next; c!=unit->connections; c=c->next) {
