@@ -133,10 +133,7 @@ accept udp 30 udp.source=udp.domain
 ignore udp udp.source=udp.netbios-ns,udp.dest=udp.netbios-ns
 accept udp 30 udp.dest=udp.netbios-ns
 accept udp 30 udp.source=udp.netbios-ns
-# keep routed and gated transfers from holding the link up
-ignore udp tcp.dest=udp.router
-ignore udp tcp.source=udp.router
-# Anything else gest 2 minutes.
+# Anything else gets 2 minutes.
 accept udp 120 any
 
 
