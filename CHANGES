@@ -1,5 +1,7 @@
 Major changes between version 0.16 and 0.98.2.
 ----------------------------------------------
+  - Fix the bug that caused the retry-count to be ignored for the
+    very first connection attempt.
   - Check we have ifconfig and either ip or route.
   - It is not an error not to have a connect script. We may not
     be expecting to initiate outgoing connections. We may be using

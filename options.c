@@ -775,4 +775,6 @@ void check_setup()
 	mon_syslog(LOG_ERR,"Terminating due to damaged reconfigure.");
 	exit(1);
     }
+
+    current_retry_count = retry_count;
 }
