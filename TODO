@@ -80,3 +80,11 @@ same data to all monitors. This is a job for multicasting surely?
 We should make the modem access routine more generic (a la proxy)
 and add a "device ssh" mode that sets up a pty with ssh to a remote
 system running on it so that we can then start pppd through it.
+
+We should have a "sticky" mode. This is like dynamic but when we get
+new addresses we use them for the proxy in the future rather than
+switching back to the original configured addresses. This is because
+many ISPs that use dynamic addresses sometimes (even often) provide
+the same addresses on subsequent connections, intentionally or otherwise.
+-- We could probably do this with ifsetup scripts but it would equally
+   be good to handle it as part of the old mechanism.
