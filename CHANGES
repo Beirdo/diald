@@ -1,5 +1,7 @@
 Major changes between version 0.99 and 0.99.1.
 ------------------------------------------------
+  - Read the full packet from the snooping socket simply because
+    we want to know the length so we can count bytes in and out.
   - If we have no AF_PACKET support we are probably running on
     a 2.0 kernel so must always down interfaces rather than
     trying to delete addresses by setting the interface to 0.0.0.0.
