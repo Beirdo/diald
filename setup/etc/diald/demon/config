@@ -38,3 +38,5 @@ died-retry-count 0
 connect-timeout	600
 retry-count	3
 connect		"/usr/share/diald/connect"
+
+include		"/usr/share/diald/filter/standard"
