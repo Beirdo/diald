@@ -34,7 +34,7 @@
  */
 #define CONFIG_DEFAULT_ACCESS \
 	(ACCESS_CONTROL | ACCESS_AUTH \
-	| ACCESS_MONITOR | ACCESS_MESSAGE)
+	| ACCESS_MONITOR)
 
 #if 0
 /* This is not needed. See the TODO file. */
