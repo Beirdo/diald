@@ -246,7 +246,6 @@ int buffer_size;
 int buffer_fifo_dispose;
 int buffer_timeout;
 FILE *acctfp;
-time_t call_start_time;
 int mode;
 int scheduler;
 int priority;

@@ -8,6 +8,9 @@
 
 #include "diald.h"
 
+int call_timer_running = 0;
+time_t call_start_time;
+
 #define STATE(name,timeout,tstate) \
         { timeout, act_ ## name, trans_ ## name, STATE_ ## tstate, #name }
 
@@ -194,6 +197,7 @@ void trans_KILL_DIAL(void)
 void act_START_LINK(void)
 {
     time(&call_start_time);
+    call_timer_running = 1;
     mon_syslog(LOG_NOTICE,
 	use_req ? "Connect request from %s\n" : "Connected to site %s\n",
 	remote_ip);
@@ -373,10 +377,12 @@ void trans_DISCONNECT(void)
 void act_CLOSE(void)
 {
     if (acctlog && (acctfp = fopen(acctlog,"a")) != NULL) {
-	int duration = -call_start_time;
-	char *tm;
-	tm = cdate(time(&call_start_time));
-	duration += call_start_time;
+	int duration = call_timer_running ? -call_start_time : 0;
+	char *tm = cdate(time(&call_start_time));
+	if (call_timer_running) {
+	    duration += call_start_time;
+	    call_timer_running = 0;
+	}
 	mon_syslog(LOG_NOTICE,
 	    "Disconnected. Call duration %d seconds.\n",
 	    duration);
