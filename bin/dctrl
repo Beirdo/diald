@@ -363,6 +363,7 @@ proc openMonitor {} {
 	wm title . "Diald: $title"
 	wm iconname . "$title"
     }
+    fconfigure $monfd -blocking 0
     fileevent $monfd readable {readMonitor}
     .toolbar.up configure -state active
     .toolbar.down configure -state active
@@ -689,7 +690,6 @@ proc readMonitor {} {
 	    wm iconname . "$foo"
 	}
     }
-    update
 }
 
 proc dctrlQuit {} {
