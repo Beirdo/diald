@@ -133,9 +133,6 @@ The next bug report will receive number: 89.
     [Partially fixed. No reports a sensible error if no pty is found.
      It should still be rewritten to look at all possible names.]
 
-93. Check the diald archives. Time for a new archivist?
-    (Mailed jeremy asking if he wants to pass the torch.)
-
 94. Dctrl man page is wrong with regard to -control-window behavior.
     Iconifying does not prevent an icon from appearing in this case.
 
