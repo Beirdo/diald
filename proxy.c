@@ -15,66 +15,79 @@
 #include <linux/types.h>
 #include <linux/netlink.h>
 
-#include "proxy.h"
-
-
-struct proxy *proxy;
-
 
 void
 send_packet(unsigned short wprot, unsigned char *p, size_t len)
 {
-	proxy->send(wprot, p, len);
+	if (proxy.send)
+		proxy.send(&proxy, wprot, p, len);
 }
 
 
 int
 recv_packet(unsigned char *p, size_t len)
 {
-	return proxy->recv(p, len);
+	return (proxy.recv
+		? proxy.recv(&proxy, p, len)
+		: 0);
 }
 
 
 void
 proxy_start()
 {
-	proxy->start();
+	if (proxy.start)
+		proxy.start(&proxy);
 }
 
 
-int
-proxy_init(char *proxydev)
+void
+proxy_stop()
 {
-	int fd;
-
-	if (proxydev) {
-		proxy = &proxy_dev;
-		return proxy->init(proxydev);
-	}
-
-	proxy = &proxy_tap;
-	if ((fd = proxy->init(NULL)) >= 0)
-		return fd;
-	proxy = &proxy_slip;
-	if ((fd = proxy->init(NULL)) >= 0)
-		return fd;
-	mon_syslog(LOG_ERR, "Unable to get a proxy interface."
-				" Manual control only.");
-	return -1;
+	if (proxy.stop)
+		proxy.stop(&proxy);
 }
 
 
 void
 proxy_close()
 {
-	proxy->close();
+	if (proxy.close)
+		proxy.close(&proxy);
 }
 
 
 void
 proxy_release()
 {
-	proxy->release();
+	if (proxy.release)
+		proxy.release(&proxy);
+}
+
+
+int
+proxy_init(proxy_t *proxy, char *proxydev)
+{
+	int fd;
+
+	if (proxydev)
+		return proxy_dev_init(proxy, proxydev);
+
+	if ((fd = proxy_tap_init(proxy, NULL)) >= 0)
+		return fd;
+	if ((fd = proxy_slip_init(proxy, NULL)) >= 0)
+		return fd;
+	mon_syslog(LOG_ERR, "Unable to get a proxy interface."
+				" Manual control only.");
+	proxy->ifunit = -1;
+	proxy->send = NULL;
+	proxy->recv = NULL;
+	proxy->init = NULL;
+	proxy->start = NULL;
+	proxy->stop = NULL;
+	proxy->close = NULL;
+	proxy->release = NULL;
+	return -1;
 }
 
 

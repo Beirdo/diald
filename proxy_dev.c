@@ -15,69 +15,150 @@
 #include <linux/types.h>
 #include <linux/netlink.h>
 
-#include "proxy.h"
 
-
-static char proxy_dev_ifbase[9];
 static char *current_proxy;
-static char hdr[ETH_HLEN + 2 - sizeof(unsigned short)];
+#ifdef HAVE_AF_PACKET
+static int current_proxy_index;
+#endif
+
+
+static void proxy_dev_send(proxy_t *proxy,
+	unsigned short wprot, unsigned char *p, size_t len);
+static int proxy_dev_recv(proxy_t *proxy, unsigned char *p, size_t len);
+static void proxy_dev_start(proxy_t *proxy);
+static void proxy_dev_stop(proxy_t *proxy);
+static void proxy_dev_close(proxy_t *proxy);
+static void proxy_dev_release(proxy_t *proxy);
+int proxy_dev_init(proxy_t *proxy, char *proxydev);
 
 
 static void
-proxy_dev_send(unsigned short wprot, unsigned char *p, size_t len)
+proxy_dev_send(proxy_t *proxy,
+	unsigned short wprot, unsigned char *p, size_t len)
 {
-    struct msghdr msg;
-    struct iovec msg_iov[3];
+    struct sockaddr *to;
+    struct sockaddr_pkt sp;
+#ifdef HAVE_AF_PACKET
+    struct sockaddr_ll sl;
+    size_t to_len;
 
-    /* This is only called to send a response to a received packet
-     * therefore there must be a convenient header in hdr.
+    if (af_packet) {
+	memset(&sl, 0, sizeof(sl));
+	sl.sll_family = AF_PACKET;
+	sl.sll_protocol = wprot;
+	sl.sll_ifindex = current_proxy_index;
+	to = (struct sockaddr *)&sl;
+	to_len = sizeof(sl);
+    } else
+#endif
+    {
+	memset(&sp, 0, sizeof(sp));
+	sp.spkt_family = AF_INET;
+	strcpy(sp.spkt_device, current_proxy);
+	sp.spkt_protocol = wprot;
+	to = (struct sockaddr *)&sp;
+	to_len = sizeof(sp);
+    }
+
+    sendto(proxy_fd, p, len, 0, to, to_len);
+}
+
+
+static int
+proxy_dev_recv(proxy_t *proxy, unsigned char *p, size_t len)
+{
+    union {
+	struct sockaddr sa;
+#ifdef HAVE_AF_PACKET
+	struct sockaddr_ll sl;
+#endif
+    } from;
+    size_t flen = sizeof(from);
+    unsigned char *q = p + sizeof(unsigned short);
+    size_t qlen = len - sizeof(unsigned short);
+
+    len = recvfrom(proxy_fd, q, qlen, 0, (struct sockaddr *)&from, &flen);
+    if (len <= 0)
+	return 0;
+
+    /* FIXME: We only care about packets *sent* on the interface
+     * not those received. But how can we tell for non AF_PACKET
+     * sockets?
      */
-    msg_iov[0].iov_base = hdr;
-    msg_iov[0].iov_len = sizeof(hdr);
-    msg_iov[1].iov_base = &wprot;
-    msg_iov[1].iov_len = sizeof(unsigned short);
-    msg_iov[2].iov_base = p;
-    msg_iov[2].iov_len = len;
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_iov = msg_iov;
-    msg.msg_iovlen = 2;
+#ifdef HAVE_AF_PACKET
+    if ((af_packet && from.sl.sll_pkttype == PACKET_OUTGOING))
+	return 0;
+#endif
 
-    sendmsg(proxy_fd, &msg, 0);
+    *(unsigned short *)p =
+#ifdef HAVE_AF_PACKET
+	af_packet ? from.sl.sll_protocol :
+#endif
+	htons(ETH_P_IP);
+    return len;
 }
 
 
-static int
-proxy_dev_recv(unsigned char *p, size_t len)
+static void
+proxy_dev_start(proxy_t *proxy)
 {
-    struct msghdr msg;
-    struct iovec msg_iov[2];
+    if (current_dev && !strcmp(current_proxy, current_dev)) {
+	if (proxy_fd >= 0) close(proxy_fd);
+	proxy_fd = proxy_dev_init(proxy, current_proxy);
+	return;
+    }
 
-    msg_iov[0].iov_base = hdr;
-    msg_iov[0].iov_len = sizeof(hdr);
-    msg_iov[1].iov_base = p;
-    msg_iov[1].iov_len = len;
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_iov = msg_iov;
-    msg.msg_iovlen = 2;
-
-    len = recvmsg(proxy_fd, &msg, 0);
-    return (len < 0 ? 0 : len - sizeof(hdr));
+    iface_start(proxy->iftype, proxy->ifunit,
+	orig_local_ip, orig_remote_ip);
 }
 
 
-static int
-proxy_dev_init(char *proxydev)
+static void
+proxy_dev_stop(proxy_t *proxy)
+{
+    if (current_dev && !strcmp(current_proxy, current_dev)) {
+	close(proxy_fd);
+	proxy_fd = -1;
+	return;
+    }
+
+    iface_stop(proxy->iftype, proxy->ifunit,
+	orig_local_ip, orig_remote_ip);
+}
+
+
+static void
+proxy_dev_close(proxy_t *proxy)
+{
+    close(proxy_fd);
+    /* Do not remove the lock file here. If we do every time we fork
+     * a child we drop the lock. Instead we just let the lock go stale
+     * when we have finished. We should handle this better...
+     */
+}
+
+
+static void
+proxy_dev_release(proxy_t *proxy)
+{
+    proxy_dev_stop(proxy);
+    proxy_dev_close(proxy);
+}
+
+
+int
+proxy_dev_init(proxy_t *proxy, char *proxydev)
 {
     int n;
 
     current_proxy = proxydev;
 
     n = strcspn(proxydev, "0123456789" );
-    proxy_dev.ifunit = atoi(proxydev + n);
-    if (n > sizeof(proxy_dev_ifbase)-1)
-		n = sizeof(proxy_dev_ifbase)-1;
-    strncpy(proxy_dev_ifbase, proxydev, n);
-    proxy_dev_ifbase[n] = '\0';
+    proxy->ifunit = atoi(proxydev + n);
+    if (n > sizeof(proxy->iftype)-1)
+		n = sizeof(proxy->iftype)-1;
+    strncpy(proxy->iftype, proxydev, n);
+    proxy->iftype[n] = '\0';
 
 #ifdef HAVE_AF_PACKET
     if (af_packet && (n = socket(AF_PACKET, SOCK_DGRAM, 0)) < 0)
@@ -101,6 +182,7 @@ proxy_dev_init(char *proxydev)
 	    close(n);
 	    return -1;
 	}
+	current_proxy_index = ifr.ifr_ifindex;
 	memset(&to, 0, sizeof(to));
 	to.sll_family = AF_PACKET;
 	to.sll_protocol = htons(ETH_P_ALL);
@@ -124,63 +206,12 @@ proxy_dev_init(char *proxydev)
 	}
     }
 
+    proxy->send = proxy_dev_send;
+    proxy->recv = proxy_dev_recv;
+    proxy->init = proxy_dev_init;
+    proxy->start = proxy_dev_start;
+    proxy->stop = proxy_dev_stop;
+    proxy->close = proxy_dev_close;
+    proxy->release = proxy_dev_release;
     return n;
 }
-
-
-static void
-proxy_dev_start()
-{
-    if (current_dev && !strcmp(current_proxy, current_dev)) {
-	close(proxy_fd);
-	if ((proxy_fd = proxy_dev_init(current_proxy)) < 0)
-	    return;
-    }
-
-    if (!blocked || blocked_route)
-	iface_start(proxy_dev.iftype, proxy_dev.ifunit,
-	    orig_local_ip, orig_remote_ip);
-}
-
-
-static void
-proxy_dev_stop()
-{
-    if (current_dev && !strcmp(current_proxy, current_dev)) {
-	close(proxy_fd);
-	proxy_fd = -1;
-    }
-    iface_stop(proxy_dev.iftype, proxy_dev.ifunit,
-	orig_local_ip, orig_remote_ip);
-}
-
-
-static void
-proxy_dev_close()
-{
-    close(proxy_fd);
-    /* Do not remove the lock file here. If we do every time we fork
-     * a child we drop the lock. Instead we just let the lock go stale
-     * when we have finished. We should handle this better...
-     */
-}
-
-
-static void
-proxy_dev_release()
-{
-    proxy_dev_stop();
-    proxy_dev_close();
-}
-
-
-struct proxy proxy_dev = {
-	proxy_dev_ifbase, 0,
-	proxy_dev_send,
-	proxy_dev_recv,
-	proxy_dev_init,
-	proxy_dev_start,
-	proxy_dev_stop,
-	proxy_dev_close,
-	proxy_dev_release
-};

@@ -15,7 +15,6 @@
  */
 
 #include "diald.h"
-#include "proxy.h"
 
 static char device_node[9];
 
@@ -126,7 +125,7 @@ int dev_set_addrs()
 	}
 
 	iface_start(device_node, link_iface, local_ip, remote_ip);
-	iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_stop(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
 
         return 1;
 }
@@ -173,7 +172,7 @@ void dev_reroute()
 {
     /* Restore the original proxy. */
     if (!blocked || blocked_route)
-	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
     local_addr = inet_addr(orig_local_ip);
 
     /* Kill the alternate routing */

@@ -26,7 +26,6 @@
  */
 
 #include "diald.h"
-#include "proxy.h"
 #include "version.h"
 
 #ifdef TCP_WRAPPERS
@@ -64,6 +63,7 @@ char *pidfile = 0;
 static PIPE *fifo_pipe;
 int argc_save;
 char **argv_save;
+proxy_t proxy;
 
 void do_config(void)
 {
@@ -161,7 +161,7 @@ main(int argc, char *argv[])
     open_fifo();
     filter_setup();
 
-    proxy_fd = proxy_init(NULL);
+    proxy_fd = proxy_init(&proxy, NULL);
     proxy_start();
     idle_filter_proxy();
 

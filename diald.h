@@ -78,6 +78,7 @@
 #include "timer.h"
 #include "firewall.h"
 #include "bufio.h"
+#include "proxy.h"
 
 #define LOG_DDIAL	LOG_LOCAL2
 
@@ -295,8 +296,7 @@ int dial_status;		/* status from last dial command */
 int state_timeout;		/* state machine timeout counter */
 int state;			/* DFA state */
 int current_retry_count;	/* current retry count */
-char *proxy_iftype;		/* Type of proxy interface */
-int proxy_ifunit;		/* Unit number for proxy interface */
+proxy_t proxy;			/* Proxy interface */
 int link_iface;			/* Interface number for ppp line */
 int orig_disc;			/* original PTY line disciple */
 int fwdfd;			/* control socket for packet forwarding */

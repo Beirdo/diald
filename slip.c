@@ -7,7 +7,6 @@
  */
 
 #include "diald.h"
-#include "proxy.h"
 
 static int dead = 1;
 static int waiting_for_bootp = 0;
@@ -253,7 +252,7 @@ int slip_set_addrs()
     }
 
     iface_start("sl", link_iface, local_ip, remote_ip);
-    iface_stop(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+    iface_stop(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
 
     return 1;
 }
@@ -279,7 +278,7 @@ void slip_reroute()
 {
     /* Restore the original proxy. */
     if (!blocked || blocked_route)
-	iface_start(proxy_iftype, proxy_ifunit, orig_local_ip, orig_remote_ip);
+	iface_start(proxy.iftype, proxy.ifunit, orig_local_ip, orig_remote_ip);
     local_addr = inet_addr(orig_local_ip);
 
     if (link_iface != -1)

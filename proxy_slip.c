@@ -11,7 +11,15 @@
 
 #include "diald.h"
 
-#include "proxy.h"
+
+static void proxy_slip_send(proxy_t *proxy,
+	unsigned short wprot, unsigned char *p, size_t len);
+static int proxy_slip_recv(proxy_t *proxy, unsigned char *p, size_t len);
+static void proxy_slip_start(proxy_t *proxy);
+static void proxy_slip_stop(proxy_t *proxy);
+static void proxy_slip_close(proxy_t *proxy);
+static void proxy_slip_release(proxy_t *proxy);
+int proxy_slip_init(proxy_t *proxy, char *proxydev);
 
 
 static int proxy_mfd;		/* master pty fd */
@@ -33,7 +41,8 @@ static int proxy_sfd;		/* slave pty fd */
  * location "p".
  */
 static void
-proxy_slip_send(unsigned short wprot, unsigned char *p, size_t len)
+proxy_slip_send(proxy_t *proxy,
+	unsigned short wprot, unsigned char *p, size_t len)
 {
     /* send an initial END character to flush out any data that may
      * have accumulated in the receiver due to line noise
@@ -85,13 +94,14 @@ proxy_slip_send(unsigned short wprot, unsigned char *p, size_t len)
  */
 
 static int
-proxy_slip_recv(unsigned char *p, size_t len)
+proxy_slip_recv(proxy_t *proxy, unsigned char *p, size_t len)
 {
     int c;
     int received = 0;
 
     *(unsigned short *)p = htons(ETH_P_IP);
     p += sizeof(unsigned short);
+    len -= sizeof(unsigned short);
 
     /* sit in a loop reading bytes until we put together
     * a whole packet.
@@ -155,6 +165,43 @@ proxy_slip_recv(unsigned char *p, size_t len)
 }
 
 
+static void
+proxy_slip_start(proxy_t *proxy)
+{
+    iface_start(proxy->iftype, proxy->ifunit,
+	orig_local_ip, orig_remote_ip);
+}
+
+
+static void
+proxy_slip_stop(proxy_t *proxy)
+{
+    iface_stop(proxy->iftype, proxy->ifunit,
+	orig_local_ip, orig_remote_ip);
+}
+
+
+static void
+proxy_slip_close(proxy_t *proxy)
+{
+    close(proxy_mfd);
+    close(proxy_sfd);
+}
+
+
+static void
+proxy_slip_release(proxy_t *proxy)
+{
+    proxy_slip_stop(proxy);
+
+    /* clear the line discipline */
+    if (ioctl(proxy_sfd, TIOCSETD, &orig_disc) < 0)
+	mon_syslog(LOG_ERR,"Can't set line discipline: %m");
+
+    proxy_slip_close(proxy);
+}
+
+
 /*
  * Set the pty to an 8 bit clean mode and change it to the
  * desired SLIP line disciple, and run ifconfig to configure the
@@ -164,8 +211,8 @@ proxy_slip_recv(unsigned char *p, size_t len)
  * gets opened as a result. (slattach doesn't return this)
  */
 
-static int
-proxy_slip_init(char *proxydev)
+int
+proxy_slip_init(proxy_t *proxy, char *proxydev)
 {
     int disc, sencap = 0;
 
@@ -182,7 +229,7 @@ proxy_slip_init(char *proxydev)
 
     /* change line disciple to SLIP and set the SLIP encapsulation */
     disc = N_SLIP;
-    if ((proxy_slip.ifunit = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
+    if ((proxy->ifunit = ioctl(proxy_sfd, TIOCSETD, &disc)) < 0) {
 	if (errno == ENFILE) {
 	   mon_syslog(LOG_ERR,"No free slip device available for proxy."), die(1);
 	} else if (errno == EEXIST) {
@@ -208,58 +255,15 @@ proxy_slip_init(char *proxydev)
 
     if (debug&DEBUG_VERBOSE)
         mon_syslog(LOG_INFO,"Proxy device established on interface %s%d",
-	    proxy_slip.iftype, proxy_slip.ifunit);
+	    proxy->iftype, proxy->ifunit);
 
+    strcpy(proxy->iftype, "sl");
+    proxy->send = proxy_slip_send;
+    proxy->recv = proxy_slip_recv;
+    proxy->init = proxy_slip_init;
+    proxy->start = proxy_slip_start;
+    proxy->stop = proxy_slip_stop;
+    proxy->close = proxy_slip_close;
+    proxy->release = proxy_slip_release;
     return proxy_mfd;
 }
-
-
-static void
-proxy_slip_start()
-{
-    /* Mark the interface as up */
-    if (!blocked || blocked_route)
-	iface_start(proxy_slip.iftype, proxy_slip.ifunit,
-	    orig_local_ip, orig_remote_ip);
-}
-
-
-static void
-proxy_slip_stop()
-{
-    iface_stop(proxy_slip.iftype, proxy_slip.ifunit,
-	orig_local_ip, orig_remote_ip);
-}
-
-
-static void
-proxy_slip_close()
-{
-    close(proxy_mfd);
-    close(proxy_sfd);
-}
-
-
-static void
-proxy_slip_release()
-{
-    proxy_slip_stop();
-
-    /* clear the line discipline */
-    if (ioctl(proxy_sfd, TIOCSETD, &orig_disc) < 0)
-	mon_syslog(LOG_ERR,"Can't set line discipline: %m");
-
-    proxy_slip_close();
-}
-
-
-struct proxy proxy_slip = {
-	"sl", 0,
-	proxy_slip_send,
-	proxy_slip_recv,
-	proxy_slip_init,
-	proxy_slip_start,
-	proxy_slip_stop,
-	proxy_slip_close,
-	proxy_slip_release
-};

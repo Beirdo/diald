@@ -1,20 +1,18 @@
+typedef struct proxy proxy_t;
+
 struct proxy {
-	char *iftype;
+	char iftype[12];
 	int ifunit;
-	void (*send)(unsigned short, unsigned char *, size_t);
-	int (*recv)(unsigned char *, size_t);
-	int (*init)(char *);
-	void (*start)(void);
-	void (*stop)(void);
-	void (*close)(void);
-	void (*release)(void);
+	void (*send)(proxy_t *, unsigned short, unsigned char *, size_t);
+	int (*recv)(proxy_t *, unsigned char *, size_t);
+	int (*init)(proxy_t *, char *);
+	void (*start)(proxy_t *);
+	void (*stop)(proxy_t *);
+	void (*close)(proxy_t *);
+	void (*release)(proxy_t *);
 };
 
-extern struct proxy *proxy;
-
-extern struct proxy proxy_dev;
-extern struct proxy proxy_tap;
-extern struct proxy proxy_slip;
-
-
-extern int proxy_init(char *proxydev);
+extern int proxy_init(proxy_t *proxy, char *proxydev);
+extern int proxy_dev_init(proxy_t *proxy, char *proxydev);
+extern int proxy_tap_init(proxy_t *proxy, char *proxydev);
+extern int proxy_slip_init(proxy_t *proxy, char *proxydev);
