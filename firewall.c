@@ -917,7 +917,7 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 	}
 
 	/* Return 1 if accepting rule with non zero timeout, 0 otherwise */
-	return ((fw->filt.type != FW_TYPE_IGNORE || fw->filt.type != FW_TYPE_WAIT) && fw->filt.timeout > 0);
+	return (fw->filt.type != FW_TYPE_IGNORE && fw->filt.type != FW_TYPE_WAIT && fw->filt.timeout > 0);
 
 next_rule: /* try the next filter */
 	fw = fw->next;
@@ -928,7 +928,7 @@ skip:
     /* Failed to match any rule. This means we ignore the packet */
     if (debug&DEBUG_FILTER_MATCH)
         log_packet(0,ip_pkt,len,0);
-    return 1;
+    return 0;
 }
 
 static char * pcountdown(char *buf, long secs)
