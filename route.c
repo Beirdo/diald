@@ -141,9 +141,11 @@ iface_start(char *mode, char *iftype, int ifunit, char *lip, char *rip)
 
     /* With no ifsetup script we have to do it all ourselves. */
     if (lip) {
-	sprintf(buf,"%s %s%d %s%s%s netmask %s metric %d mtu %d up",
+	sprintf(buf,"%s %s%d %s%s%s%s%s netmask %s metric %d mtu %d up",
 	    path_ifconfig, iftype, ifunit, lip,
 	    rip ? " pointopoint " : "",
+	    rip ? rip : "",
+	    rip ? " broadcast " : "",
 	    rip ? rip : "",
 	    netmask ? netmask : "255.255.255.255",
 	    metric, mtu);
