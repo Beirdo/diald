@@ -38,6 +38,7 @@ void idle_filter_init()
 	    die(1);
 	}
     }
+    fcntl(snoopfd, F_SETFD, FD_CLOEXEC);
 
     if (fwdfd != -1)
 	close(fwdfd);
@@ -51,6 +52,7 @@ void idle_filter_init()
         mon_syslog(LOG_ERR, "Could not get socket to do packet forwarding: %m");
         die(1);
     }
+    fcntl(fwdfd, F_SETFD, FD_CLOEXEC);
 
     if (current_mode == MODE_SLIP) {
 	sprintf(snoop_dev,"sl%d",link_iface);
@@ -120,6 +122,7 @@ void idle_filter_proxy()
     	    die(1);
 	}
     }
+    fcntl(snoopfd, F_SETFD, FD_CLOEXEC);
 
     sprintf(snoop_dev,"%s%d", proxy.iftype, proxy.ifunit);
     if (debug) mon_syslog(LOG_DEBUG,"Changed snoop device to %s",snoop_dev);

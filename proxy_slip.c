@@ -222,6 +222,7 @@ proxy_slip_init(proxy_t *proxy, char *proxydev)
     get_pty(&d, &proxy_sfd);
     if (d < 0)
 	return -1;
+    fcntl(d, F_SETFD, FD_CLOEXEC);
     proxy_mfp = fdopen(d, "r+");
 
     /* change proxy_sfd to 8 bit clean line, 38400 speed */

@@ -93,7 +93,10 @@ void ppp_start()
 	setreuid(getuid(), getuid());
 	setregid(getgid(), getgid());
 
-	dup2(modem_fd, 0);
+	if (modem_fd != 0)
+	    dup2(modem_fd, 0);
+	else
+	    fcntl(modem_fd, F_SETFD, 0);
 	dup2(modem_fd, 1);
 
 	execv(path_pppd,argv);
@@ -127,8 +130,10 @@ int ppp_set_addrs()
     ulong laddr = 0, raddr = 0, baddr = 0;
 
     /* We need a socket. Any socket... */
-    if (sock < 0)
+    if (sock < 0) {
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	fcntl(sock, F_SETFD, FD_CLOEXEC);
+    }
 
     /* Try to get the interface number if we don't know it yet. */
     if (link_iface == -1) {

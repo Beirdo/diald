@@ -1,5 +1,7 @@
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
+  - Use close on exec flag rather than trying (and failing) to
+    figure out what to close every time we fork and exec.
   - Allow the value for a debug fifo command to be given as
     hax (0x...) or octal (0...).
   - Removed spurious calls to {ppp,slip,dev}_reroute(). These

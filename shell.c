@@ -39,7 +39,7 @@ run_shell(int mode, const char *name, const char *buf, int d)
 	     * not a serial line...
 	     */
 	    setpgrp();
-	    if (tcsetpgrp(modem_fd, getpid()) < 0 && errno != ENOTTY)
+	    if (tcsetpgrp(d, getpid()) < 0 && errno != ENOTTY)
 		mon_syslog(LOG_ERR, "dial: failed to set pgrp: %m");
 	} else {
 	    setsid();    /* No controlling tty. */
@@ -51,34 +51,9 @@ run_shell(int mode, const char *name, const char *buf, int d)
         default_sigacts();
 	unblock_signals();
 
-	/* close all fd's the child should not see */
-#if 1
-	/* FIXME: These should not be open to std{in,out,err} anyway
-	 * unless we are not in daemon mode...
-	 */
-	close(0);
-	close(1);
-	close(2);
-#endif
-	if (modem_fd >= 0 && modem_fd != d) close(modem_fd);
+#if 0
 	proxy_close();
-	if (fifo_fd != -1) close(fifo_fd);
-	if (tcp_fd != -1) close(tcp_fd);
-	if (pipes) {
-	    PIPE *c = pipes;
-	    while (c) {
-		close(c->fd);
-		c = c->next;
-	    }
-	}
-	if (monitors) {
-	    MONITORS *c = monitors;
-	    while (c) {
-		close(c->fd);
-		c = c->next;
-	    }
-	}
-
+#endif
 	/* make sure the stdin, stdout and stderr get directed to /dev/null */
 	if (p[0] >= 0) close(p[0]);
 	d2 = open("/dev/null", O_RDWR);
@@ -88,6 +63,8 @@ run_shell(int mode, const char *name, const char *buf, int d)
 	    if (d != 0) {
 	    	dup2(d, 0);
 		close(d);
+	    } else {
+		fcntl(d, F_SETFD, 0);
 	    }
 	    dup2(0, 1);
         } else {

@@ -55,8 +55,10 @@ int dev_set_addrs()
     struct ifreq   ifr; 
 
     /* We need a socket. Any socket... */
-    if (sock < 0)
+    if (sock < 0) {
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	fcntl(sock, F_SETFD, FD_CLOEXEC);
+    }
 
     /* Try to get the interface number if we don't know it yet. */
     if (link_iface == -1) {

@@ -141,6 +141,8 @@ proxy_tap_init(proxy_t *proxy, char *proxydev)
 	if (d < 0)
 	    goto unlock;
 
+	fcntl(d, F_SETFD, FD_CLOEXEC);
+
 	memset(&nl, 0, sizeof(nl));
 	nl.nl_family = AF_NETLINK;
 	nl.nl_groups = ~0;

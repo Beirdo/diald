@@ -269,6 +269,7 @@ int open_modem()
 
 	current_dev = strdup(current_dev);
     }
+    fcntl(modem_fd, F_SETFD, FD_CLOEXEC);
 
     if (current_dev[0] != '/')
 	current_mode = MODE_DEV;

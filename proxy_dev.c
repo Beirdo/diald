@@ -158,6 +158,7 @@ proxy_dev_init(proxy_t *proxy, char *proxydev)
 	    return -1;
 	}
     }
+    fcntl(d, F_SETFD, FD_CLOEXEC);
 
 #ifdef HAVE_AF_PACKET
     if (af_packet) {

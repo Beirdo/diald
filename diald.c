@@ -147,11 +147,11 @@ main(int argc, char *argv[])
 
     /* Get an internet socket for doing socket ioctls. */
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0)
-      {
+    if (sockfd < 0) {
 	syslog(LOG_ERR, "Couldn't create IP socket: %m");
 	die(1);
-      }
+    }
+    fcntl(sockfd, F_SETFD, FD_CLOEXEC);
 
     if (debug&DEBUG_VERBOSE)
         syslog(LOG_INFO,"Starting diald version %s",VERSION);
@@ -236,6 +236,7 @@ main(int argc, char *argv[])
 			    char def[] = "simple default";
 			    char buf[1024];
 			    int n;
+			    fcntl(fd, F_SETFD, FD_CLOEXEC);
 			    n = snprintf(buf, sizeof(buf)-2, "TCP %s:%d",
 					inet_ntoa(sa.sin_addr), sa.sin_port);
 			    buf[n] = '\0';
@@ -346,6 +347,7 @@ void open_fifo()
 	 * This guarantees that there is always at least one writer...
          */
 	if ((fifo_fd = open(fifoname, O_RDWR)) >= 0) {
+	    fcntl(fifo_fd, F_SETFD, FD_CLOEXEC);
             fifo_pipe = (PIPE *)malloc(sizeof(PIPE));
             if (fifo_pipe) {
 	        if (debug&DEBUG_VERBOSE)
@@ -368,6 +370,7 @@ void open_fifo()
     if (tcpport) {
 	if ((tcp_fd = socket(AF_INET, SOCK_STREAM, 0)) >= 0) {
 	    struct sockaddr_in sa;
+	    fcntl(tcp_fd, F_SETFD, FD_CLOEXEC);
 	    sa.sin_family = AF_INET;
 	    sa.sin_addr.s_addr = INADDR_ANY;
 	    sa.sin_port = htons(tcpport);
@@ -677,6 +680,7 @@ void ctrl_read(PIPE *pipe)
 				pipe->name, buf+k);
 			} else {
 			    struct firewall_req req;
+			    fcntl(fd, F_SETFD, FD_CLOEXEC);
 			    new = (MONITORS *)malloc(sizeof(MONITORS));
 			    new->name = strdup(buf+k);
 			    new->next = monitors;
