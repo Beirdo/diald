@@ -824,7 +824,7 @@ int check_firewall(int unitnum, sockaddr_ll_t *sll, unsigned char *pkt, int len)
 	    lflags.tcp_flags |= direction;
 	}
 	if ((lflags.saw_fin & opdir) && (tcp->ack)) {
-	    if (lflags.fin_seq[opdir-1] == ntohl(tcp->ack_seq)) {
+	    if (lflags.fin_seq[opdir-1] <= ntohl(tcp->ack_seq)) {
 		lflags.tcp_flags &= ~direction;
 	    }
 	}

@@ -37,7 +37,7 @@ add_routes(char *desc, char *iface, char *lip, char *rip, int metric)
      */
     if (rip) {
 	if (path_ip && *path_ip) {
-	    sprintf(buf,"%s route add %s dev %s scope link%s%s metric %d %s",
+	    sprintf(buf,"%s route replace %s dev %s scope link%s%s metric %d %s",
 		path_ip, rip, iface,
 		lip ? " src " : "",
 		lip ? lip : "",
@@ -61,13 +61,13 @@ add_routes(char *desc, char *iface, char *lip, char *rip, int metric)
 	    }
 	    run_shell(SHELL_WAIT, desc, buf, -1);
 	}
-#endif
     }
+#endif
 
     /* Add in a default route for the link if required. */
     if (default_route) {
 	if (path_ip && *path_ip) {
-	    sprintf(buf, "%s route add default dev %s scope link%s%s metric %d %s",
+	    sprintf(buf, "%s route replace default dev %s scope link%s%s metric %d %s",
 		path_ip, iface,
 		lip ? " src " : "",
 		lip ? lip : "",

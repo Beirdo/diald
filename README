@@ -2,7 +2,7 @@ The Diald README File
 
 ----------------------------------------------------------------------------
 
-This is release 0.99.1 of diald.
+This is release 0.99.4 of diald.
 
 Diald is a daemon that provides on demand IP links via SLIP or PPP. The
 purpose of diald is to make it transparently appear that you have a
@@ -19,9 +19,11 @@ passing over the link.
 
 Getting Diald
 
-The file is called diald-0.99.1.tar.gz. It can be obtained from the diald
-home page at "http://diald.unix.ch/". Note that the diald home page has
-moved from its old location at "http://www.loonie.net/~erics/diald.html".
+The file is called diald-0.99.4.tar.gz. It can be obtained from the diald
+project on "http://sourceforge.net/". Note that the diald home page has
+moved from its old locations of "http://diald.unix.ch" and
+"http://www.loonie.net/~erics/diald.html". It can now be found at
+"http://diald.sourceforge.net".
 
 Mailing List
 
@@ -46,9 +48,7 @@ with it. Someone on the mailing list will probably be able to suggest a
 solution to your problem well before that.
 
 The mailing list is, apparently, being archived by the Mailing List
-Archives at PCC (along with a whole load of others).
-
-Try http://www.progressive-comp.com/Lists/
+Archives at "http://www.geocrawler.com" (along with a whole load of others).
 
 FAQ
 

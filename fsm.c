@@ -154,6 +154,7 @@ void trans_CONNECT(void)
 	}
     } else if (request_down) {
         mon_syslog(LOG_NOTICE,"Cancelling connect script.");
+	flush_timeout_queue();
 	GOTO(STATE_STOP_DIAL);
     } else if (state_timeout == 0) {
 	mon_syslog(LOG_NOTICE,"Connect script timed out. Killing script.");
@@ -270,7 +271,10 @@ void trans_KILL_LINK(void)
 void act_UP(void)
 {
     idle_filter_init();
+#if 0
+    /* If the local address has changed this may be useful? */
     flush_timeout_queue();
+#endif
     interface_up();
     ppp_half_dead = 0;
     if (buffer_packets)
@@ -432,7 +436,8 @@ void trans_CLOSE(void)
 	GOTO(STATE_DOWN); /* STATE_DOWN handles the link-up-request */
     if (no_redial_delay == 1) {
 	no_redial_delay = 0;
-	GOTO(STATE_DOWN);
+	if (two_way) GOTO(STATE_DOWN);
+	GOTO(STATE_RETRY);
     }
 }
 

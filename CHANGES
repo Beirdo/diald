@@ -1,3 +1,22 @@
+Major changes between version 0.99.3 and 0.99.4.
+------------------------------------------------
+  - Fix to the TCP close detection from Fedor.
+  - Flush the timeout queue when a connect is explicitly cancelled
+    but do not flush it when the link goes up.
+  - In retry we want to go DOWN if the link is two-way (because
+    the other end might have deliberately hung up and can dial
+    back if it needs to) otherwise to RETRY (because we decide
+    when the link is idle).
+  - Use "ip route replace ..." instead of "ip route add ..."
+  - Changed pointers to web site and mailing list archive in
+    the README.
+
+
+Major changes between version 0.99.2 and 0.99.3.
+------------------------------------------------
+  - Section gone AWOL. Sorry.
+
+
 Major changes between version 0.99.1 and 0.99.2.
 ------------------------------------------------
   - Routes on the proxy and actual link are given different metrics
