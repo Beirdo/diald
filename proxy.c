@@ -84,7 +84,7 @@ proxy_init(proxy_t *proxy, char *proxydev)
 		return proxy_dev_init(proxy, proxydev);
 	}
 
-#ifdef TUNTAP
+#if HAVE_LINUX_IF_TUN_H
 	if ((fd = proxy_tun_init(proxy, NULL)) >= 0)
 		return fd;
 #endif
