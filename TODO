@@ -88,3 +88,9 @@ broken dial script that started pppd itself. Can we recover
 gracefully from this?
 
 Remove assumption that we are always dealing with links supporting IPv4.
+
+Should be a more obvious indication of whether the link is forced up
+or not in dctrl.
+
+Specs used for connection identification in diald.defs need to take
+in to account protocol (UDP, TCP etc.) as well as IP and port.
