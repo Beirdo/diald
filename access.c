@@ -6,10 +6,6 @@
 #include "diald.h"
 
 
-/* FIXME: this should be a config option... */
-#define DIALD_ACC_SIMPLE_FILE	"/usr/lib/diald/auth"
-
-
 static struct {
 	char *name;
 	int value;
@@ -73,7 +69,7 @@ acc_simple(char *buf)
 	FILE *fd;
 	char line[1024];
 
-	if (!(fd = fopen(DIALD_ACC_SIMPLE_FILE, "r")))
+	if (!(fd = fopen(authsimple, "r")))
 		return new_access;
 
 	while (fgets(line, sizeof(line), fd)) {

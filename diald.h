@@ -213,6 +213,7 @@ int mtu;
 int mru;
 char *link_name;
 char *link_desc;
+char *authsimple;
 char *initializer;
 char *deinitializer;
 char *connector;
