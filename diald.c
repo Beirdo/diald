@@ -120,6 +120,12 @@ main(int argc, char *argv[])
     long tstamp = ticks();
     long ts;
 
+    /* This fixes a problem with diald using UTC in log messages
+     * rather than local time. I do not believe this call should
+     * be necessary. It may be library version dependent.
+     */
+    tzset();
+
     if (argc > 1
     && (!strcmp(argv[1], "-V") || !strcmp(argv[1], "-v")
     || !strcmp(argv[1], "--version"))) {
