@@ -36,7 +36,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
      * and should, get rid of the original zero metric route.
      */
     if (rip) {
-	if (path_ip) {
+	if (path_ip && *path_ip) {
 	    sprintf(buf,"%s route add %s dev %s%d scope link%s%s metric %d %s",
 		path_ip, rip, iftype, ifunit,
 		lip ? " src " : "",
@@ -50,7 +50,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 	report_system_result(res, buf);
 
 	if (metric) {
-	    if (path_ip) {
+	    if (path_ip && *path_ip) {
 		sprintf(buf,"%s route del %s dev %s%d scope link%s%s metric 0 %s",
 		    path_ip, rip, iftype, ifunit,
 		    lip ? " src " : "",
@@ -68,7 +68,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 
     /* Add in a default route for the link if required. */
     if (default_route) {
-	if (path_ip) {
+	if (path_ip && *path_ip) {
 	    sprintf(buf, "%s route add default dev %s%d scope link%s%s metric %d %s",
 		path_ip, iftype, ifunit,
 		lip ? " src " : "",
@@ -117,7 +117,7 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
     }
 
     if (default_route) {
-	if (path_ip) {
+	if (path_ip && *path_ip) {
 	    sprintf(buf, "%s route del default dev %s%d scope link%s%s metric %d",
 		path_ip, iftype, ifunit,
 		lip ? " src " : "",

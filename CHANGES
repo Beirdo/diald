@@ -1,4 +1,4 @@
-Major changes between version 0.98.2 and 0.98.4.
+Major changes between version 0.98.3 and 0.98.4.
 ------------------------------------------------
   - Made local and remote addresses optional. If you are using a
     named interface as proxy (or have no proxy at all) you may
@@ -24,6 +24,7 @@ Major changes between version 0.98.2 and 0.98.4.
   - Use -defaultroute rather than nodefaultroute since pppd 2.2
     does not understand nodefaultroute.
   - Fix for compilation on Linux 2.0.x.
+
 
 Major changes between version 0.98.2 and 0.98.3.
 ------------------------------------------------
