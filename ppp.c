@@ -191,7 +191,7 @@ int ppp_set_addrs()
 	    }
 	}
 
-	if (dynamic_addrs) {
+	if (dynamic_addrs && laddr) {
 	    /* only do the configuration in dynamic mode. */
 	    struct in_addr addr;
 	    addr.s_addr = baddr;
@@ -204,14 +204,7 @@ int ppp_set_addrs()
 	    if (local_ip) free(local_ip);
 	    local_ip = strdup(inet_ntoa(addr));
 	    local_addr = laddr;
-	    if (dynamic_addrs > 1) {
-		if (orig_broadcast_ip) free(orig_broadcast_ip);
-		orig_broadcast_ip = strdup(broadcast_ip);
-		if (orig_remote_ip) free(orig_remote_ip);
-		orig_remote_ip = strdup(remote_ip);
-		if (orig_local_ip) free(orig_local_ip);
-		orig_local_ip = strdup(local_ip);
-	    }
+
 	    mon_syslog(LOG_INFO, "New addresses: local %s%s%s%s%s",
 		local_ip,
 		remote_ip ? ", remote " : "",
@@ -227,6 +220,20 @@ int ppp_set_addrs()
 	    local_ip, remote_ip, broadcast_ip, metric);
 	if (proxy.stop)
 	    proxy.stop(&proxy);
+
+	/* If we were given at least a local address and are running
+	 * in "sticky" mode then the original addresses change to match.
+	 */
+	if (dynamic_addrs > 1 && laddr) {
+	    if (orig_netmask) free(orig_netmask);
+	    orig_netmask = strdup(netmask);
+	    if (orig_broadcast_ip) free(orig_broadcast_ip);
+	    orig_broadcast_ip = strdup(broadcast_ip);
+	    if (orig_remote_ip) free(orig_remote_ip);
+	    orig_remote_ip = strdup(remote_ip);
+	    if (orig_local_ip) free(orig_local_ip);
+	    orig_local_ip = strdup(local_ip);
+	}
 
 	return 1;
     }

@@ -92,6 +92,7 @@ void do_config(void)
     orig_local_ip = (local_ip ? strdup(local_ip) : NULL);
     orig_remote_ip = (remote_ip ? strdup(remote_ip) : NULL);
     orig_broadcast_ip = (broadcast_ip ? strdup(broadcast_ip) : NULL);
+    orig_netmask = (netmask ? strdup(netmask) : NULL);
 
     if (initializer) {
 	if (devices && devices[0])
@@ -879,6 +880,7 @@ void die(int i)
 
 	close_modem();
 	interface_down();
+	proxy_stop();
 	proxy_release();
 
 	if (deinitializer) {

@@ -231,12 +231,6 @@ int slip_set_addrs()
 
     if (waiting_for_bootp) {
         pclose(bootpfp);
-	if (dynamic_addrs > 1) {
-	    if (orig_remote_ip) free(orig_remote_ip);
-	    orig_remote_ip = strdup(remote_ip);
-	    if (orig_local_ip) free(orig_local_ip);
-	    orig_local_ip = strdup(local_ip);
-	}
 	mon_syslog(LOG_INFO,"New addresses: local %s, remote %s.",
 	    local_ip,remote_ip);
     	waiting_for_bootp = 0;
@@ -258,6 +252,16 @@ int slip_set_addrs()
 	local_ip, remote_ip, broadcast_ip, metric);
     if (proxy.stop)
 	proxy.stop(&proxy);
+
+    /* If we were given at least a local address and are running
+     * in "sticky" mode then the original addresses change to match.
+     */
+    if (dynamic_addrs > 1 && local_ip) {
+	if (orig_remote_ip) free(orig_remote_ip);
+	orig_remote_ip = strdup(remote_ip);
+	if (orig_local_ip) free(orig_local_ip);
+	orig_local_ip = strdup(local_ip);
+    }
 
     return 1;
 }

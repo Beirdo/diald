@@ -35,6 +35,7 @@ char *proxyif = 0;
 char *orig_local_ip = 0;
 char *orig_remote_ip = 0;
 char *orig_broadcast_ip = 0;
+char *orig_netmask = 0;
 char *local_ip = 0;
 unsigned long local_addr = 0;
 char *remote_ip = 0;
@@ -288,6 +289,8 @@ void init_vars()
     netmask = 0;
     if (broadcast_ip) free(broadcast_ip);
     broadcast_ip = 0;
+    if (orig_netmask) free(orig_netmask);
+    orig_netmask = 0;
     if (orig_broadcast_ip) free(orig_broadcast_ip);
     orig_broadcast_ip = 0;
     if (remote_ip) free(remote_ip);

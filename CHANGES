@@ -3,6 +3,11 @@ Major changes between version 0.99.4 and 0.99.5.
   - Fixed a %d which should have been a %s in a debug message.
   - Handle a down request received between starting the protocol
     and the interface becoming available for traffic.
+  - If we are running in "sticky" mode we should replace the
+    original addresses with those allocated *after* we have taken
+    the stopped the proxy.
+  - Added save of netmask in "sticky" mode as well as local, remote
+    and broadcast addresses.
 
 
 Major changes between version 0.99.3 and 0.99.4.

@@ -279,8 +279,8 @@ int open_modem()
     }
 
     if (current_mode == MODE_DEV) {
-	/* If we have a connector we may need to run it to set up the
-	 * real interface.
+	/* No tty but if we have a connector we may need to run
+	 * it to set up the real interface.
 	 */
 	if (!req_pid && connector)
 		dial_pid = run_shell(SHELL_NOWAIT,
