@@ -60,7 +60,8 @@ install: diald
 	$(INSTALL) -o root -g bin -m 0644 doc/diald-control.man $(DESTDIR)$(mandir)/man5/diald-control.5
 	$(INSTALL) -o root -g bin -m 0644 doc/diald-monitor.man $(DESTDIR)$(mandir)/man5/diald-monitor.5
 	$(INSTALL) -d $(DESTDIR)$(datadir)/diald
-	$(INSTALL) -o root -g bin lib/*.gif $(DESTDIR)$(datadir)/diald
+	$(INSTALL) -d $(DESTDIR)$(datadir)/diald/dctrl
+	$(INSTALL) -o root -g bin lib/*.gif $(DESTDIR)$(datadir)/diald/dctrl
 	$(INSTALL) -o root -g bin -m 0644 config/diald.defs $(DESTDIR)$(datadir)/diald/diald.defs
 	$(INSTALL) -o root -g bin -m 0644 config/standard.filter $(DESTDIR)$(datadir)/diald/standard.filter
 	$(INSTALL) -d -m 0755 $(DESTDIR)$(sysconfdir)/pam.d
