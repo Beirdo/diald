@@ -70,6 +70,7 @@ int two_way = 0;
 int give_way = 0;
 int do_reroute = UNSAFE_ROUTING;
 int proxyarp = 0;
+int demasq = 0;
 int route_wait = 0;
 
 int connect_timeout = 60;
@@ -141,6 +142,7 @@ struct {
     {"addroute","<script>",1,&addroute,set_str},
     {"delroute","<script>",1,&delroute,set_str},
     {"proxyarp","",0,&proxyarp,set_flag},
+    {"demasq","",0,&demasq,set_flag},
     {"ip-up","<script>",1,&ip_up,set_str},
     {"ip-down","<script>",1,&ip_down,set_str},
     {"reroute","",0,&do_reroute,set_flag},
@@ -258,6 +260,7 @@ void init_vars()
     two_way = 0;
     do_reroute = UNSAFE_ROUTING;
     proxyarp = 0;
+    demasq = 0;
     route_wait = 0;
     connect_timeout = 60;
     disconnect_timeout = 60;

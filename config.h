@@ -34,6 +34,19 @@
 	(ACCESS_CONTROL | ACCESS_MONITOR | ACCESS_MESSAGE \
 	| ACCESS_UP | ACCESS_DOWN)
 
+/* The PORT_MASQ_BEGIN and PORT_MASQ_END defines specify the range
+ * of ports which may be used by the kernel masquerade code under Linux.
+ * Some sites that need to masquerade many connections at once may have
+ * increased this range. If so you should change the defines here. For a
+ * truely general diald you should leave both undefined but this adds some
+ * usually unnecessary overhead.
+ *  N.B. The demasquerading needs to be enabled using the "demasq" option.
+ * FIXME: This probably isn't a big killer unless you have lots of
+ * short lived connections?
+ */
+#define PORT_MASQ_BEGIN	61000
+#define PORT_MASQ_END	(PORT_MASQ_BEGIN + 4096)
+
 
 /*****************************************************************************
  * EVERYTHING BELOW HERE IS RUN TIME CONFIGURABLE

@@ -152,37 +152,135 @@ static unsigned int slot_end_timeout(FW_Timeslot *slot, time_t *clock)
     	return maxtime;
 }
 
+#ifdef __linux__
+/* Demasquerade an address. */
+static void
+demasquerade(int proto,
+	struct in_addr *saddr, int *sport,
+	struct in_addr *daddr, int *dport)
+{
+    struct in_addr *addr = NULL;
+    int *port = NULL;
+    FILE *fd;
+    int plen;
+    char protoname[8], pname[16], line[256];
+
+    /* If we are using an AF_PACKET socket then we know the source
+     * address is the first. If not all we know is that the first
+     * address is the numerically smaller.
+     *   Remember: only _one_ end of the link can be masqueraded
+     * by this system...
+     */
+
+    if (saddr->s_addr == local_addr
+#ifdef PORT_MASQ_BEGIN
+    && *sport >= PORT_MASQ_BEGIN
+#endif
+#ifdef PORT_MASQ_END
+    && *sport <= PORT_MASQ_END
+#endif
+    ) {
+	addr = saddr;
+	port = sport;
+    }
+
+    if (!addr
+#ifdef HAVE_AF_PACKET
+    && !af_packet &&
+#endif
+    (daddr->s_addr == local_addr
+#ifdef PORT_MASQ_BEGIN
+    && *dport >= PORT_MASQ_BEGIN
+#endif
+#ifdef PORT_MASQ_END
+    && *dport <= PORT_MASQ_END
+#endif
+    )) {
+	addr = daddr;
+	port = dport;
+    }
+
+    if (!addr)
+	return;
+
+    if (!(fd = fopen("/proc/net/ip_masquerade", "r")))
+	return;
+
+    /* This matches what the kernel masquerade code says... */
+    switch (proto) {
+	case IPPROTO_UDP:
+	    strcpy(protoname, "UDP"); break;
+	case IPPROTO_TCP:
+	    strcpy(protoname, "TCP"); break;
+	case IPPROTO_ICMP:
+	    strcpy(protoname, "ICMP"); break;
+	default:
+	    sprintf(protoname, "IP_%d", proto); break;
+    }
+    plen = strlen(protoname);
+
+    sprintf(pname, "%04X", *port);
+
+    while (fgets(line, sizeof(line), fd)) {
+	if (strncmp(line, protoname, plen))
+	    continue;
+
+	if (!strncmp(line+plen+29, pname, 4)) {
+	    addr->s_addr = htonl(strtoul(line+plen+1, NULL, 16));
+	    *port = strtoul(line+plen+10, NULL, 16);
+	    break;
+	}
+    }
+    fclose(fd);
+}
+#endif
+
 /* Generate a connection description */
 static char *
 desc_connection(FW_Connection *c)
 {
-    struct in_addr addr;
-    char saddr[20], daddr[20];
+    struct in_addr saddr, daddr;
     int sport, dport;
+    char sad_text[20], dad_text[20];
     char *pent;
     char proto[20];
     char *buf;
 
-    addr.s_addr = c->id.id[1] + (c->id.id[2]<<8)
-		+ (c->id.id[3]<<16) + (c->id.id[4]<<24);
-    strcpy(saddr,inet_ntoa(addr));
+    /* The packet has network byte order, we want to preserve it
+     * in the address regardless of the host ordering.
+     */
+    saddr.s_addr = htonl((c->id.id[1] << 24)
+			+ (c->id.id[2] << 16)
+			+ (c->id.id[3] << 8)
+			+ (c->id.id[4]));
     sport = c->id.id[10]+(c->id.id[9]<<8);
-
-    addr.s_addr = c->id.id[5] + (c->id.id[6]<<8)
-		+ (c->id.id[7]<<16) + (c->id.id[8]<<24);
-    strcpy(daddr,inet_ntoa(addr));
+    daddr.s_addr = htonl((c->id.id[5] << 24)
+			+ (c->id.id[6] << 16)
+			+ (c->id.id[7] << 8)
+			+ (c->id.id[8]));
     dport = c->id.id[12]+(c->id.id[11]<<8);
 
+#if defined(__linux__)
+    if (demasq)
+	demasquerade(c->id.id[0], &saddr, &sport, &daddr, &dport);
+#endif
+
+    strcpy(sad_text, inet_ntoa(saddr));
+    strcpy(dad_text, inet_ntoa(daddr));
+
     pent = getprotonumber(c->id.id[0]);
-    if (pent)
-	strcpy(proto,pent);
-    else
-	sprintf(proto,"%d",c->id.id[0]);
+    if (pent) {
+	strncpy(proto, pent, sizeof(proto)-1);
+	proto[sizeof(proto)-1] = '\0';
+    } else {
+	sprintf(proto, "%d", c->id.id[0]);
+    }
 
     buf = malloc(64);
     if (buf) {
-	sprintf(buf, "%-4s  %15s/%-5d  %15s/%-5d",
-		proto, saddr, sport, daddr, dport);
+	snprintf(buf, 64-1, "%-4s  %15s/%-5d  %15s/%-5d",
+		proto, sad_text, sport, dad_text, dport);
+	buf[64-1] = '\0';
     }
 
     return buf;

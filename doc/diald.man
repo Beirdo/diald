@@ -696,6 +696,14 @@ Tell diald to add an entry to this system's ARP [Address Resolution Protocol]
 table with the IP address of the remote system, and the Ethernet address
 of this system.
 .TP
+.B demasq
+Tell diald that packets across this link may be being masqueraded
+by the kernel. If diald sees a packet whose port is in the range
+normally used by the kernel masquerading (61000 - 61000+4096)
+diald will attempt to look up the real source in /proc/net/ip_masquerade
+and show this as the source in the connection queue shown to
+monitors.
+.TP
 .B addroute \fI<script-name>\fR
 The designated script or executable
 is called by \fBdiald\fR once it has established

@@ -121,3 +121,36 @@ Need to sort out keyboard accelerators and shortcuts on dctrl's menus.
 When building the description string for a connection we should optionally
 unmasquerade (using /proc/net/ip_masquerade) and convert addresses
 to textual names.
+-- Demasquerading is done (controlled by the demasq option).
+   Note that this demasq's *only* as far as the description in
+   the connection queue given to monitors is concerned. It would
+   also be nice to have a way of demasq'ing before feeding the
+   address through the firewall rules. That would mean demasqing
+   every packet though...
+
+It would be nice for dctrl to have some obvious display of how
+long the link has been up somewhere.
+
+The port numbers really should be separated from the IP addresses
+by colons rather than slashes in the packet queue list. However
+diald-top has some excessively strict parsing and changing this
+would break it. One day I will. I may send a patch to diald-top
+before then if I get round to it. I may not...
+
+If we come up on an incoming request and the requested device
+name does not start with '/' we should assume it is an interface
+name and handle it as for mode = dev regardless of the configured
+mode setting. This should allow for things like laptops which
+may have a PC-Card (aka PCMCIA) interface inserted while in the
+office/home but be required to make *out*-going connections
+via dial up ppp or slip. It may also enable us to have a diald
+attach itself to an arbitrary interface and act as a traffic
+monitor on it. (We also need a way to have a diald release a
+link without downing it first)
+
+There should be an on-demand option that determines whether
+the link is brought up on demand. The block option should
+block *all* dial attempts - manual included.
+
+Is it possible to run with no timeout for the connect script and
+let the connect script handle everything?
