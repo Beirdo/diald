@@ -163,8 +163,6 @@ int dev_set_addrs()
 
 int dev_dead()
 {
-    if (dead)
-	dev_reroute();
     return (dead);
 }
 

@@ -237,8 +237,6 @@ int ppp_set_addrs()
 
 int ppp_dead()
 {
-    if (link_pid == 0)
-	ppp_reroute();
     return (link_pid == 0);
 }
 

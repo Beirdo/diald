@@ -264,8 +264,6 @@ int slip_set_addrs()
 
 int slip_dead()
 {
-    if (dead)
-	slip_reroute();
     return (dead);
 }
 
