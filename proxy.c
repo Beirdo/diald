@@ -74,6 +74,9 @@ proxy_init(proxy_t *proxy, char *proxydev)
 	proxy->close = NULL;
 	proxy->release = NULL;
 
+	if (!strcmp(proxydev, "none"))
+		return 0;
+
 	if (proxydev)
 		return proxy_dev_init(proxy, proxydev);
 

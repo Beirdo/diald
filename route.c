@@ -35,34 +35,45 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
      * duplicate routes. But if the metric is non-zero we can,
      * and should, get rid of the original zero metric route.
      */
-    if (path_ip) {
-	sprintf(buf,"%s route add %s dev %s%d scope link src %s metric %d %s",
-	    path_ip, rip, iftype, ifunit, lip, metric, win); 
-    } else {
-	sprintf(buf,"%s add %s metric %d %s dev %s%d",
-	    path_route, rip, metric, win, iftype, ifunit); 
-    }
-    res = system(buf);
-    report_system_result(res, buf);
-
-    if (metric) {
+    if (rip) {
 	if (path_ip) {
-	    sprintf(buf,"%s route del %s dev %s%d scope link src %s metric 0 %s",
-		path_ip, rip, iftype, ifunit, lip, win); 
+	    sprintf(buf,"%s route add %s dev %s%d scope link%s%s metric %d %s",
+		path_ip, rip, iftype, ifunit,
+		lip ? " src " : "",
+		lip ? lip : "",
+		metric, win); 
 	} else {
-	    sprintf(buf,"%s del %s metric 0 %s dev %s%d",
-		path_route, rip, win, iftype, ifunit); 
+	    sprintf(buf,"%s add %s metric %d %s dev %s%d",
+		path_route, rip, metric, win, iftype, ifunit); 
 	}
 	res = system(buf);
 	report_system_result(res, buf);
-    }
+
+	if (metric) {
+	    if (path_ip) {
+		sprintf(buf,"%s route del %s dev %s%d scope link%s%s metric 0 %s",
+		    path_ip, rip, iftype, ifunit,
+		    lip ? " src " : "",
+		    lip ? lip : "",
+		    win); 
+	    } else {
+		sprintf(buf,"%s del %s metric 0 %s dev %s%d",
+		    path_route, rip, win, iftype, ifunit); 
+	    }
+	    res = system(buf);
+	    report_system_result(res, buf);
+	}
 #endif
+    }
 
     /* Add in a default route for the link if required. */
     if (default_route) {
 	if (path_ip) {
-	    sprintf(buf, "%s route add default dev %s%d scope link src %s metric %d %s",
-		path_ip, iftype, ifunit, lip, metric, win); 
+	    sprintf(buf, "%s route add default dev %s%d scope link%s%s metric %d %s",
+		path_ip, iftype, ifunit,
+		lip ? " src " : "",
+		lip ? lip : "",
+		metric, win); 
 	} else {
 	    sprintf(buf,"%s add default metric %d %s netmask 0.0.0.0 dev %s%d",
 		path_route, metric, win, iftype, ifunit);
@@ -73,7 +84,7 @@ add_routes(char *iftype, int ifunit, char *lip, char *rip)
 
     /* call addroute script */
     if (addroute) {
-        sprintf(buf,"%s %s%d %s %s %s %d %d",
+        sprintf(buf,"%s %s%d %s \"%s\" \"%s\" %d %d",
 	    addroute, iftype, ifunit, (netmask)?netmask:"default",
 	    lip, rip, metric, window);
 	res = system(buf);
@@ -97,7 +108,7 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 
     if (delroute) {
 	/* call delroute <iface> <netmask> <local> <remote> */
-        sprintf(buf, "%s %s%d %s %s %s %d",
+        sprintf(buf, "%s %s%d %s \"%s\" \"%s\" %d",
 	    delroute, iftype, ifunit,
 	    (netmask) ? netmask : "default",
 	    lip, rip, metric);
@@ -107,8 +118,11 @@ del_routes(char *iftype, int ifunit, char *lip, char *rip)
 
     if (default_route) {
 	if (path_ip) {
-	    sprintf(buf, "%s route del default dev %s%d scope link src %s metric %d",
-		path_ip, iftype, ifunit, lip, metric); 
+	    sprintf(buf, "%s route del default dev %s%d scope link%s%s metric %d",
+		path_ip, iftype, ifunit,
+		lip ? " src " : "",
+		lip ? lip : "",
+		metric); 
 	} else {
 	    sprintf(buf, "%s del default metric %d netmask 0.0.0.0 dev %s%d",
 		path_route, metric, iftype, ifunit);
@@ -125,12 +139,16 @@ iface_start(char *iftype, int ifunit, char *lip, char *rip)
     char buf[128];
 
     /* mark the interface as up */
-    sprintf(buf,"%s %s%d %s pointopoint %s netmask %s metric %d mtu %d up",
-	path_ifconfig, iftype, ifunit, lip, rip,
-	netmask ? netmask : "255.255.255.255",
-	metric, mtu);
-    res = system(buf);
-    report_system_result(res,buf);
+    if (lip) {
+	sprintf(buf,"%s %s%d %s%s%s netmask %s metric %d mtu %d up",
+	    path_ifconfig, iftype, ifunit, lip,
+	    rip ? " pointopoint " : "",
+	    rip ? rip : "",
+	    netmask ? netmask : "255.255.255.255",
+	    metric, mtu);
+	res = system(buf);
+	report_system_result(res,buf);
+    }
 
     add_routes(iftype, ifunit, lip, rip);
 

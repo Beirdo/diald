@@ -90,8 +90,8 @@ void do_config(void)
     /* Do validity checks on the setup */
     check_setup();
 
-    orig_local_ip = strdup(local_ip);
-    orig_remote_ip = strdup(remote_ip);
+    orig_local_ip = (local_ip ? strdup(local_ip) : NULL);
+    orig_remote_ip = (remote_ip ? strdup(remote_ip) : NULL);
 
     if (initializer) {
         int res;

@@ -760,16 +760,14 @@ void check_setup()
 	flag = 1, mon_syslog(LOG_ERR,"No ifconfig program found.");
     if (!path_ip && !path_route)
 	flag = 1, mon_syslog(LOG_ERR,"No ip or route programs found.");
-    if (!remote_ip)
-	flag = 1, mon_syslog(LOG_ERR,"You must define the remote ip address.");
-    else if (inet_addr(remote_ip) == -1)
+    else if (remote_ip && inet_addr(remote_ip) == -1)
 	flag = 1, mon_syslog(LOG_ERR,"Bad remote ip address specification.");
-    if (!local_ip)
-	flag = 1, mon_syslog(LOG_ERR,"You must define the local ip address.");
-    else if (inet_addr(local_ip) == -1)
-	flag = 1, mon_syslog(LOG_ERR,"Bad local ip address specification.");
-    else
-    	local_addr = inet_addr(local_ip);
+    else if (local_ip) {
+	if (inet_addr(local_ip) == -1)
+	    flag = 1, mon_syslog(LOG_ERR,"Bad local ip address specification.");
+	else
+    	    local_addr = inet_addr(local_ip);
+    }
 
     if (acctlog) {
 	if ((acctfp = fopen(acctlog,"a")) == NULL)
